@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Builds the engine files that live in the Unity project, so the simulator and the game
+       compile the same source. netstandard2.1 + C# 9 is what Unity supports. -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <RootNamespace>ShatteredPantheon.Battle</RootNamespace>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../Unity/Assets/BattleCore/**/*.cs" />
+  </ItemGroup>
+</Project>

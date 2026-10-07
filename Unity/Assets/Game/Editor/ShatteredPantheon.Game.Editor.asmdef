@@ -1,0 +1,18 @@
+{
+    "name": "ShatteredPantheon.Game.Editor",
+    "rootNamespace": "ShatteredPantheon.Game.Editor",
+    "references": [
+        "ShatteredPantheon.Game"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

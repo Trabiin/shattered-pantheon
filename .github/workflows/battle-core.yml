@@ -1,0 +1,26 @@
+name: Battle core
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  parity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Build the battle core and simulator
+        run: dotnet build tools/BattleSim -c Release
+      - name: C# and JavaScript engines give identical fights
+        run: |
+          node sim-js/parity.js 1000 > js.txt
+          dotnet tools/BattleSim/bin/Release/net8.0/BattleSim.dll --parity 1000 > cs.txt
+          cmp js.txt cs.txt
+          echo "$(wc -l < cs.txt) fights identical"

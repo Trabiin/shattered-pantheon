@@ -1,0 +1,14 @@
+[
+ {"id":"raider","name":"Ashfang Raider","faction":"Wild","type":"Verdant","role":"Warrior","hp":850,"atk":95,"def":25,"spd":90},
+ {"id":"howler","name":"Ashfang Howler","faction":"Wild","type":"Storm","role":"Caster","hp":600,"atk":80,"def":15,"spd":95,
+  "skill":{"name":"Howl","cd":3,"actions":[{"target":"allEnemies","effect":"damage","mult":0.6}]}},
+ {"id":"knight","name":"Drowned Knight","faction":"Sea","type":"Tide","role":"Tank","hp":1100,"atk":105,"def":50,"spd":80,
+  "skill":{"name":"Barnacle Plate","cd":3,"actions":[{"target":"self","effect":"shield","value":250}]}},
+ {"id":"archer","name":"Chapel Archer","faction":"Sea","type":"Tide","role":"Ranger","hp":600,"atk":150,"def":15,"spd":105,"backline":true},
+ {"id":"priest","name":"Tide Priest","faction":"Sea","type":"Tide","role":"Support","hp":750,"atk":75,"def":20,"spd":95,
+  "skill":{"name":"Brine Mending","cd":3,"actions":[{"target":"lowestAlly","effect":"heal","mult":1.8}]}},
+ {"id":"saint","name":"The Hollow Saint","faction":"Night","type":"Umbral","role":"Boss","hp":6500,"atk":150,"def":40,"spd":90,"boss":true,
+  "skill":{"name":"Mending Rite","cd":3,"actions":[{"target":"self","effect":"channel","healMaxHp":0.2}]},
+  "ult":{"name":"Eclipse","actions":[{"target":"backRow","effect":"damage","mult":1.8}]}},
+ {"id":"acolyte","name":"Hollow Acolyte","faction":"Night","type":"Umbral","role":"Warrior","hp":850,"atk":115,"def":25,"spd":90}
+]

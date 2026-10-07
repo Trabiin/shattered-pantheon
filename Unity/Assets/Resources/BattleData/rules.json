@@ -1,0 +1,101 @@
+{
+  "secondsPerActionAt1x": 1.0,
+  "maxActions": 900,
+  "critChance": 0.15,
+  "critMultiplier": 1.5,
+  "damageSpread": 0.05,
+  "energyPerAction": 25,
+  "energyWhenHit": 8,
+  "factionAdvantage": 0.15,
+  "typeStrong": 0.3,
+  "typeResisted": 0.3,
+  "matchupClamp": [
+    0.6,
+    1.5
+  ],
+  "factionWheel": {
+    "Sun": "Night",
+    "Night": "Wild",
+    "Wild": "Sea",
+    "Sea": "Forge",
+    "Forge": "Sun"
+  },
+  "typeChart": {
+    "Flame": {
+      "strong": [
+        "Verdant"
+      ],
+      "resistedBy": [
+        "Tide"
+      ]
+    },
+    "Verdant": {
+      "strong": [
+        "Stone"
+      ],
+      "resistedBy": [
+        "Flame"
+      ]
+    },
+    "Stone": {
+      "strong": [
+        "Storm"
+      ],
+      "resistedBy": [
+        "Verdant"
+      ]
+    },
+    "Storm": {
+      "strong": [
+        "Tide"
+      ],
+      "resistedBy": [
+        "Stone"
+      ]
+    },
+    "Tide": {
+      "strong": [
+        "Flame"
+      ],
+      "resistedBy": [
+        "Storm"
+      ]
+    },
+    "Radiant": {
+      "strong": [
+        "Umbral"
+      ],
+      "resistedBy": []
+    },
+    "Umbral": {
+      "strong": [
+        "Radiant"
+      ],
+      "resistedBy": []
+    }
+  },
+  "difficultyTargetsSeconds": {
+    "easy": [
+      0,
+      60
+    ],
+    "normal": [
+      60,
+      180
+    ],
+    "hard": [
+      60,
+      180
+    ],
+    "nightmare": [
+      300,
+      900
+    ]
+  },
+  "reliableWinShareMax": {
+    "easy": 1.0,
+    "normal": 0.9,
+    "hard": 0.5,
+    "nightmare": 0.2
+  }
+}
