@@ -47,7 +47,8 @@ static class Program
         var cards = Cards(cfg, data);
 
         if (args.ContainsKey("check")) { Check(cfg, data, cards); return 0; }
-        if (args.ContainsKey("probe")) { Probe(cfg, data, args["probe"]); return 0; }
+        if (args.ContainsKey("lift")) { foreach (var kv in KitLift(cfg, data).OrderByDescending(x => x.Value)) Console.WriteLine($"{kv.Key,-10} {kv.Value:0.00}"); return 0; }
+        if (args.ContainsKey("probe")) { Probe(cfg, data, args["probe"], args.TryGetValue("team", out var tm) && tm != null ? tm.Split(',').ToList() : null); return 0; }
 
         int days = int.Parse(Arg("days", "365")), seeds = int.Parse(Arg("seeds", "6"));
         var jobs = (from t in cfg.Times from s in cfg.Spends from k in Enumerable.Range(0, seeds) select (t, s, k)).ToList();
@@ -78,6 +79,7 @@ static class Program
     // one of the test kits; kits are dealt out in turn so each kit appears at several rarities.
     static List<HeroCard> Cards(Cfg c, GameData data)
     {
+        var lift = KitLift(c, data);
         var list = new List<HeroCard>();
         int next = 0;
         void Make(string rarity, int day)
@@ -87,7 +89,7 @@ static class Program
             {
                 Id = $"{h.Id}-{rarity.ToLowerInvariant()}-{list.Count}", Kit = h.Id, Rarity = rarity, ReleaseDay = day,
                 Name = $"{h.Name} ({rarity})", Faction = h.Faction, Role = h.Role,
-                KitPower = Math.Sqrt(h.Stats.Get("hp") * h.Stats.Get("atk")),
+                KitPower = lift[h.Id],
             });
         }
         foreach (var r in new[] { c.StarterRarity }.Concat(c.Rarities.Where(x => x != c.StarterRarity)))
@@ -97,8 +99,31 @@ static class Program
         return list;
     }
 
+    // How much each kit lifts a team's win rate across the campaign: random teams at the recommended
+    // power on a spread of battles, win rate with the kit divided by the overall win rate. Simulated
+    // players pick their teams by this times hero growth, the way a real player learns who's good.
+    static Dictionary<string, double> KitLift(Cfg c, GameData data)
+    {
+        var rng = new Random(23);
+        var with = data.Heroes.ToDictionary(h => h.Id, _ => 0.0);
+        var seen = data.Heroes.ToDictionary(h => h.Id, _ => 0.0);
+        int wins = 0, n = 3000;
+        for (int i = 0; i < n; i++)
+        {
+            int d = rng.Next(c.Difficulties.Count), k = rng.Next(c.BattlesPerDifficulty);
+            var ids = data.Heroes.OrderBy(_ => rng.Next()).Take(5).Select(h => h.Id).ToList();
+            var team = Formation.AutoPlace(data, ids);
+            foreach (var s in team) s.HpScale = s.AtkScale = c.RecScale(d, k);
+            bool win = Battle.Run(data, team, Cfg.StageId(d, k), i + 1).Result == "win";
+            if (win) wins++;
+            foreach (var id in ids) { seen[id]++; if (win) with[id]++; }
+        }
+        double overall = (double)wins / n;
+        return data.Heroes.ToDictionary(h => h.Id, h => with[h.Id] / Math.Max(1, seen[h.Id]) / overall);
+    }
+
     // Win rate of random teams on one battle at 90 to 120% of its recommended power, e.g. --probe c3-167.
-    static void Probe(Cfg c, GameData data, string id)
+    static void Probe(Cfg c, GameData data, string id, List<string> fixedTeam = null)
     {
         var parts = id.Substring(1).Split('-');
         int d = int.Parse(parts[0]), k = int.Parse(parts[1]);
@@ -108,12 +133,12 @@ static class Program
             int wins = 0, n = 200;
             for (int i = 0; i < n; i++)
             {
-                var ids = data.Heroes.OrderBy(_ => rng.Next()).Take(5).Select(h => h.Id).ToList();
+                var ids = fixedTeam ?? data.Heroes.OrderBy(_ => rng.Next()).Take(5).Select(h => h.Id).ToList();
                 var team = Formation.AutoPlace(data, ids);
                 foreach (var s in team) s.HpScale = s.AtkScale = c.RecScale(d, k) * m;
                 if (Battle.Run(data, team, id, i + 1).Result == "win") wins++;
             }
-            Console.WriteLine($"{id} at {m * 100:0}% of recommended power: random teams win {100 * wins / n}%");
+            Console.WriteLine($"{id} at {m * 100:0}% of recommended power: {(fixedTeam == null ? "random teams" : string.Join(",", fixedTeam))} win {100 * wins / n}%");
         }
     }
 

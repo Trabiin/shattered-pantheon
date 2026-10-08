@@ -9,7 +9,7 @@ using ShatteredPantheon.Battle;
 class HeroCard
 {
     public string Id, Kit, Name, Rarity, Faction, Role;
-    public double KitPower;   // sqrt(health x attack) of the kit, so heroes compare across roles
+    public double KitPower;   // how much the kit lifts a team's win rate (1 = average), measured once by simulation
     public int ReleaseDay;    // 0 = in the launch roster
 }
 
@@ -304,7 +304,8 @@ class Player
     // ---------- Team ----------
 
     double HeroScale(Owned o) => C.Scale(o.Card.Rarity, o.Level, o.Stars, o.Gear, o.Skill);
-    double Power(Owned o) => HeroScale(o) * o.Card.KitPower;
+    // Kit strength counts for a lot: an average kit needs about 15% more growth to match a strong one.
+    double Power(Owned o) => HeroScale(o) * Math.Pow(o.Card.KitPower, 2);
     double TeamScale(List<Owned> team) => team.Count == 0 ? 0 : team.Average(HeroScale) * Math.Min(1, team.Count / 5.0);
 
     // The strongest 5 heroes with different kits, nudged toward heroes whose type does well against
@@ -319,17 +320,20 @@ class Player
             double takes = enemies.Average(e => ShatteredPantheon.Battle.Battle.TypeMultiplier(data.Rules, e.Type, data.Hero(o.Card.Kit).Type));
             return p * deals / Math.Sqrt(takes);
         }
+        // A tank and a healer first when there's a decent one: without them most line-ups lose
+        // badly at equal power (a team of five Warriors wins about 1 fight in 10 that a balanced team wins).
+        var ranked = Roster.Values.OrderByDescending(Score).ToList();
         var team = new List<Owned>();
-        foreach (var o in Roster.Values.OrderByDescending(Score))
+        double top = ranked.Count > 0 ? Score(ranked[0]) : 0;
+        foreach (var role in new[] { "Tank", "Support" })
         {
-            if (team.Any(t => t.Card.Kit == o.Card.Kit)) continue;
-            team.Add(o);
-            if (team.Count == 5) break;
+            var o = ranked.FirstOrDefault(h => h.Card.Role == role && team.All(t => t.Card.Kit != h.Card.Kit));
+            if (o != null && Score(o) >= top * 0.7) team.Add(o);
         }
-        if (team.Count == 5 && !team.Any(t => t.Card.Role == "Tank" || t.Card.Role == "Warrior"))
+        foreach (var o in ranked)
         {
-            var front = Roster.Values.Where(o => (o.Card.Role == "Tank" || o.Card.Role == "Warrior") && team.All(t => t.Card.Kit != o.Card.Kit)).OrderByDescending(Power).FirstOrDefault();
-            if (front != null) { team.RemoveAt(4); team.Add(front); }
+            if (team.Count == 5) break;
+            if (team.All(t => t.Card.Kit != o.Card.Kit)) team.Add(o);
         }
         return team;
     }
@@ -337,7 +341,7 @@ class Player
     readonly Dictionary<(int, int), int> lossesHere = new Dictionary<(int, int), int>();
 
     // A different line-up after a loss: any 5 kits whose best hero is close to the strongest ones,
-    // keeping at least one front-liner. Players rearrange and try counters before grinding (doc 10).
+    // keeping a tank and a healer when the pool has them. Players rearrange and try counters before grinding (doc 10).
     List<Owned> VariantTeam(List<UnitDef> enemies, int variant)
     {
         var best = BestTeam(enemies);
@@ -349,7 +353,8 @@ class Player
         for (int tries = 0; tries < 20; tries++)
         {
             var team = pool.OrderBy(_ => r.Next()).Take(5).ToList();
-            if (team.Any(t => t.Card.Role == "Tank" || t.Card.Role == "Warrior")) return team;
+            bool Has(string role) => team.Any(t => t.Card.Role == role) || pool.All(t => t.Card.Role != role);
+            if (Has("Tank") && Has("Support")) return team;
         }
         return best;
     }
