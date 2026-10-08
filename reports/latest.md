@@ -1,6 +1,6 @@
 # Battle Balance Report
 
-*Generated 2026-10-07 13:50 UTC by `node sim.js`. 400 random 5-hero teams × 12 fights per stage, auto-placed (tanks and melee in front). Fight length assumes 1s per action at 1x.*
+*Generated 2026-10-08 09:58 UTC by `dotnet run --project tools/BattleSim`. 400 random 5-hero teams × 12 fights per stage, auto-placed (tanks and melee in front). Fight length assumes 1s per action at 1x.*
 
 ## The Ash Road (easy)
 
