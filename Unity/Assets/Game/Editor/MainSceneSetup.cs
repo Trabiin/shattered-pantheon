@@ -1,5 +1,5 @@
-// Creates the battle scene the first time the project is opened, adds it to the build,
-// and sets the phone to portrait. Also available from the menu: Shattered Pantheon > Rebuild Battle Scene.
+// Creates the game's scene the first time the project is opened, adds it to the build,
+// and sets the phone to portrait. Also available from the menu: Shattered Pantheon > Rebuild Main Scene.
 using System.IO;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -8,11 +8,11 @@ using UnityEngine;
 namespace ShatteredPantheon.Game.Editor
 {
     [InitializeOnLoad]
-    public static class BattleSceneSetup
+    public static class MainSceneSetup
     {
-        const string ScenePath = "Assets/Scenes/Battle.unity";
+        const string ScenePath = "Assets/Scenes/Main.unity";
 
-        static BattleSceneSetup()
+        static MainSceneSetup()
         {
             EditorApplication.delayCall += () =>
             {
@@ -20,7 +20,7 @@ namespace ShatteredPantheon.Game.Editor
             };
         }
 
-        [MenuItem("Shattered Pantheon/Rebuild Battle Scene")]
+        [MenuItem("Shattered Pantheon/Rebuild Main Scene")]
         public static void CreateScene()
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode) return;
@@ -32,7 +32,7 @@ namespace ShatteredPantheon.Game.Editor
                 cam.clearFlags = CameraClearFlags.SolidColor;
                 cam.backgroundColor = new Color(0.08f, 0.07f, 0.1f);
             }
-            new GameObject("Battle Screen").AddComponent<BattleScreen>();
+            new GameObject("Game").AddComponent<GameApp>();
             EditorSceneManager.SaveScene(scene, ScenePath);
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
 
@@ -40,7 +40,7 @@ namespace ShatteredPantheon.Game.Editor
             PlayerSettings.productName = "Shattered Pantheon";
             PlayerSettings.defaultInterfaceOrientation = UIOrientation.Portrait;
             AssetDatabase.SaveAssets();
-            Debug.Log("Shattered Pantheon: created " + ScenePath + ". Press Play to watch a fight.");
+            Debug.Log("Shattered Pantheon: created " + ScenePath + ". Press Play to start.");
         }
     }
 }

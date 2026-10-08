@@ -1,8 +1,10 @@
-// Plays the battle screen on fake Unity (FakeUnity.cs): every stage to the end, a restart in
-// the middle of a fight, the speed button, and the results screen. Fails on any exception the
-// screen throws, on a fight that differs from the engine run directly, or on leaked objects.
+// Plays the game's screens on fake Unity (FakeUnity.cs) the way a player would: stage select,
+// team and formation editing, fights on every stage, retreating mid-fight, results, retry.
+// Fails on any exception a screen throws, on a fight that differs from the engine run directly,
+// on screens or animations left behind, or on a team that isn't what the player picked.
 //   dotnet run --project tools/ScreenSmokeTest
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -14,6 +16,7 @@ using UnityEngine.UI;
 static class Program
 {
     static int failures;
+    static GameApp app;
 
     static int Main()
     {
@@ -21,67 +24,133 @@ static class Program
         UnityEngine.Resources.Root = Path.Combine(root, "Unity", "Assets", "Resources");
         var data = GameData.LoadDirectory(Path.Combine(UnityEngine.Resources.Root, "BattleData"));
 
-        var screen = new GameObject("Battle Screen").AddComponent<BattleScreen>();
-        Call(screen, "Start");
-        Expect(Scheduler.Errors.Count == 0, "screen starts without errors");
+        app = new GameObject("Game").AddComponent<GameApp>();
+        Call(app, "Start");
+        Expect(Current is StageSelectView, "game opens on stage select");
+        Expect(data.Stages.All(s => Find("Stage: " + s.Id) != null), "every stage is listed");
 
-        // Restart part-way through a fight, while popups and card animations are running.
+        // Team editing on the first stage.
+        var first = data.Stages[0];
+        Click("Stage: " + first.Id);
+        Expect(Current is TeamView, "tapping a stage opens the team screen");
+        Expect(Team().Count == 5, "a default team of 5 is ready");
+        Click("Clear Button");
+        Expect(Team().Count == 0, "Clear empties the team");
+        Click("Fight! Button");
+        Expect(Current is TeamView, "can't start a fight with no heroes");
+        Click("Auto Button");
+        Expect(Team().Count == 5, "Auto fills the default team");
+        Click("Slot: back2"); Click("Slot: back2");
+        Expect(Team().Count == 4 && Team().All(t => t.Slot != "back2"), "tapping a selected slot empties it");
+        Click("Hero: ysolde");
+        Expect(Has("ysolde", "back2"), "tapping a hero puts them in the selected slot");
+        string frontHero = Team().First(t => t.Slot == "front0").Id;
+        Click("Hero: " + frontHero);
+        Expect(Has(frontHero, "back2") && Has("ysolde", "front0"), "tapping a hero already in the team swaps them into the selected slot");
+        var picked = Team();
+        Click("Formation Button");
+        Expect(((TeamView)Current).Formation == "3-2" && Team().Count == 5 && Team().Count(t => t.Row == "front") == 3, "the formation button switches to 3-2 and keeps all five heroes");
+        Click("Formation Button");
+        Expect(((TeamView)Current).Formation == "2-3" && TeamSet(Team()) == TeamSet(picked), "switching back to 2-3 restores the same placement");
+        Expect(Scheduler.Errors.Count == 0, "team editing throws nothing");
+
+        // Fight with that team, then check results.
+        Click("Fight! Button");
+        Expect(Current is BattleView, "Fight! opens the battle");
+        CheckFight(data, first, picked);
+
+        // Retry, and retreat part-way through fights while popups and animations are running.
+        Click("Retry Button");
         foreach (float wait in new[] { 0.65f, 1.1f, 1.62f, 2.05f, 3.3f, 4.31f })
         {
+            Expect(Current is BattleView, "battle running before retreat");
             RunFor(wait);
-            Click("Restart");
+            Click("Retreat Button");
+            Expect(Current is TeamView, $"Retreat after {wait}s returns to the team screen");
+            Expect(TeamSet(Team()) == TeamSet(picked), "the team screen keeps the player's team after retreating");
+            Click("Fight! Button");
         }
-        Expect(Scheduler.Errors.Count == 0, "restarting mid-fight throws nothing");
+        Expect(Scheduler.Errors.Count == 0, "retreating mid-fight throws nothing");
+        Click("Speed Button"); Click("Speed Button");
+        Expect(Label(Find("Speed Button")) == "3x", "speed button cycles to 3x");
+        CheckFight(data, first, picked);
 
-        Click("1x"); Click("2x"); // to 3x
-        Expect(Label("1x Button") == "3x", "speed button cycles to 3x");
-
-        for (int s = 0; s < data.Stages.Count; s++)
+        // Every stage with its default team, via the stage list.
+        Click("Stages Button");
+        Expect(Current is StageSelectView, "Stages returns to stage select");
+        foreach (var stage in data.Stages.Skip(1))
         {
-            var stage = data.Stages[s];
-            float t = RunUntil(() => Active("Result"), 3600);
-            int seed = (int)Field(screen, "seed");
-            var direct = Battle.Run(data, Formation.AutoPlace(data, new[] { "hilde", "solenne", "thessaly", "maren", "pip" }), stage.Id, seed);
-            var shown = (Battle)Field(screen, "battle");
-            string title = ((Text)Field(screen, "resultTitle")).text;
-            Console.WriteLine($"{stage.Name}: \"{title}\" after {shown.Actions} actions ({t:0}s simulated at 3x)");
-            Expect(Active("Result"), $"{stage.Name}: results screen appears");
-            Expect(shown.Result == direct.Result && shown.Actions == direct.Actions, $"{stage.Name}: fight on screen matches the engine run directly ({direct.Result}, {direct.Actions} actions)");
-            Expect(title == (direct.Result == "win" ? "Victory" : direct.Result == "lose" ? "Defeat" : "Time's up"), $"{stage.Name}: result title is right");
-            Expect(((Text)Field(screen, "resultBody")).text.Contains("Fight length"), $"{stage.Name}: result details filled in");
-            RunFor(3);
-            int popups = LiveTexts() - BaselineTexts(shown);
-            Expect(popups == 0, $"{stage.Name}: damage numbers are cleaned up ({popups} left)");
-            Expect(Scheduler.Running == 0, $"{stage.Name}: no animations left running ({Scheduler.Running})");
-            Click(s == data.Stages.Count - 1 ? "Fight again" : "Next stage");
-            RunFor(0.5f);
-            Expect(!Active("Result"), $"{stage.Name}: results screen closes for the next fight");
+            Click("Stage: " + stage.Id);
+            Expect(TeamSet(Team()) == TeamSet(picked), $"{stage.Name}: opens with the last team used");
+            Click("Clear Button"); Click("Auto Button");
+            var team = Team();
+            Click("Fight! Button");
+            CheckFight(data, stage, team);
+            Click("Stages Button");
         }
+
+        // A fight in the 3-2 formation.
+        var wide = data.Stages.Last();
+        Click("Stage: " + wide.Id);
+        Click("Formation Button");
+        var three = Team();
+        Expect(three.Count(t => t.Row == "front") == 3, "3-2 puts three heroes in front");
+        Click("Fight! Button");
+        Expect(((BattleView)Current).Battle.HeroFormation == "3-2", "the fight uses the 3-2 formation");
+        CheckFight(data, wide, three);
+        Click("Change team Button");
+        Expect(((TeamView)Current).Formation == "3-2", "the team screen remembers the 3-2 formation");
+        Click("Stages Button".Replace("Stages", "Back"));
+
+        // The first stage remembers its own team; cleared stages are marked.
+        Click("Stage: " + first.Id);
+        Expect(Team().Select(t => t.Id + "@" + t.Slot).SequenceEqual(picked.Select(t => t.Id + "@" + t.Slot)), "a stage reopens with the team last used on it");
+        Click("Back Button");
+        Expect(Current is StageSelectView, "Back returns to stage select");
 
         foreach (var e in Scheduler.Errors.Distinct().Take(5)) Console.WriteLine("ERROR " + e);
-        Expect(Scheduler.Errors.Count == 0, "no errors during any fight");
+        Expect(Scheduler.Errors.Count == 0, "no errors on any screen");
         Console.WriteLine(failures == 0 ? "All screen checks passed." : $"{failures} screen check(s) failed.");
         return failures == 0 ? 0 : 1;
     }
 
+    static void CheckFight(GameData data, StageDef stage, List<TeamSlot> team)
+    {
+        var view = (BattleView)Current;
+        float t = RunUntil(() => Current is ResultsView, 3600);
+        var direct = Battle.Run(data, team, stage.Id, view.Seed, new BattleOptions { Formation = view.Battle.HeroFormation });
+        var shown = view.Battle;
+        var results = Current as ResultsView;
+        Console.WriteLine($"{stage.Name}: {results?.Title ?? "no results"} after {shown.Actions} actions ({t:0}s at {GameApp.Speeds[app.SpeedIndex]}x)");
+        Expect(results != null, $"{stage.Name}: results screen opens when the fight ends");
+        Expect(shown.Result == direct.Result && shown.Actions == direct.Actions, $"{stage.Name}: fight on screen matches the engine run directly ({direct.Result}, {direct.Actions} actions)");
+        Expect(TeamSet(shown.Units.Where(u => u.Side == "A").Select(u => new TeamSlot(u.Id, u.Row, u.Slot)).ToList()) == TeamSet(team), $"{stage.Name}: the fight used the picked team and formation");
+        Expect(results != null && results.Title == (direct.Result == "win" ? "Victory" : direct.Result == "lose" ? "Defeat" : "Time's up"), $"{stage.Name}: result title is right");
+        Expect(direct.Result != "win" || PlayerPrefs.GetInt("cleared." + stage.Id) == 1, $"{stage.Name}: a win marks the stage cleared");
+        Expect(direct.Heroes.All(h => Find("Row: " + h.Id) != null), $"{stage.Name}: every hero has a results row");
+        Expect(Scheduler.Running == 0, $"{stage.Name}: no animations left running ({Scheduler.Running})");
+        Expect(CanvasChildren() == 2, $"{stage.Name}: old screens are cleaned up ({CanvasChildren()} canvas children)");
+    }
+
     static void Expect(bool ok, string what) { if (!ok) failures++; Console.WriteLine((ok ? "  ok   " : "  FAIL ") + what); }
+
+    static object Current => Field(app, "current");
+    static List<TeamSlot> Team() => ((TeamView)Current).Team();
+    static bool Has(string id, string slot) => Team().Any(t => t.Id == id && t.Slot == slot);
+    static string TeamSet(List<TeamSlot> team) => string.Join(",", team.Select(t => t.Id + "@" + t.Row + "/" + t.Slot).OrderBy(x => x));
 
     static void RunFor(float seconds) { for (float t = 0; t < seconds; t += 1 / 60f) Scheduler.Frame(1 / 60f); }
     static float RunUntil(Func<bool> done, float limit) { float t = 0; while (!done() && t < limit) { Scheduler.Frame(1 / 60f); t += 1 / 60f; } return t; }
 
     static GameObject Find(string name) => UnityEngine.Object.All.OfType<GameObject>().LastOrDefault(g => g != null && g.name == name);
-    static bool Active(string name) { var g = Find(name); return g != null && g.activeSelf; }
-    static string Label(string buttonName) => Find(buttonName).transform.Cast<Transform>().Select(t => t.GetComponent<Text>()).First(t => t != null).text;
-    static void Click(string label)
+    static string Label(GameObject go) => go.transform.Cast<Transform>().Select(t => t.GetComponent<Text>()).First(t => t != null).text;
+    static void Click(string name)
     {
-        var go = Find(label + " Button") ?? UnityEngine.Object.All.OfType<GameObject>().LastOrDefault(g => g != null && g.name.EndsWith(" Button") && Label(g.name) == label);
-        if (go == null) { Expect(false, $"button \"{label}\" exists"); return; }
+        var go = Find(name);
+        if (go == null) { Expect(false, $"\"{name}\" exists to tap"); return; }
         go.GetComponent<Button>().onClick.Invoke();
     }
-
-    // Text objects that should exist when no popup is showing: everything except popups, which are direct children of the battlefield.
-    static int LiveTexts() => Find("Battlefield").transform.Cast<Transform>().Count(t => t.GetComponent<Text>() != null);
-    static int BaselineTexts(Battle b) => 2; // stage label and log line
+    static int CanvasChildren() => Find("Canvas").transform.Cast<Transform>().Count();
 
     static object Field(object o, string name) => o.GetType().GetField(name, BindingFlags.NonPublic | BindingFlags.Instance).GetValue(o);
     static void Call(object o, string name) => o.GetType().GetMethod(name, BindingFlags.NonPublic | BindingFlags.Instance).Invoke(o, null);

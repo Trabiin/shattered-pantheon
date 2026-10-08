@@ -1,7 +1,7 @@
 // A tiny stand-in for the parts of Unity the game screens use, with real behaviour where it
 // matters for catching bugs: object hierarchy, destroy (touching a destroyed object throws,
 // like Unity's MissingReferenceException), coroutines on a simulated clock, Resources loading
-// from the Unity project, and button clicks. It is not Unity: layout and rendering are not
+// from the Unity project, PlayerPrefs in memory, and button clicks. It is not Unity: layout and rendering are not
 // checked here. The real-API compile check runs in CI (.github/workflows/unity-compile.yml).
 using System;
 using System.Collections;
@@ -91,7 +91,9 @@ namespace UnityEngine
         public GameObject(string n, params Type[] types)
         {
             name = n;
-            var t = types.Any(x => x == typeof(RectTransform)) ? (Transform)new RectTransform() : new Transform();
+            // Like Unity, UI components (which require a RectTransform) get one instead of a plain Transform.
+            bool rect = types.Any(x => x == typeof(RectTransform) || x == typeof(Canvas) || typeof(UI.Graphic).IsAssignableFrom(x));
+            var t = rect ? (Transform)new RectTransform() : new Transform();
             Attach(t);
             foreach (var type in types.Where(x => !typeof(Transform).IsAssignableFrom(x))) Attach((Component)Activator.CreateInstance(type));
         }
@@ -188,6 +190,18 @@ namespace UnityEngine
     public enum ScreenOrientation { Portrait }
     public static class Screen { public static ScreenOrientation orientation; }
     public class TextAsset : Object { public string text; }
+
+    public static class PlayerPrefs
+    {
+        static readonly Dictionary<string, object> store = new Dictionary<string, object>();
+        public static int GetInt(string k, int d = 0) => store.TryGetValue(k, out var v) ? (int)v : d;
+        public static void SetInt(string k, int v) => store[k] = v;
+        public static string GetString(string k, string d = "") => store.TryGetValue(k, out var v) ? (string)v : d;
+        public static void SetString(string k, string v) => store[k] = v;
+        public static void Save() { }
+        public static bool HasKey(string k) => store.ContainsKey(k);
+        public static void DeleteAll() => store.Clear();
+    }
     public class Font : Object { }
 
     public static class Resources
@@ -203,7 +217,7 @@ namespace UnityEngine
             path == "LegacyRuntime.ttf" && typeof(T) == typeof(Font) ? (T)(Object)new Font { name = path } : throw new ArgumentException("No built-in resource " + path);
     }
 
-    public enum TextAnchor { UpperCenter, MiddleLeft, MiddleCenter }
+    public enum TextAnchor { UpperLeft, UpperCenter, MiddleLeft, MiddleCenter }
     public enum FontStyle { Normal, Bold }
     public enum HorizontalWrapMode { Wrap, Overflow }
     public enum VerticalWrapMode { Truncate, Overflow }
