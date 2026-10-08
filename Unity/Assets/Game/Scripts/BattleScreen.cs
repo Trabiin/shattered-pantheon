@@ -91,7 +91,7 @@ namespace ShatteredPantheon.Game
             switch (e.Kind)
             {
                 case EventKind.Turn:
-                    actor.Pulse(this, SecondsPerAction);
+                    actor.Pulse(SecondsPerAction);
                     if (e.Detail == "stunned") { Popup(actor, "Stunned", Palette.Status, 30); logLine.text = $"{actor.Name} is stunned"; }
                     else if (e.Detail.StartsWith("ult:")) { Popup(actor, e.Detail.Substring(4), Palette.Ult, 34); logLine.text = $"{actor.Name} unleashes <b>{e.Detail.Substring(4)}</b>"; }
                     else if (e.Detail.StartsWith("skill:")) logLine.text = $"{actor.Name} uses <b>{e.Detail.Substring(6)}</b>";
@@ -99,7 +99,7 @@ namespace ShatteredPantheon.Game
                     break;
                 case EventKind.Damage:
                     Popup(target, e.Crit ? $"-{e.Amount}!" : $"-{e.Amount}", Palette.Damage, e.Crit ? 46 : 36);
-                    target.Flash(this);
+                    target.Flash();
                     break;
                 case EventKind.BurnTick:
                     Popup(target, $"-{e.Amount} burn", Palette.Burn, 30);
@@ -220,6 +220,8 @@ namespace ShatteredPantheon.Game
         readonly Image face, hpFill, shieldFill, energyFill;
         readonly Text hpText, statusText;
         readonly CanvasGroup group;
+        // Card animations run on the card itself, so they stop when the card is destroyed (on restart).
+        readonly MonoBehaviour host;
         Coroutine pulse;
 
         public UnitCard(Unit u, RectTransform parent, Vector2 pos)
@@ -229,6 +231,7 @@ namespace ShatteredPantheon.Game
             Root = frame.rectTransform;
             Root.Configure(pos, u.Boss ? new Vector2(320, 270) : new Vector2(300, 250));
             group = frame.gameObject.AddComponent<CanvasGroup>();
+            host = frame.gameObject.AddComponent<CardHost>();
 
             face = Ui.Panel(Root, "Face", Palette.Faction(u.Faction));
             Ui.Stretch(face.rectTransform, 4);
@@ -269,7 +272,7 @@ namespace ShatteredPantheon.Game
             group.alpha = u.Alive ? 1 : 0.25f;
         }
 
-        public void Pulse(MonoBehaviour host, float duration)
+        public void Pulse(float duration)
         {
             if (pulse != null) host.StopCoroutine(pulse);
             pulse = host.StartCoroutine(PulseRoutine(Mathf.Clamp(duration * 0.6f, 0.15f, 0.5f)));
@@ -285,7 +288,7 @@ namespace ShatteredPantheon.Game
             Root.localScale = Vector3.one;
         }
 
-        public void Flash(MonoBehaviour host) => host.StartCoroutine(FlashRoutine());
+        public void Flash() => host.StartCoroutine(FlashRoutine());
 
         IEnumerator FlashRoutine()
         {
