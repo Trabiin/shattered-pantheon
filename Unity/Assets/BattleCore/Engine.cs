@@ -86,6 +86,9 @@ namespace ShatteredPantheon.Battle
     public class TeamSlot
     {
         public string Id, Row, Slot;
+        // Growth from levels, stars, gear and skills (1 = the hero's listed stats). Health and attack grow
+        // together on both sides, and defence doesn't, so fights keep the same length as both sides grow.
+        public double HpScale = 1, AtkScale = 1;
         public TeamSlot(string id, string row, string slot) { Id = id; Row = row; Slot = slot; }
         public TeamSlot(string id, string slot) : this(id, slot.StartsWith("front") ? "front" : "back", slot) { }
     }
@@ -151,7 +154,7 @@ namespace ShatteredPantheon.Battle
             HeroFormation = options?.Formation ?? FormationOf(team.Select(t => t.Slot));
             EnemyFormation = Stage.Formation ?? FormationOf(Stage.Enemies.Select(e => e.Slot));
             foreach (var m in team)
-                Add(data.Hero(m.Id) ?? throw new ArgumentException("Unknown hero " + m.Id), "A", m.Slot, HeroFormation, 1, 1);
+                Add(data.Hero(m.Id) ?? throw new ArgumentException("Unknown hero " + m.Id), "A", m.Slot, HeroFormation, m.HpScale, m.AtkScale);
             foreach (var se in Stage.Enemies)
                 Add(data.Enemy(se.Id) ?? throw new ArgumentException("Unknown enemy " + se.Id), "E", se.Slot, EnemyFormation, Stage.HpScale, Stage.AtkScale);
             foreach (var side in new[] { "A", "E" }) ApplySynergies(side);

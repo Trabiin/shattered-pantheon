@@ -1,0 +1,419 @@
+{
+  "_about": "Progression and economy rules (plan docs 07, 08 and 10). Read by tools/ProgressionSim; the game will read the same file. Rewards marked 'levels' are worth that many level-ups at the recommended level of the player's current campaign battle, so they scale as the player advances. Each difficulty's rewardScale multiplies XP, gold, gear materials and skill tomes (easing in from the previous difficulty), which sets how long the later difficulties take.",
+  "heroGrowth": {
+    "levelGain": 0.03,
+    "starGain": 0.1,
+    "gearGain": 0.05,
+    "skillGain": 0.02,
+    "rarityBase": {
+      "Rare": 0.85,
+      "Epic": 1.0,
+      "Legendary": 1.15
+    },
+    "rarityStars": {
+      "Rare": 3,
+      "Epic": 4,
+      "Legendary": 5
+    },
+    "levelCapByStars": {
+      "3": 60,
+      "4": 110,
+      "5": 170,
+      "6": 200
+    },
+    "maxGear": 12,
+    "maxSkill": 10
+  },
+  "costs": {
+    "xpToNext": {
+      "a": 30,
+      "exp": 1.6
+    },
+    "goldPerXp": 0.5,
+    "gearMats": {
+      "perTier": 5
+    },
+    "gearGoldLevels": 0.5,
+    "skillTomes": {
+      "perLevel": 5
+    },
+    "ascendFodder": {
+      "3": 2,
+      "4": 3,
+      "5": 4
+    }
+  },
+  "roster": {
+    "_about": "The simulator's roster: each test kit appears under several names to stand in for a 48-hero launch roster. Rarity per copy.",
+    "copies": [
+      [
+        "Rare",
+        "Epic",
+        "Legendary"
+      ],
+      [
+        "Rare",
+        "Epic"
+      ],
+      [
+        "Rare",
+        "Epic",
+        "Legendary"
+      ],
+      [
+        "Rare",
+        "Epic"
+      ],
+      [
+        "Rare",
+        "Epic",
+        "Legendary"
+      ],
+      [
+        "Rare",
+        "Epic"
+      ],
+      [
+        "Rare",
+        "Epic",
+        "Legendary"
+      ],
+      [
+        "Rare",
+        "Epic"
+      ],
+      [
+        "Rare",
+        "Epic",
+        "Legendary"
+      ],
+      [
+        "Rare",
+        "Epic"
+      ],
+      [
+        "Rare",
+        "Epic",
+        "Legendary"
+      ],
+      [
+        "Rare",
+        "Epic"
+      ],
+      [
+        "Rare",
+        "Epic",
+        "Legendary"
+      ],
+      [
+        "Rare",
+        "Epic"
+      ],
+      [
+        "Rare",
+        "Epic",
+        "Legendary"
+      ],
+      [
+        "Rare",
+        "Epic"
+      ],
+      [
+        "Rare",
+        "Epic",
+        "Legendary"
+      ],
+      [
+        "Rare",
+        "Epic"
+      ],
+      [
+        "Rare",
+        "Epic",
+        "Legendary"
+      ],
+      [
+        "Rare",
+        "Epic"
+      ]
+    ],
+    "starters": [
+      "hilde",
+      "varkhul",
+      "maren"
+    ]
+  },
+  "summon": {
+    "cost": 300,
+    "rates": {
+      "Rare": 0.8,
+      "Epic": 0.17,
+      "Legendary": 0.03
+    },
+    "epicEvery": 10,
+    "legendaryPity": 60,
+    "firstTenGuaranteesEpic": true
+  },
+  "campaign": {
+    "difficulties": [
+      {
+        "name": "Normal",
+        "levels": [
+          1,
+          100
+        ],
+        "curve": 0.85,
+        "stars": [
+          4,
+          4
+        ],
+        "gear": [
+          0,
+          6
+        ],
+        "skill": [
+          1,
+          5
+        ],
+        "rewardScale": 1
+      },
+      {
+        "name": "Hard",
+        "levels": [
+          100,
+          140
+        ],
+        "curve": 1.0,
+        "stars": [
+          4,
+          5
+        ],
+        "gear": [
+          6,
+          9
+        ],
+        "skill": [
+          5,
+          7
+        ],
+        "rewardScale": 0.3
+      },
+      {
+        "name": "Nightmare",
+        "levels": [
+          140,
+          170
+        ],
+        "curve": 1.0,
+        "stars": [
+          5,
+          5.5
+        ],
+        "gear": [
+          9,
+          11
+        ],
+        "skill": [
+          7,
+          9
+        ],
+        "rewardScale": 0.1
+      },
+      {
+        "name": "Godless",
+        "levels": [
+          170,
+          200
+        ],
+        "curve": 1.0,
+        "stars": [
+          5.5,
+          6
+        ],
+        "gear": [
+          11,
+          12
+        ],
+        "skill": [
+          9,
+          10
+        ],
+        "rewardScale": 0.05
+      }
+    ],
+    "stages": 40,
+    "battlesPerStage": 10,
+    "enemyFactor": 1.4,
+    "bossFactor": 1.0,
+    "starSteps": [
+      1.08,
+      1.16,
+      1.24,
+      1.32
+    ],
+    "winBand": [
+      0.75,
+      0.92
+    ],
+    "bossWinBand": [
+      0.72,
+      0.9
+    ],
+    "earlyBattles": 30,
+    "earlyWinBand": [
+      0.97,
+      1.0
+    ],
+    "rewardEase": 0.1
+  },
+  "rewards": {
+    "shrinePerHour": {
+      "xpLevels": 0.4,
+      "goldLevels": 0.4,
+      "godshards": 4,
+      "devotion": 4
+    },
+    "shrineCapHours": 12,
+    "firstClear": {
+      "xpLevels": 0.6,
+      "goldLevels": 0.6,
+      "godshards": 10,
+      "gearMats": 1
+    },
+    "stageClear": {
+      "godshards": 80,
+      "gearMats": 6,
+      "skillTomes": 6
+    },
+    "star": {
+      "godshards": 5
+    },
+    "starChestEvery": 50,
+    "starChest": {
+      "godshards": 200,
+      "gearMats": 10,
+      "summonTickets": 1
+    },
+    "farm": {
+      "devotion": 8,
+      "xpLevels": 0.2,
+      "goldLevels": 0.25,
+      "gearMats": 1
+    },
+    "daily": {
+      "minutes": 5,
+      "godshards": 80,
+      "xpLevels": 3,
+      "goldLevels": 3,
+      "devotion": 60,
+      "gearMats": 6,
+      "skillTomes": 4
+    },
+    "dailyHard": {
+      "count": 2,
+      "godshards": 60,
+      "powerOver": 1.05
+    },
+    "weekly": {
+      "godshards": 400,
+      "summonTickets": 1
+    },
+    "codex": {
+      "firstCopy": {
+        "Rare": 10,
+        "Epic": 50,
+        "Legendary": 150
+      },
+      "stars": {
+        "4": 30,
+        "5": 60,
+        "6": 120
+      },
+      "factionShare": {
+        "0.25": 100,
+        "0.5": 200,
+        "0.75": 300,
+        "1": 800
+      }
+    },
+    "milestones": [
+      {
+        "battles": 30,
+        "legendaryPick": true
+      },
+      {
+        "day": 7,
+        "epicPick": true
+      }
+    ],
+    "devotionRegenPerDay": 288,
+    "devotionRegenCap": 120,
+    "startingGodshards": 3000,
+    "loginCalendar": {
+      "everyDays": 3,
+      "summonTickets": 2
+    }
+  },
+  "players": {
+    "time": [
+      {
+        "name": "Casual",
+        "minutes": 20,
+        "sessions": 1
+      },
+      {
+        "name": "Regular",
+        "minutes": 45,
+        "sessions": 2
+      },
+      {
+        "name": "Dedicated",
+        "minutes": 90,
+        "sessions": 3
+      }
+    ],
+    "spend": [
+      {
+        "name": "Free",
+        "godshardsPerDay": 0,
+        "devotionRefills": 0,
+        "bonus": 0
+      },
+      {
+        "name": "Light",
+        "godshardsPerDay": 90,
+        "devotionRefills": 0,
+        "bonus": 0.2
+      },
+      {
+        "name": "Heavy",
+        "godshardsPerDay": 600,
+        "devotionRefills": 2,
+        "bonus": 0.5
+      }
+    ],
+    "secondsPerFightOverhead": 15,
+    "replaySpeed": 3,
+    "attemptsBeforeUpgrading": 3
+  },
+  "targets": {
+    "normalDays": {
+      "Casual": 40,
+      "Regular": 21,
+      "Dedicated": 12
+    },
+    "hardDays": {
+      "Casual": 120,
+      "Regular": 75,
+      "Dedicated": 50
+    },
+    "wallDays": 3,
+    "newHeroEveryDays": 3,
+    "firstLegendaryDay": 7,
+    "maxDaysWithoutBigMoment": 2,
+    "lightSpenderFaster": [
+      0.25,
+      0.35
+    ]
+  }
+}

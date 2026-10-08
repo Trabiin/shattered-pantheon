@@ -12,8 +12,10 @@ A mobile auto-battle gacha game, built in Unity. Design docs live in the project
 | `Unity/Assets/Game/` | The game screens, built in code with placeholder art: stage select, team and formation, battle, results. |
 | `tools/BattleData/` | The script that writes the battle data, and a guide to its format. |
 | `tools/FightViewer/` | A browser page that replays real engine fights turn by turn (`build.py` explains how to rebuild it). |
+| `tools/ProgressionSim/` | The progression and economy simulator: simulated players play a year of the campaign day by day, every campaign battle a real fight. Reads `progression.json` and `campaign.json`. |
 | `tools/BattleSim/` | The balance simulator, compiled from the same `BattleCore` files. |
 | `reports/latest.md` | The latest balance report. |
+| `reports/progression.md` | The latest progression report. |
 
 ## Open the game
 
@@ -34,9 +36,17 @@ dotnet run --project tools/BattleSim -- --team hilde,solenne,thessaly,maren,pip 
 dotnet run --project tools/BattleSim -- --log hilde,solenne,thessaly,maren,pip --stage saint --seed 1
 ```
 
+The progression simulator (about a minute):
+
+```
+dotnet run --project tools/ProgressionSim -c Release                          # report -> reports/progression.md
+dotnet run --project tools/ProgressionSim -c Release -- --build-campaign      # rebuild and sim-check campaign.json
+```
+
 ## Checks without Unity
 
 Every pull request runs these on GitHub (`.github/workflows/`):
 - **Unity compile:** the game and editor scripts are compiled against the real Unity 6.3 libraries, taken from an official Unity editor image. No Unity licence is needed.
 - **Screen smoke test:** `dotnet run --project tools/ScreenSmokeTest` plays the screens on a stand-in for Unity, like a player would, and fails on errors or on fights that differ from the engine.
 - **Replays:** the same seed always gives the same fight, so replays and server checks work.
+- **Simulators run:** the balance report and a short progression run complete without errors.
