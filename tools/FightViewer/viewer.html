@@ -1,0 +1,483 @@
+<title>Pantheon Fight Viewer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marcellus+SC&family=Alegreya+Sans:wght@400;500;700&display=swap">
+<style>
+/* Layout: a single battle board (enemies above, heroes below, staggered rows) with transport controls
+   under it and the turn log beside it on wide screens, below it on phones. One dark world by choice. */
+:root {
+  --ground: #14161f;      /* night over the broken temple */
+  --stone: #1f2230;       /* panels */
+  --stone-2: #2a2e3f;     /* raised */
+  --line: #3a3f55;
+  --ink: #ece4d2;         /* bone-white text */
+  --ink-dim: #a49d8e;
+  --gold: #d1a24c;        /* tarnished gold accent */
+  --hp: #6fbf73;
+  --hp-low: #d0624f;
+  --shield: #9fc3e6;
+  --mana: #7e8fe8;
+  --dmg: #ff8a6b;
+  --heal: #8fe39a;
+  --buff: #8fc7e8;
+  --debuff: #e59a7a;
+  --display: "Marcellus SC", "Trajan Pro", Georgia, serif;
+  --body: "Alegreya Sans", "Segoe UI", system-ui, sans-serif;
+  color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { background: var(--ground); color: var(--ink); }
+body { font-family: var(--body); font-size: 15px; line-height: 1.45; }
+.wrap { max-width: 1120px; margin: 0 auto; padding-inline: 16px; padding-block: 16px 40px; display: grid; gap: 14px; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 16px; }
+h1 { font-family: var(--display); font-weight: 400; font-size: 26px; letter-spacing: .04em; margin: 0; text-wrap: balance; }
+h1 small { display: block; font-family: var(--body); font-size: 13px; letter-spacing: 0; color: var(--ink-dim); }
+button, select { font: inherit; color: var(--ink); background: var(--stone-2); border: 1px solid var(--line); border-radius: 6px; padding: 7px 12px; cursor: pointer; }
+button:hover, select:hover { border-color: var(--gold); }
+button:focus-visible, select:focus-visible, input:focus-visible, .unit:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+button[aria-pressed="true"] { background: var(--gold); color: var(--ground); border-color: var(--gold); }
+.picker { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.picker label { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-dim); }
+.fights { display: flex; flex-wrap: wrap; gap: 6px; }
+.fights button { font-size: 13px; padding: 5px 10px; }
+.intro { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline; color: var(--ink-dim); font-size: 14px; }
+.intro strong { color: var(--ink); font-weight: 700; }
+.tag { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; padding: 2px 8px; border-radius: 99px; border: 1px solid var(--line); color: var(--ink-dim); }
+.tag.diff-easy { color: var(--heal); border-color: currentColor; }
+.tag.diff-normal { color: var(--buff); border-color: currentColor; }
+.tag.diff-hard { color: var(--gold); border-color: currentColor; }
+.tag.diff-nightmare { color: var(--dmg); border-color: currentColor; }
+.main { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 900px) { .main { grid-template-columns: minmax(0, 1fr) 320px; } }
+
+/* Board: enemy back, enemy front, hero front, hero back. Positions come from the engine's slot x (-1..1). */
+.board { position: relative; background: radial-gradient(ellipse at 50% 50%, #232738 0%, var(--ground) 75%); border: 1px solid var(--line); border-radius: 10px; height: 600px; overflow: hidden; }
+.board::after { content: ""; position: absolute; left: 6%; right: 6%; top: 50%; border-top: 1px dashed var(--line); }
+.side-label { position: absolute; left: 10px; font-size: 11px; text-transform: uppercase; letter-spacing: .12em; color: var(--ink-dim); }
+.unit { position: absolute; width: 29%; max-width: 190px; height: 112px; transform: translateX(-50%); background: var(--stone); border: 1px solid var(--line); border-top: 4px solid var(--fc, var(--line)); border-radius: 8px; padding: 6px 7px; display: grid; gap: 3px; align-content: start; cursor: pointer; transition: opacity .3s, transform .2s, box-shadow .2s; }
+.unit .nm { font-weight: 700; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.unit .sub { font-size: 11px; color: var(--ink-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bar { position: relative; height: 8px; background: #0d0f15; border-radius: 3px; overflow: hidden; }
+.bar i { position: absolute; inset: 0 auto 0 0; display: block; transition: width .25s; }
+.bar .hp { background: var(--hp); }
+.bar .hp.low { background: var(--hp-low); }
+.bar .sh { background: var(--shield); opacity: .85; }
+.bar.mana { height: 4px; }
+.bar .mn { background: var(--mana); }
+.bar .mn.full { background: var(--gold); }
+.nums { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+.chips { display: flex; flex-wrap: nowrap; gap: 3px; min-height: 16px; overflow: hidden; }
+.chip { flex: none; font-size: 10px; line-height: 14px; padding: 0 5px; border-radius: 3px; background: #0d0f15; }
+.chip.buff { color: var(--buff); }
+.chip.debuff { color: var(--debuff); }
+.chip.other { color: var(--gold); }
+.unit.dead { opacity: .28; }
+.unit.actor { box-shadow: 0 0 0 2px var(--gold), 0 0 18px rgba(209,162,76,.45); transform: translateX(-50%) scale(1.04); z-index: 2; }
+.unit.target { box-shadow: 0 0 0 2px var(--dmg); }
+.unit.exposed::before { content: "exposed"; position: absolute; top: -9px; right: 6px; font-size: 9px; text-transform: uppercase; letter-spacing: .1em; background: var(--hp-low); color: var(--ground); padding: 0 4px; border-radius: 3px; }
+.unit .boss { color: var(--gold); }
+.float { position: absolute; pointer-events: none; font-weight: 700; font-size: 17px; transform: translate(-50%, 0); animation: rise 1.1s ease-out forwards; text-shadow: 0 1px 2px #000; z-index: 5; font-variant-numeric: tabular-nums; }
+.float.crit { font-size: 22px; }
+.float.small { font-size: 12px; font-weight: 500; white-space: nowrap; }
+@keyframes rise { from { opacity: 1; margin-top: 0; } to { opacity: 0; margin-top: -42px; } }
+.cast { font-family: var(--display); font-size: 18px; letter-spacing: .05em; min-height: 1.5em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--gold); }
+.banner { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(10,11,16,.62); z-index: 6; text-align: center; }
+.banner b { display: block; font-family: var(--display); font-weight: 400; font-size: 40px; letter-spacing: .06em; }
+.banner.win b { color: var(--gold); }
+.banner.lose b, .banner.timeout b { color: var(--dmg); }
+.banner span { color: var(--ink-dim); }
+
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.controls .grow { flex: 1 1 200px; display: flex; gap: 10px; align-items: center; min-width: 0; }
+.controls input[type=range] { flex: 1; min-width: 0; accent-color: var(--gold); }
+.turn { font-variant-numeric: tabular-nums; color: var(--ink-dim); font-size: 13px; white-space: nowrap; }
+.speed { display: flex; gap: 4px; }
+.speed button { padding: 5px 9px; font-size: 13px; }
+
+aside { display: grid; gap: 12px; align-content: start; min-width: 0; }
+.panel { background: var(--stone); border: 1px solid var(--line); border-radius: 10px; padding: 12px; min-width: 0; }
+.panel h2 { font-family: var(--display); font-weight: 400; font-size: 17px; letter-spacing: .04em; margin: 0 0 8px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.log { max-height: 340px; overflow-y: auto; font-size: 13px; display: grid; gap: 6px; }
+.log .t { border-left: 2px solid var(--line); padding-left: 8px; }
+.log .t.now { border-color: var(--gold); }
+.log .who { font-weight: 700; }
+.log .A { color: #e8d6a8; }
+.log .E { color: #e9b3a3; }
+.log .d { color: var(--dmg); }
+.log .h { color: var(--heal); }
+.log .s { color: var(--shield); }
+.log .x { color: var(--ink-dim); }
+.info { font-size: 13px; display: grid; gap: 8px; }
+.info p { margin: 0; }
+.info .k { display: grid; gap: 2px; }
+.info .k b { color: var(--gold); font-weight: 500; }
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 4px 10px; font-variant-numeric: tabular-nums; font-size: 12px; color: var(--ink-dim); }
+.stats span b { color: var(--ink); font-weight: 500; }
+.help { font-size: 13px; color: var(--ink-dim); display: grid; gap: 6px; }
+.help p { margin: 0; }
+.help b { color: var(--ink); font-weight: 500; }
+.icon-btn { width: 28px; height: 28px; padding: 0; border-radius: 50%; font-size: 14px; line-height: 1; }
+@media (max-width: 520px) {
+  .board { height: 540px; }
+  .unit { height: 102px; padding: 5px; }
+  .unit .nm { font-size: 13px; }
+  .float { font-size: 15px; }
+  .float.crit { font-size: 19px; }
+}
+@media (prefers-reduced-motion: reduce) { .float { animation-duration: .01s; } .unit, .bar i { transition: none; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Pantheon Fight Viewer<small>Real fights from the battle engine, replayed turn by turn</small></h1>
+    <div class="picker">
+      <label for="stage">Stage</label>
+      <select id="stage"></select>
+    </div>
+  </header>
+  <div class="fights" id="fights" role="group" aria-label="Fights on this stage"></div>
+  <div class="intro" id="intro"></div>
+
+  <div class="main">
+    <section style="display:grid;gap:10px;min-width:0">
+      <div class="board" id="board" aria-label="Battlefield">
+        <span class="side-label" style="top:8px">Enemies</span>
+        <span class="side-label" style="bottom:8px">Your heroes</span>
+      </div>
+      <div class="cast" id="cast" aria-live="polite"></div>
+      <div class="controls">
+        <button id="back" aria-label="Previous turn">◀</button>
+        <button id="play" aria-label="Play">Play</button>
+        <button id="fwd" aria-label="Next turn">▶</button>
+        <div class="grow">
+          <input type="range" id="scrub" min="0" value="0" aria-label="Turn">
+          <span class="turn" id="turn"></span>
+        </div>
+        <div class="speed" role="group" aria-label="Speed" id="speed"></div>
+      </div>
+    </section>
+    <aside>
+      <div class="panel" id="unitPanel">
+        <h2><span id="uTitle">Tap a fighter</span></h2>
+        <div class="info" id="uBody"><p class="x" style="color:var(--ink-dim)">Tap any card to see that fighter's kit: basic attack, three skills, ultimate and passive.</p></div>
+      </div>
+      <div class="panel">
+        <h2>Turn log <button class="icon-btn" id="helpBtn" aria-expanded="false" aria-controls="help" title="How to read a fight">?</button></h2>
+        <div class="help" id="help" hidden>
+          <p><b>Turns:</b> faster fighters act more often. Each turn a fighter uses its ultimate if its mana bar (thin, under health) is full, otherwise its first ready skill, otherwise its basic attack.</p>
+          <p><b>Cover:</b> a front fighter shields the back fighters standing behind it. When it falls, those back fighters are <b>exposed</b> and most attacks can reach them.</p>
+          <p><b>Health bar:</b> green is health, pale blue is shield. Shields absorb damage first.</p>
+          <p><b>Effects:</b> blue chips are buffs, orange chips are debuffs. The number is turns left.</p>
+        </div>
+        <div class="log" id="log" aria-live="polite"></div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script>
+const DATA = /*__DATA__*/null;
+const BUFFS = ["Challenge","Bulwark","Bloodrite","Tailwind","Grace","Ward"];
+const DEBUFFS = ["Pyre","Blight","Godstruck","Hush","Sunder","Eclipse"];
+const EFFECT_TEXT = {
+  challenge:"Challenge (enemies must target it)", bulwark:"Bulwark (takes less damage)", bloodrite:"Bloodrite (attack up, stacks)",
+  tailwind:"Tailwind (speed up)", grace:"Grace (heals each turn)", ward:"Ward (blocks the next debuff)",
+  pyre:"Pyre (burns each turn, stacks)", blight:"Blight (rots each turn, halves healing)", godstruck:"Godstruck (loses its next turn)",
+  hush:"Hush (basic attack only)", sunder:"Sunder (armour and spirit down)", eclipse:"Eclipse (accuracy down)"
+};
+const FACTION = { Sun:"#9e7a26", Night:"#45387a", Wild:"#386b33", Sea:"#21617a", Forge:"#8c4026", Grave:"#3d5750", War:"#8c2630", Hearth:"#996b38", Arcana:"#33458c", Trickster:"#7a3873" };
+const TARGET_TEXT = {
+  opposite:"the enemy opposite", front:"the nearest reachable enemy", back:"a back-row enemy", pierce:"an enemy and the one behind it",
+  splash:"an enemy and its neighbours", cross:"an enemy and those around it", frontRow:"the enemy front row", backRow:"the enemy back row",
+  all:"all enemies", lowest:"the weakest enemy (lowest health)", highest:"the healthiest enemy", strongest:"the hardest-hitting enemy",
+  fastest:"the fastest enemy", mostMana:"the enemy closest to its ultimate", mostBuffs:"the most-buffed enemy", mostDebuffs:"the most-debuffed enemy",
+  role:"an enemy of a given role", revenge:"whoever last hit it", marked:"the marked enemy", random:"random enemies", chain:"a chain of enemies",
+  self:"itself", same:"the same targets", context:"that ally", contextAttacker:"the attacker", lowestAlly:"the weakest ally", allAllies:"all allies",
+  behind:"the ally behind it", inFront:"the ally in front of it", neighbours:"its neighbours", myRow:"its own row", debuffedAlly:"a debuffed ally",
+  manaAlly:"the ally closest to its ultimate", lowestManaAlly:"the ally furthest from its ultimate", fallenAlly:"a fallen ally"
+};
+const TRIGGER_TEXT = { always:"Always on", battleStart:"At the start of battle", turnStart:"At the start of its turn", onHit:"When it hits",
+  onCrit:"When it crits", onHitTaken:"When it is hit", onDodge:"When it dodges", onKill:"When it gets a kill", allyFalls:"When an ally falls",
+  hpBelow:"When its health drops low", afterUlt:"After its ultimate" };
+
+const defs = {}; for (const d of [...DATA.heroes, ...DATA.enemies]) defs[d.id] = d;
+const pct = x => Math.round(x * 100) + "%";
+const cap = s => s ? s[0].toUpperCase() + s.slice(1) : s;
+
+function describeAction(a) {
+  let who = TARGET_TEXT[a.target] || a.target;
+  if (a.target === "random" || a.target === "chain") who = `${a.n || 1} ${a.target === "chain" ? "chained" : "random"} enemies`;
+  else if (a.n > 1) who = who.replace("the ", `the ${a.n} `).replace("enemy", "enemies");
+  const extra = [];
+  if (a.execute) extra.push(`finishes off targets under ${pct(a.execute)} health`);
+  if (a.bonusVsExposed) extra.push(`+${pct(a.bonusVsExposed)} against exposed targets`);
+  if (a.bonusVs) extra.push(`+${pct(a.bonus || 0)} against ${cap(a.bonusVs)}`);
+  if (a.repeatOnKill) extra.push(`strikes again on a kill (up to ${a.repeatOnKill}×)`);
+  if (a.lifesteal) extra.push(`heals for ${pct(a.lifesteal)} of damage`);
+  if (a.pen) extra.push(`ignores ${pct(a.pen)} of defence`);
+  const tail = extra.length ? `, ${extra.join(", ")}` : "";
+  switch (a.effect) {
+    case "damage": return `Hits ${who} for ${pct(a.mult || 0)} attack${tail}.`;
+    case "heal": return `Heals ${who}${a.mult ? ` for ${pct(a.mult)} attack` : ""}${a.casterMaxHp ? ` for ${pct(a.casterMaxHp)} of its max health` : ""}${a.targetMaxHp || a.pct ? ` for ${pct(a.targetMaxHp || a.pct)} of their max health` : ""}.`;
+    case "shield": return `Shields ${who}${a.mult ? ` for ${pct(a.mult)} attack` : ""}${a.casterMaxHp ? ` for ${pct(a.casterMaxHp)} of its max health` : ""}${a.targetMaxHp || a.pct ? ` for ${pct(a.targetMaxHp || a.pct)} of their max health` : ""}.`;
+    case "status": return `${a.chance ? pct(a.chance) + " chance to give" : "Gives"} ${who} ${EFFECT_TEXT[a.status] || cap(a.status)}${a.turns ? ` for ${a.turns} turn${a.turns > 1 ? "s" : ""}` : ""}${a.stacks > 1 ? ` (${a.stacks} stacks)` : ""}.`;
+    case "cleanse": return `Removes debuffs from ${who}.`;
+    case "strip": return `Strips buffs from ${who}.`;
+    case "steal": return `Steals a buff from ${who}.`;
+    case "mana": return `Gives ${who} ${a.value || 0} mana.`;
+    case "gauge": return `${(a.value || a.pct || 0) > 0 ? "Speeds up" : "Delays"} ${who}'s next turn.`;
+    case "revive": return `Revives ${who} at ${pct(a.pct || a.value || 0.25)} health.`;
+    case "mark": return `Marks ${who}.`;
+    case "channel": return `Starts a ritual that heals ${pct(a.pct || 0)} when it completes, unless interrupted by Godstruck or Hush.`;
+    case "resetCd": return `Resets ${who}'s skill cooldowns.`;
+    default: return `${cap(a.effect)} on ${who}.`;
+  }
+}
+const skillHtml = (label, s, meta) => `<div class="k"><b>${label}: ${s.name}${meta ? ` <span style="color:var(--ink-dim)">· ${meta}</span>` : ""}</b>${(s.actions || []).map(a => `<span>${describeAction(a)}</span>`).join("")}</div>`;
+
+// ---------- state ----------
+let fight = null, frame = 0, playing = false, speed = 2, timer = null;
+const board = document.getElementById("board"), cast = document.getElementById("cast");
+let cards = {};
+
+function stages() {
+  const seen = []; for (const f of DATA.fights) if (!seen.find(s => s.id === f.stage)) seen.push({ id: f.stage, name: f.stageName, diff: f.difficulty });
+  return seen;
+}
+function initPicker() {
+  const sel = document.getElementById("stage");
+  sel.innerHTML = stages().map(s => `<option value="${s.id}">${s.name} · ${cap(s.diff)}</option>`).join("");
+  sel.onchange = () => showStage(sel.value);
+  const sp = document.getElementById("speed");
+  sp.innerHTML = [1, 2, 4, 8].map(x => `<button data-x="${x}" aria-pressed="${x === speed}">${x}×</button>`).join("");
+  sp.onclick = e => { const x = +e.target.dataset.x; if (!x) return; speed = x; for (const b of sp.children) b.setAttribute("aria-pressed", +b.dataset.x === x); if (playing) { stop(); play(); } };
+  document.getElementById("play").onclick = () => playing ? stop() : play();
+  document.getElementById("fwd").onclick = () => { stop(); go(frame + 1, true); };
+  document.getElementById("back").onclick = () => { stop(); go(frame - 1, false); };
+  document.getElementById("scrub").oninput = e => { stop(); go(+e.target.value, false); };
+  const hb = document.getElementById("helpBtn"), help = document.getElementById("help");
+  hb.onclick = () => { help.hidden = !help.hidden; hb.setAttribute("aria-expanded", !help.hidden); };
+}
+function showStage(id, index = 0) {
+  document.getElementById("stage").value = id;
+  const list = DATA.fights.map((f, i) => ({ f, i })).filter(x => x.f.stage === id);
+  const fe = document.getElementById("fights");
+  fe.innerHTML = list.map((x, j) => `<button data-i="${x.i}" aria-pressed="${j === index}">${x.f.title}</button>`).join("");
+  fe.onclick = e => { const i = e.target.dataset.i; if (i === undefined) return; for (const b of fe.children) b.setAttribute("aria-pressed", b === e.target); load(DATA.fights[+i]); };
+  load(list[index].f);
+}
+
+function slotTop(u) {
+  const h = board.clientHeight, card = cardH();
+  const rows = { "E:back": 0.07, "E:front": 0.285, "A:front": 0.52, "A:back": 0.735 };
+  return Math.round(rows[u.side + ":" + u.row] * h + (h * 0.215 - card) / 2);
+}
+const cardH = () => (window.innerWidth <= 520 ? 102 : 112);
+
+function load(f) {
+  stop();
+  fight = f; frame = 0;
+  for (const el of board.querySelectorAll(".unit,.float,.banner")) el.remove();
+  cards = {};
+  const res = { win: "Victory", lose: "Defeat", timeout: "Time's up" }[f.result];
+  document.getElementById("intro").innerHTML =
+    `<span class="tag diff-${f.difficulty}">${cap(f.difficulty)}</span><strong>${f.title}</strong><span>${f.note}</span>` +
+    `<span>Heroes in ${f.heroFormation} (front-back) · enemies in ${f.enemyFormation}</span><span>This fight: ${res} in ${f.actions} turns</span>`;
+  f.units.forEach((u, i) => {
+    const el = document.createElement("div");
+    el.className = "unit"; el.tabIndex = 0;
+    el.style.setProperty("--fc", FACTION[u.faction] || "var(--line)");
+    el.style.left = `calc(50% + ${u.x * 31}%)`;
+    el.setAttribute("role", "button");
+    el.innerHTML = `<div class="nm">${u.boss ? '<span class="boss">♛ </span>' : ""}${u.name}</div>
+      <div class="sub">${u.role} · ${u.faction} · ${u.type}</div>
+      <div class="bar"><i class="hp"></i><i class="sh"></i></div>
+      <div class="nums"><span class="hpn"></span><span class="shn"></span></div>
+      <div class="bar mana"><i class="mn"></i></div>
+      <div class="chips"></div>`;
+    el.onclick = el.onkeydown = e => { if (e.type === "keydown" && e.key !== "Enter" && e.key !== " ") return; e.preventDefault?.(); showUnit(i); };
+    board.appendChild(el);
+    cards[u.key] = el;
+  });
+  layout();
+  const sc = document.getElementById("scrub"); sc.max = f.frames.length - 1; sc.value = 0;
+  render(false);
+}
+function layout() {
+  if (!fight) return;
+  fight.units.forEach(u => { cards[u.key].style.top = slotTop(u) + "px"; });
+}
+window.addEventListener("resize", layout);
+
+function render(animate) {
+  const fr = fight.frames[frame];
+  fight.units.forEach((u, i) => {
+    const [hp, sh, mana, alive, sts] = fr.s[i];
+    const el = cards[u.key];
+    const hpW = Math.min(100, hp / u.maxHp * 100), shW = Math.min(100 - hpW, sh / u.maxHp * 100);
+    const hpEl = el.querySelector(".hp");
+    hpEl.style.width = hpW + "%"; hpEl.classList.toggle("low", hpW < 30);
+    const shEl = el.querySelector(".sh"); shEl.style.left = hpW + "%"; shEl.style.width = shW + "%";
+    el.querySelector(".hpn").textContent = `${hp} / ${u.maxHp}`;
+    el.querySelector(".shn").textContent = sh > 0 ? `+${sh} shield` : "";
+    const mn = el.querySelector(".mn"); mn.style.width = mana + "%"; mn.classList.toggle("full", mana >= 100);
+    el.classList.toggle("dead", !alive);
+    const chips = sts.map(s => { const [lab, st, t] = s.split(":"); const cls = BUFFS.includes(lab) ? "buff" : DEBUFFS.includes(lab) ? "debuff" : "other"; return `<span class="chip ${cls}" title="${EFFECT_TEXT[lab.toLowerCase()] || lab}">${lab}${+st > 1 ? " ×" + st : ""}${+t > 0 && +t < 90 ? " " + t : ""}</span>`; });
+    el.querySelector(".chips").innerHTML = chips.slice(0, 3).join("") + (chips.length > 3 ? `<span class="chip other">+${chips.length - 3}</span>` : "");
+    el.classList.remove("actor", "target");
+  });
+  // Exposure: a back unit with no living front unit within half a slot of it.
+  for (const u of fight.units) {
+    let exposed = false;
+    if (u.row === "back") {
+      const i = fight.units.indexOf(u);
+      exposed = fr.s[i][3] === 1 && !fight.units.some((v, j) => v.side === u.side && v.row === "front" && fr.s[j][3] === 1 && Math.abs(v.x - u.x) <= 0.51);
+    }
+    cards[u.key].classList.toggle("exposed", exposed);
+  }
+  const turnEv = fr.e.filter(e => e[0] === "Turn");
+  const main = turnEv[turnEv.length - 1];
+  cast.textContent = main && frame < fight.frames.length - 1 ? castLabel(main) : "";
+  if (main && cards[main[1]]) cards[main[1]].classList.add("actor");
+  for (const e of fr.e) if (["Damage","Heal","Shield","Miss","StatusAdded"].includes(e[0]) && cards[e[2]] && e[2] !== main?.[1]) cards[e[2]].classList.add("target");
+  if (animate) floats(fr.e);
+  document.getElementById("turn").textContent = `Turn ${frame} / ${fight.frames.length - 1}`;
+  document.getElementById("scrub").value = frame;
+  document.getElementById("play").textContent = playing ? "Pause" : frame >= fight.frames.length - 1 ? "Replay" : "Play";
+  board.querySelector(".banner")?.remove();
+  if (frame === fight.frames.length - 1) {
+    const b = document.createElement("div");
+    b.className = "banner " + fight.result;
+    const heroesLeft = fight.units.filter((u, i) => u.side === "A" && fr.s[i][3]).length;
+    b.innerHTML = `<div><b>${{ win: "Victory", lose: "Defeat", timeout: "Time's up" }[fight.result]}</b><span>${fight.actions} turns · about ${mmss(fight.actions)} at 1× · ${heroesLeft} of 5 heroes standing</span></div>`;
+    board.appendChild(b);
+  }
+  renderLog();
+}
+const mmss = n => `${Math.floor(n / 60)}:${String(n % 60).padStart(2, "0")}`;
+const nameOf = key => { const u = fight.units.find(x => x.key === key); return !u ? key : u.side === "A" ? u.name.split(" ")[0] : u.name.replace(/^The /, ""); };
+function castLabel(e) {
+  const d = e[3];
+  if (d === "basic") return `${nameOf(e[1])}: basic attack`;
+  if (d === "stunned") return `${nameOf(e[1])} is Godstruck`;
+  const [kind, name] = d.split(":");
+  return `${nameOf(e[1])}: ${name}${kind === "ult" ? " (ultimate)" : kind === "passive" ? " (passive)" : kind === "echo" ? " (echo)" : ""}`;
+}
+// One small stack of numbers per target: total damage, healing and shield, then what landed or failed.
+function floats(events) {
+  const per = {};
+  for (const [kind, , tgt, detail, amt, crit] of events) {
+    if (!cards[tgt]) continue;
+    const p = per[tgt] ||= { dmg: 0, crit: false, heal: 0, shield: 0, tags: [] };
+    if (kind === "Damage" || kind === "DotTick") { p.dmg += amt; p.crit ||= !!crit; }
+    else if (kind === "Heal") p.heal += amt;
+    else if (kind === "Shield") p.shield += amt;
+    else if (kind === "Miss") p.tags.push(["miss", "var(--ink-dim)"]);
+    else if (kind === "StatusAdded") p.tags.push([cap(detail), BUFFS.includes(cap(detail)) ? "var(--buff)" : "var(--debuff)"]);
+    else if (kind === "Resisted") p.tags.push(["resisted", "var(--ink-dim)"]);
+    else if (kind === "Blocked") p.tags.push(["blocked", "var(--ink-dim)"]);
+    else if (kind === "Death") p.tags.push(["falls", "var(--ink)"]);
+    else if (kind === "Revive") p.tags.push(["rises", "var(--gold)"]);
+    else if (kind === "Interrupt") p.tags.push(["interrupted", "var(--gold)"]);
+  }
+  let k = 0;
+  for (const [tgt, p] of Object.entries(per)) {
+    const lines = [];
+    if (p.dmg) lines.push([`-${p.dmg}${p.crit ? "!" : ""}`, "var(--dmg)", p.crit]);
+    if (p.heal) lines.push([`+${p.heal}`, "var(--heal)"]);
+    if (p.shield) lines.push([`+${p.shield}`, "var(--shield)"]);
+    const tags = [...new Map(p.tags.map(t => [t[0], t])).values()];
+    if (tags.length) lines.push([tags.map(t => t[0]).join(" · "), tags[0][1]]);
+    const el = cards[tgt];
+    lines.slice(0, 3).forEach(([text, color, crit], j) => {
+      const f = document.createElement("div");
+      f.className = "float" + (crit ? " crit" : "") + (j === lines.length - 1 && tags.length ? " small" : "");
+      f.textContent = text; f.style.color = color;
+      f.style.left = el.style.left;
+      f.style.top = (parseInt(el.style.top) + 22 + j * 20) + "px";
+      f.style.animationDelay = Math.min(k, 6) * 50 + "ms";
+      board.appendChild(f);
+      setTimeout(() => f.remove(), 1600);
+    });
+    k++;
+  }
+}
+function lineFor(e) {
+  const [kind, a, t, d, amt, crit] = e;
+  const A = `<span class="who ${a[0]}">${nameOf(a)}</span>`, T = `<span class="who ${t[0]}">${nameOf(t)}</span>`;
+  switch (kind) {
+    case "Damage": return `${T} takes <span class="d">${amt}${crit ? " (crit)" : ""}</span>`;
+    case "DotTick": return `${T} takes <span class="d">${amt}</span> from ${cap(d)}`;
+    case "Heal": return `${T} heals <span class="h">${amt}</span>`;
+    case "Shield": return `${T} gains a <span class="s">${amt}</span> shield`;
+    case "Miss": return `${A} misses ${T}`;
+    case "StatusAdded": return `${T} gets ${cap(d)}`;
+    case "Resisted": return `${T} resists ${cap(d)}`;
+    case "Blocked": return `${T}'s Ward blocks ${cap(d)}`;
+    case "Cleansed": return `${T} is cleansed of ${cap(d)}`;
+    case "Interrupt": return `${A} interrupts ${T}'s ritual`;
+    case "Intercept": return `${A} steps in front of ${T}`;
+    case "RitualStart": return `${A} begins a ritual`;
+    case "RitualComplete": return `${A} completes a ritual`;
+    case "Mana": return `${T} gains ${amt} mana`;
+    case "Death": return `${T} <span class="d">falls</span>`;
+    case "Revive": return `${T} <span class="h">rises again</span>`;
+    default: return null;
+  }
+}
+function renderLog() {
+  const log = document.getElementById("log");
+  const from = Math.max(1, frame - 14);
+  let html = "";
+  for (let i = frame; i >= from; i--) {
+    const fr = fight.frames[i];
+    const turns = fr.e.filter(e => e[0] === "Turn");
+    const head = turns.length ? turns.map(e => `<span class="who ${e[1][0]}">${castLabel(e)}</span>`).join(" · ") : "";
+    const lines = fr.e.map(lineFor).filter(Boolean);
+    html += `<div class="t${i === frame ? " now" : ""}"><div><span class="x">${i}.</span> ${head}</div>${lines.length ? `<div class="x">${lines.join("; ")}</div>` : ""}</div>`;
+  }
+  log.innerHTML = html || `<div class="x">Press Play to start the fight.</div>`;
+}
+
+function showUnit(i) {
+  const u = fight.units[i], d = defs[u.id];
+  document.getElementById("uTitle").textContent = u.name;
+  if (!d) return;
+  const st = d;
+  const stats = [["Health", u.maxHp], ["Attack", st.atk], ["Speed", st.spd], ["Armour", st.armour], ["Spirit", st.spirit], ["Damage", st.kind === "magic" ? "magic" : "physical"]];
+  let html = `<p>${d.description ? d.description + " " : ""}<span style="color:var(--ink-dim)">${u.role} of the ${u.faction}, ${u.type} type. Stands ${u.row === "front" ? "in front" : "at the back"}.</span></p>`;
+  html += `<div class="stats">${stats.map(([k, v]) => `<span>${k} <b>${v ?? "–"}</b></span>`).join("")}</div>`;
+  if (d.basic) html += skillHtml("Basic", d.basic);
+  else html += `<div class="k"><b>Basic attack</b><span>Hits ${["Ranger", "Caster", "Support"].includes(d.role) ? "the nearest reachable enemy" : "the enemy opposite"} for 100% attack.</span></div>`;
+  (d.skills || []).forEach((s, j) => html += skillHtml(`Skill ${j + 1}`, s, `cooldown ${s.cd}${s.startCd ? `, ready after ${s.startCd}` : ""}`));
+  if (d.ult) html += skillHtml("Ultimate", d.ult, "at full mana");
+  for (const p of d.passives || []) {
+    const when = p.trigger === "hpBelow" ? `When its health drops below ${pct(p.hpBelow)}` : TRIGGER_TEXT[p.trigger] || p.trigger;
+    const opts = [p.once ? "once per fight" : "", p.chance ? pct(p.chance) + " chance" : "", p.cooldown ? `every ${p.cooldown} turns at most` : ""].filter(Boolean).join(", ");
+    const statTxt = p.stats ? Object.entries(p.stats).map(([k, v]) => `${k} ${v > 0 ? "+" : ""}${Math.abs(v) < 1 ? pct(v) : v}`).join(", ") : "";
+    html += `<div class="k"><b>Passive: ${p.name} <span style="color:var(--ink-dim)">· ${when}${opts ? ", " + opts : ""}</span></b>${statTxt ? `<span>${statTxt}.</span>` : ""}${(p.actions || []).map(a => `<span>${describeAction(a)}</span>`).join("")}</div>`;
+  }
+  document.getElementById("uBody").innerHTML = html;
+  if (window.innerWidth < 900) document.getElementById("unitPanel").scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function go(n, animate) {
+  n = Math.max(0, Math.min(fight.frames.length - 1, n));
+  if (n === frame && animate) return;
+  frame = n; render(animate);
+}
+function play() {
+  if (frame >= fight.frames.length - 1) frame = 0;
+  playing = true;
+  const tick = () => {
+    if (frame >= fight.frames.length - 1) { stop(); return; }
+    go(frame + 1, true);
+    timer = setTimeout(tick, 900 / speed);
+  };
+  render(false); tick();
+}
+function stop() { playing = false; clearTimeout(timer); if (fight) document.getElementById("play").textContent = frame >= fight.frames.length - 1 ? "Replay" : "Play"; }
+
+initPicker();
+showStage(DATA.fights[2].stage, 0);
+</script>

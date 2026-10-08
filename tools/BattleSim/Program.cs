@@ -4,6 +4,7 @@
 //   dotnet run --project tools/BattleSim -- --team hilde,solenne,thessaly,maren,pip --stage saint --runs 500
 //   dotnet run --project tools/BattleSim -- --team hilde@front0,solenne@front1,thessaly@back0,maren@back1,pip@back2 --stage saint
 //   dotnet run --project tools/BattleSim -- --log hilde,solenne,thessaly,maren,pip --stage saint --seed 1   -> one fight, event by event
+//   dotnet run --project tools/BattleSim -- --replays replays.json  -> sample fights frame by frame, for the fight viewer
 //   dotnet run --project tools/BattleSim -- --fingerprint 300  -> one line per fight; two runs must match (same seed, same fight)
 // Options: --data <dir> (default Unity/Assets/Resources/BattleData), --out <file>, --teams N, --runs N, --puzzle (no randomness).
 using System;
@@ -15,7 +16,7 @@ using System.Text;
 using System.Threading.Tasks;
 using ShatteredPantheon.Battle;
 
-static class Program
+static partial class Program
 {
     static GameData data;
     static BattleOptions options = new BattleOptions();
@@ -30,6 +31,8 @@ static class Program
         string root = args.ContainsKey("data") ? null : FindRoot();
         data = GameData.LoadDirectory(Arg("data", root != null ? Path.Combine(root, DataPath) : null));
         options.Deterministic = args.ContainsKey("puzzle");
+
+        if (args.ContainsKey("replays")) { WriteReplays(Arg("replays", "replays.json")); return 0; }
 
         if (args.ContainsKey("fingerprint")) { Fingerprint(int.Parse(Arg("fingerprint", "300"))); return 0; }
 

@@ -133,6 +133,11 @@ namespace ShatteredPantheon.Game
                 case "Wild": return new Color(0.22f, 0.42f, 0.2f);
                 case "Sea": return new Color(0.13f, 0.38f, 0.48f);
                 case "Forge": return new Color(0.55f, 0.25f, 0.15f);
+                case "Grave": return new Color(0.24f, 0.34f, 0.31f);
+                case "War": return new Color(0.55f, 0.15f, 0.17f);
+                case "Hearth": return new Color(0.6f, 0.42f, 0.22f);
+                case "Arcana": return new Color(0.2f, 0.27f, 0.55f);
+                case "Trickster": return new Color(0.48f, 0.22f, 0.45f);
                 default: return new Color(0.3f, 0.3f, 0.32f);
             }
         }
