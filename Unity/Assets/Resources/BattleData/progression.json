@@ -1,21 +1,27 @@
 {
-  "_about": "Progression and economy rules (plan docs 07, 08 and 10). Read by tools/ProgressionSim; the game will read the same file. Rewards marked 'levels' are worth that many level-ups at the recommended level of the player's current campaign battle, so they scale as the player advances. Each difficulty's rewardScale multiplies XP, gold, gear materials and skill tomes (easing in from the previous difficulty), which sets how long the later difficulties take.",
+  "_about": "Progression and economy rules (plan docs 07, 08 and 10). Read by tools/ProgressionSim; the game will read the same file. Rewards marked 'levels' are worth that many level-ups at the recommended level of the player's current campaign battle, so they scale as the player advances. Each difficulty's rewardScale multiplies XP, gold, gear materials and skill tomes (easing in from the previous difficulty), which sets how long the later difficulties take. 'vessels' map a star rank to an expected count (0.3 = a 30% chance of one): a Vessel counts as any hero of that star rank when ascending.",
   "heroGrowth": {
     "levelGain": 0.03,
     "starGain": 0.1,
     "gearGain": 0.05,
     "skillGain": 0.02,
     "rarityBase": {
+      "Common": 0.75,
+      "Uncommon": 0.8,
       "Rare": 0.85,
       "Epic": 1.0,
       "Legendary": 1.15
     },
     "rarityStars": {
+      "Common": 1,
+      "Uncommon": 2,
       "Rare": 3,
       "Epic": 4,
       "Legendary": 5
     },
     "levelCapByStars": {
+      "1": 30,
+      "2": 45,
       "3": 60,
       "4": 110,
       "5": 170,
@@ -33,125 +39,72 @@
     "gearMats": {
       "perTier": 5
     },
-    "gearGoldLevels": 0.5,
+    "gearGoldLevels": 0.25,
     "skillTomes": {
       "perLevel": 5
     },
     "ascendFodder": {
+      "1": 1,
+      "2": 1,
       "3": 2,
       "4": 3,
       "5": 4
     }
   },
   "roster": {
-    "_about": "The simulator's roster: each test kit appears under several names to stand in for a 48-hero launch roster. Rarity per copy.",
-    "copies": [
-      [
-        "Rare",
-        "Epic",
-        "Legendary"
-      ],
-      [
-        "Rare",
-        "Epic"
-      ],
-      [
-        "Rare",
-        "Epic",
-        "Legendary"
-      ],
-      [
-        "Rare",
-        "Epic"
-      ],
-      [
-        "Rare",
-        "Epic",
-        "Legendary"
-      ],
-      [
-        "Rare",
-        "Epic"
-      ],
-      [
-        "Rare",
-        "Epic",
-        "Legendary"
-      ],
-      [
-        "Rare",
-        "Epic"
-      ],
-      [
-        "Rare",
-        "Epic",
-        "Legendary"
-      ],
-      [
-        "Rare",
-        "Epic"
-      ],
-      [
-        "Rare",
-        "Epic",
-        "Legendary"
-      ],
-      [
-        "Rare",
-        "Epic"
-      ],
-      [
-        "Rare",
-        "Epic",
-        "Legendary"
-      ],
-      [
-        "Rare",
-        "Epic"
-      ],
-      [
-        "Rare",
-        "Epic",
-        "Legendary"
-      ],
-      [
-        "Rare",
-        "Epic"
-      ],
-      [
-        "Rare",
-        "Epic",
-        "Legendary"
-      ],
-      [
-        "Rare",
-        "Epic"
-      ],
-      [
-        "Rare",
-        "Epic",
-        "Legendary"
-      ],
-      [
-        "Rare",
-        "Epic"
-      ]
+    "_about": "The simulator's roster. Each test kit stands in for several heroes of different rarities: the launch roster, then new heroes every releaseEveryDays. Rarities are listed rarest first.",
+    "rarities": [
+      "Legendary",
+      "Epic",
+      "Rare",
+      "Uncommon",
+      "Common"
     ],
+    "launch": {
+      "Rare": 14,
+      "Epic": 12,
+      "Legendary": 8,
+      "Uncommon": 14,
+      "Common": 12
+    },
+    "release": [
+      "Rare",
+      "Epic",
+      "Epic",
+      "Legendary"
+    ],
+    "releaseEveryDays": 30,
     "starters": [
       "hilde",
       "varkhul",
       "maren"
-    ]
+    ],
+    "starterRarity": "Rare"
   },
   "summon": {
     "cost": 300,
     "rates": {
-      "Rare": 0.8,
-      "Epic": 0.17,
-      "Legendary": 0.03
+      "Legendary": 0.008,
+      "Epic": 0.06,
+      "Rare": 0.14,
+      "Uncommon": 0.3,
+      "Common": 0.492
     },
-    "epicEvery": 10,
-    "legendaryPity": 60,
+    "_guarantees": "At least this rarity once every N pulls. The counters carry over.",
+    "guarantees": [
+      {
+        "rarity": "Rare",
+        "every": 10
+      },
+      {
+        "rarity": "Epic",
+        "every": 40
+      },
+      {
+        "rarity": "Legendary",
+        "every": 160
+      }
+    ],
     "firstTenGuaranteesEpic": true
   },
   "campaign": {
@@ -270,29 +223,32 @@
     "shrinePerHour": {
       "xpLevels": 0.4,
       "goldLevels": 0.4,
-      "godshards": 4,
+      "godshards": 3,
       "devotion": 4
     },
     "shrineCapHours": 12,
     "firstClear": {
-      "xpLevels": 0.6,
-      "goldLevels": 0.6,
-      "godshards": 10,
+      "xpLevels": 0.8,
+      "goldLevels": 0.8,
+      "godshards": 5,
       "gearMats": 1
     },
     "stageClear": {
-      "godshards": 80,
+      "godshards": 50,
       "gearMats": 6,
       "skillTomes": 6
     },
     "star": {
-      "godshards": 5
+      "godshards": 1
     },
-    "starChestEvery": 50,
+    "starChestEvery": 100,
     "starChest": {
-      "godshards": 200,
+      "godshards": 100,
       "gearMats": 10,
-      "summonTickets": 1
+      "summonTickets": 1,
+      "vessels": {
+        "3": 1
+      }
     },
     "farm": {
       "devotion": 8,
@@ -302,7 +258,7 @@
     },
     "daily": {
       "minutes": 5,
-      "godshards": 80,
+      "godshards": 50,
       "xpLevels": 3,
       "goldLevels": 3,
       "devotion": 60,
@@ -311,18 +267,20 @@
     },
     "dailyHard": {
       "count": 2,
-      "godshards": 60,
+      "godshards": 30,
       "powerOver": 1.05
     },
     "weekly": {
-      "godshards": 400,
+      "godshards": 300,
       "summonTickets": 1
     },
     "codex": {
       "firstCopy": {
+        "Common": 2,
+        "Uncommon": 5,
         "Rare": 10,
-        "Epic": 50,
-        "Legendary": 150
+        "Epic": 30,
+        "Legendary": 100
       },
       "stars": {
         "4": 30,
@@ -330,10 +288,10 @@
         "6": 120
       },
       "factionShare": {
-        "0.25": 100,
-        "0.5": 200,
-        "0.75": 300,
-        "1": 800
+        "0.25": 30,
+        "0.5": 60,
+        "0.75": 120,
+        "1": 400
       }
     },
     "milestones": [
@@ -351,7 +309,146 @@
     "startingGodshards": 3000,
     "loginCalendar": {
       "everyDays": 3,
-      "summonTickets": 2
+      "summonTickets": 1
+    },
+    "stageClearVessels": [
+      {
+        "2": 1
+      },
+      {
+        "3": 1
+      },
+      {
+        "4": 0.5
+      },
+      {
+        "4": 0.5,
+        "5": 0.2
+      }
+    ],
+    "farmByDifficulty": [
+      {
+        "vessels": {
+          "1": 0.3
+        },
+        "heroShards": 0.01,
+        "gearMats": 0.5,
+        "skillTomes": 0.3
+      },
+      {
+        "vessels": {
+          "2": 0.3
+        },
+        "heroShards": 0.015,
+        "gearMats": 0.4,
+        "skillTomes": 0.25
+      },
+      {
+        "vessels": {
+          "3": 0.15
+        },
+        "heroShards": 0.02,
+        "gearMats": 0.3,
+        "skillTomes": 0.2
+      },
+      {
+        "vessels": {
+          "3": 0.2,
+          "4": 0.03
+        },
+        "heroShards": 0.025,
+        "gearMats": 0.25,
+        "skillTomes": 0.15
+      }
+    ],
+    "bossHunts": {
+      "_about": "Doc 06: one boss, tiers by difficulty. The player hunts the highest difficulty where they've beaten a boss. Free attempts each day, then Devotion.",
+      "unlockBattles": 100,
+      "freePerDay": 2,
+      "devotionCost": 16,
+      "minutes": 2,
+      "byDifficulty": [
+        {
+          "gearMats": 3,
+          "skillTomes": 2,
+          "heroShards": 0.25,
+          "vessels": {
+            "2": 0.5,
+            "3": 0.1
+          }
+        },
+        {
+          "gearMats": 2.5,
+          "skillTomes": 2,
+          "heroShards": 0.35,
+          "vessels": {
+            "3": 0.4,
+            "4": 0.08
+          }
+        },
+        {
+          "gearMats": 2,
+          "skillTomes": 1.5,
+          "heroShards": 0.45,
+          "vessels": {
+            "4": 0.3,
+            "5": 0.04
+          }
+        },
+        {
+          "gearMats": 2,
+          "skillTomes": 1.5,
+          "heroShards": 0.55,
+          "vessels": {
+            "4": 0.4,
+            "5": 0.08
+          }
+        }
+      ]
+    },
+    "endless": {
+      "_about": "Doc 06: weekly milestone rewards for the deepest floor reached, by the difficulty the player is on. One run a week.",
+      "unlockBattles": 200,
+      "minutes": 15,
+      "byDifficulty": [
+        {
+          "godshards": 150,
+          "heroShards": 3,
+          "vessels": {
+            "3": 1
+          },
+          "gearMats": 10,
+          "skillTomes": 8
+        },
+        {
+          "godshards": 200,
+          "heroShards": 4,
+          "vessels": {
+            "4": 1
+          },
+          "gearMats": 10,
+          "skillTomes": 8
+        },
+        {
+          "godshards": 250,
+          "heroShards": 5,
+          "vessels": {
+            "4": 1,
+            "5": 0.3
+          },
+          "gearMats": 10,
+          "skillTomes": 8
+        },
+        {
+          "godshards": 300,
+          "heroShards": 6,
+          "vessels": {
+            "5": 0.5
+          },
+          "gearMats": 10,
+          "skillTomes": 8
+        }
+      ]
     }
   },
   "players": {
@@ -375,21 +472,28 @@
     "spend": [
       {
         "name": "Free",
-        "godshardsPerDay": 0,
-        "devotionRefills": 0,
-        "bonus": 0
+        "dollarsPerMonth": 0
       },
       {
         "name": "Light",
-        "godshardsPerDay": 90,
-        "devotionRefills": 0,
-        "bonus": 0.2
+        "pilgrimsPath": true,
+        "shrineBlessing": true,
+        "starterOffer": true
+      },
+      {
+        "name": "Medium",
+        "pilgrimsPath": true,
+        "shrineBlessing": true,
+        "starterOffer": true,
+        "packDollarsPerMonth": 35
       },
       {
         "name": "Heavy",
-        "godshardsPerDay": 600,
-        "devotionRefills": 2,
-        "bonus": 0.5
+        "pilgrimsPath": true,
+        "shrineBlessing": true,
+        "starterOffer": true,
+        "packDollarsPerMonth": 285,
+        "devotionRefillsPerDay": 2
       }
     ],
     "secondsPerFightOverhead": 15,
@@ -414,6 +518,115 @@
     "lightSpenderFaster": [
       0.25,
       0.35
-    ]
+    ],
+    "collection": {
+      "_about": "Share of released Epics and Legendaries a regular free player owns on these days, and at most this share of Legendaries after a year.",
+      "rosterShare": {
+        "30": [
+          0.15,
+          0.3
+        ],
+        "90": [
+          0.3,
+          0.45
+        ],
+        "180": [
+          0.4,
+          0.6
+        ],
+        "365": [
+          0.55,
+          0.75
+        ]
+      },
+      "legendaryShareMax": 0.6
+    },
+    "timePays": 1.3,
+    "lateWallDays": 14,
+    "pullsPerDayFree": {
+      "month1": [
+        1.5,
+        3
+      ],
+      "later": [
+        0.8,
+        1.6
+      ]
+    }
+  },
+  "heroShards": {
+    "_about": "Hero shards go to the hero at the top of the player's wish list; this many unlock that hero.",
+    "unlock": {
+      "Common": 10,
+      "Uncommon": 15,
+      "Rare": 25,
+      "Epic": 50,
+      "Legendary": 150
+    }
+  },
+  "shop": {
+    "_about": "Doc 08. Real money buys Godshards, the Pilgrim's Path, the Shrine Blessing and cosmetics, never a specific hero or power a free player can't earn.",
+    "godshardPacks": [
+      {
+        "price": 0.99,
+        "godshards": 120
+      },
+      {
+        "price": 4.99,
+        "godshards": 650
+      },
+      {
+        "price": 9.99,
+        "godshards": 1350
+      },
+      {
+        "price": 19.99,
+        "godshards": 2800
+      },
+      {
+        "price": 49.99,
+        "godshards": 7200
+      },
+      {
+        "price": 99.99,
+        "godshards": 15000
+      }
+    ],
+    "firstPurchaseDoubles": true,
+    "starterOffer": {
+      "price": 0.99,
+      "godshards": 300,
+      "summonTickets": 5,
+      "vessels": {
+        "3": 2
+      }
+    },
+    "pilgrimsPath": {
+      "price": 9.99,
+      "days": 30,
+      "godshards": 2400,
+      "summonTickets": 8,
+      "vessels": {
+        "3": 3,
+        "4": 2
+      },
+      "xpGoldBonus": 0.15
+    },
+    "shrineBlessing": {
+      "price": 4.99,
+      "days": 30,
+      "godshardsNow": 300,
+      "godshardsPerDay": 100,
+      "devotionPerDay": 60
+    },
+    "devotionRefill": {
+      "devotion": 120,
+      "godshards": [
+        50,
+        100,
+        200,
+        400
+      ]
+    }
   }
 }

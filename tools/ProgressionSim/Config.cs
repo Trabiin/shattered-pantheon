@@ -9,14 +9,23 @@ using ShatteredPantheon.Battle;
 
 class Reward
 {
-    public double XpLevels, GoldLevels, Godshards, Devotion, GearMats, SkillTomes, SummonTickets;
-    public static Reward From(JsonElement e) => new Reward
+    public double XpLevels, GoldLevels, Godshards, Devotion, GearMats, SkillTomes, SummonTickets, HeroShards;
+    public Dictionary<int, double> Vessels = new Dictionary<int, double>();   // star rank -> expected count
+    public static Reward From(JsonElement e)
     {
-        XpLevels = Cfg.N(e, "xpLevels"), GoldLevels = Cfg.N(e, "goldLevels"), Godshards = Cfg.N(e, "godshards"),
-        Devotion = Cfg.N(e, "devotion"), GearMats = Cfg.N(e, "gearMats"), SkillTomes = Cfg.N(e, "skillTomes"),
-        SummonTickets = Cfg.N(e, "summonTickets"),
-    };
+        var r = new Reward
+        {
+            XpLevels = Cfg.N(e, "xpLevels"), GoldLevels = Cfg.N(e, "goldLevels"), Godshards = Cfg.N(e, "godshards"),
+            Devotion = Cfg.N(e, "devotion"), GearMats = Cfg.N(e, "gearMats"), SkillTomes = Cfg.N(e, "skillTomes"),
+            SummonTickets = Cfg.N(e, "summonTickets"), HeroShards = Cfg.N(e, "heroShards"),
+        };
+        if (e.TryGetProperty("vessels", out var v)) r.Vessels = Cfg.Vessels(v);
+        return r;
+    }
+    public static List<Reward> List(JsonElement e) => e.EnumerateArray().Select(From).ToList();
 }
+
+class Mode { public int UnlockBattles, FreePerDay; public double DevotionCost, Minutes; public List<Reward> ByDifficulty; }
 
 class Difficulty
 {
@@ -26,13 +35,20 @@ class Difficulty
 }
 
 class TimeProfile { public string Name; public double Minutes; public int Sessions; }
-class SpendProfile { public string Name; public double GodshardsPerDay, Bonus, DevotionRefills; }
+class SpendProfile
+{
+    public string Name;
+    public bool PilgrimsPath, ShrineBlessing, StarterOffer;
+    public double PackDollarsPerMonth, DevotionRefillsPerDay;
+}
 
 class Cfg
 {
     public static double N(JsonElement e, string k, double def = 0) => e.TryGetProperty(k, out var v) && v.ValueKind == JsonValueKind.Number ? v.GetDouble() : def;
     static double[] Arr(JsonElement e, string k) => e.GetProperty(k).EnumerateArray().Select(x => x.GetDouble()).ToArray();
-    static Dictionary<string, double> Map(JsonElement e) => e.EnumerateObject().ToDictionary(p => p.Name, p => p.Value.GetDouble());
+    static Dictionary<string, double> Map(JsonElement e) => e.EnumerateObject().Where(p => p.Value.ValueKind == JsonValueKind.Number).ToDictionary(p => p.Name, p => p.Value.GetDouble());
+    public static Dictionary<int, double> Vessels(JsonElement e) => Map(e).ToDictionary(kv => int.Parse(kv.Key), kv => kv.Value);
+    static bool B(JsonElement e, string k) => e.TryGetProperty(k, out var v) && v.ValueKind == JsonValueKind.True;
 
     // Hero growth
     public double LevelGain, StarGain, GearGain, SkillGain;
@@ -43,9 +59,18 @@ class Cfg
     public double XpA, XpExp, GoldPerXp, GearMatsPerTier, GearGoldLevels, TomesPerLevel;
     public Dictionary<int, int> AscendFodder = new Dictionary<int, int>();
     // Roster and summons
-    public List<string[]> Copies = new List<string[]>();
-    public List<string> Starters;
-    public double SummonCost; public Dictionary<string, double> Rates; public int EpicEvery, LegendaryPity; public bool FirstTenEpic;
+    public List<string> Rarities;                        // rarest first
+    public Dictionary<string, int> Launch;
+    public List<string> Release; public int ReleaseEvery;
+    public List<string> Starters; public string StarterRarity;
+    public double SummonCost; public Dictionary<string, double> Rates; public bool FirstTenEpic;
+    public List<(string rarity, int every)> Guarantees = new List<(string, int)>();
+    public Dictionary<string, double> ShardUnlock;
+    // Shop (doc 08)
+    public List<(double price, double godshards)> Packs = new List<(double, double)>();
+    public Reward StarterOffer, PassReward; public double StarterPrice, PassPrice, PassDays, PassBonus;
+    public double BlessingPrice, BlessingDays, BlessingNow, BlessingPerDay, BlessingDevotion;
+    public double RefillDevotion; public double[] RefillCosts;
     // Campaign
     public List<Difficulty> Difficulties = new List<Difficulty>();
     public int Stages, BattlesPerStage;
@@ -55,6 +80,9 @@ class Cfg
     public double RewardEase;
     // Rewards
     public Reward ShrinePerHour, FirstClear, StageClear, StarChest, Farm, Daily, Weekly;
+    public List<Dictionary<int, double>> StageClearVessels;
+    public List<Reward> FarmByDifficulty;
+    public Mode BossHunts, Endless;
     public double StartingGodshards, LoginEvery, LoginTickets;
     public double ShrineCapHours, StarGodshards, StarChestEvery, FarmCost, DailyMinutes, DailyHardCount, DailyHardGodshards, DailyHardPower;
     public Dictionary<string, double> CodexFirst; public Dictionary<int, double> CodexStars = new Dictionary<int, double>();
@@ -69,8 +97,28 @@ class Cfg
     public Dictionary<string, double> NormalDays, HardDays;
     public double WallDays, NewHeroEveryDays, FirstLegendaryDay, MaxDaysWithoutBig;
     public double[] LightFaster;
+    public SortedDictionary<int, double[]> CollectionShare = new SortedDictionary<int, double[]>();
+    public double LegendaryShareMax, TimePays, LateWallDays;
+    public double[] PullsMonth1, PullsLater;
 
     public int BattlesPerDifficulty => Stages * BattlesPerStage;
+
+    // Godshards for a month's spend on packs: the biggest packs that fit, then smaller ones.
+    public double PackGodshards(double dollars)
+    {
+        double g = 0;
+        foreach (var (price, shards) in Packs.OrderByDescending(p => p.price))
+            while (dollars >= price - 0.01) { dollars -= price; g += shards; }
+        return g;
+    }
+
+    public double DollarsPerMonth(SpendProfile s)
+    {
+        double d = (s.PilgrimsPath ? PassPrice : 0) + (s.ShrineBlessing ? BlessingPrice : 0), left = s.PackDollarsPerMonth;
+        foreach (var (price, _) in Packs.OrderByDescending(p => p.price))
+            while (left >= price - 0.01) { left -= price; d += price; }
+        return d;
+    }
 
     public static Cfg Load(string path)
     {
@@ -89,13 +137,24 @@ class Cfg
         foreach (var kv in Map(co.GetProperty("ascendFodder"))) c.AscendFodder[int.Parse(kv.Key)] = (int)kv.Value;
 
         var ro = r.GetProperty("roster");
-        foreach (var a in ro.GetProperty("copies").EnumerateArray()) c.Copies.Add(a.EnumerateArray().Select(x => x.GetString()).ToArray());
-        c.Starters = ro.GetProperty("starters").EnumerateArray().Select(x => x.GetString()).ToList();
+        List<string> Strs(JsonElement e, string k) => e.GetProperty(k).EnumerateArray().Select(x => x.GetString()).ToList();
+        c.Rarities = Strs(ro, "rarities");
+        c.Launch = Map(ro.GetProperty("launch")).ToDictionary(kv => kv.Key, kv => (int)kv.Value);
+        c.Release = Strs(ro, "release"); c.ReleaseEvery = (int)N(ro, "releaseEveryDays");
+        c.Starters = Strs(ro, "starters"); c.StarterRarity = ro.GetProperty("starterRarity").GetString();
 
         var su = r.GetProperty("summon");
         c.SummonCost = N(su, "cost"); c.Rates = Map(su.GetProperty("rates"));
-        c.EpicEvery = (int)N(su, "epicEvery"); c.LegendaryPity = (int)N(su, "legendaryPity");
-        c.FirstTenEpic = su.GetProperty("firstTenGuaranteesEpic").GetBoolean();
+        foreach (var gu in su.GetProperty("guarantees").EnumerateArray()) c.Guarantees.Add((gu.GetProperty("rarity").GetString(), (int)N(gu, "every")));
+        c.FirstTenEpic = B(su, "firstTenGuaranteesEpic");
+        c.ShardUnlock = Map(r.GetProperty("heroShards").GetProperty("unlock"));
+
+        var sh = r.GetProperty("shop");
+        foreach (var pk in sh.GetProperty("godshardPacks").EnumerateArray()) c.Packs.Add((N(pk, "price"), N(pk, "godshards")));
+        var so = sh.GetProperty("starterOffer"); c.StarterOffer = Reward.From(so); c.StarterPrice = N(so, "price");
+        var pp = sh.GetProperty("pilgrimsPath"); c.PassReward = Reward.From(pp); c.PassPrice = N(pp, "price"); c.PassDays = N(pp, "days"); c.PassBonus = N(pp, "xpGoldBonus");
+        var bl = sh.GetProperty("shrineBlessing"); c.BlessingPrice = N(bl, "price"); c.BlessingDays = N(bl, "days"); c.BlessingNow = N(bl, "godshardsNow"); c.BlessingPerDay = N(bl, "godshardsPerDay"); c.BlessingDevotion = N(bl, "devotionPerDay");
+        var rf = sh.GetProperty("devotionRefill"); c.RefillDevotion = N(rf, "devotion"); c.RefillCosts = Arr(rf, "godshards");
 
         var ca = r.GetProperty("campaign");
         foreach (var d in ca.GetProperty("difficulties").EnumerateArray())
@@ -111,6 +170,10 @@ class Cfg
         c.FirstClear = Reward.From(re.GetProperty("firstClear")); c.StageClear = Reward.From(re.GetProperty("stageClear"));
         c.StarGodshards = N(re.GetProperty("star"), "godshards"); c.StarChestEvery = N(re, "starChestEvery");
         c.StarChest = Reward.From(re.GetProperty("starChest"));
+        c.StageClearVessels = re.GetProperty("stageClearVessels").EnumerateArray().Select(Vessels).ToList();
+        c.FarmByDifficulty = Reward.List(re.GetProperty("farmByDifficulty"));
+        Mode M(JsonElement e) => new Mode { UnlockBattles = (int)N(e, "unlockBattles"), FreePerDay = (int)N(e, "freePerDay"), DevotionCost = N(e, "devotionCost"), Minutes = N(e, "minutes"), ByDifficulty = Reward.List(e.GetProperty("byDifficulty")) };
+        c.BossHunts = M(re.GetProperty("bossHunts")); c.Endless = M(re.GetProperty("endless"));
         c.Farm = Reward.From(re.GetProperty("farm")); c.FarmCost = c.Farm.Devotion; c.Farm.Devotion = 0;
         c.Daily = Reward.From(re.GetProperty("daily")); c.DailyMinutes = N(re.GetProperty("daily"), "minutes");
         var dh = re.GetProperty("dailyHard"); c.DailyHardCount = N(dh, "count"); c.DailyHardGodshards = N(dh, "godshards"); c.DailyHardPower = N(dh, "powerOver");
@@ -130,13 +193,23 @@ class Cfg
 
         var pl = r.GetProperty("players");
         foreach (var t in pl.GetProperty("time").EnumerateArray()) c.Times.Add(new TimeProfile { Name = t.GetProperty("name").GetString(), Minutes = N(t, "minutes"), Sessions = (int)N(t, "sessions") });
-        foreach (var s in pl.GetProperty("spend").EnumerateArray()) c.Spends.Add(new SpendProfile { Name = s.GetProperty("name").GetString(), GodshardsPerDay = N(s, "godshardsPerDay"), Bonus = N(s, "bonus"), DevotionRefills = N(s, "devotionRefills") });
+        foreach (var s in pl.GetProperty("spend").EnumerateArray())
+            c.Spends.Add(new SpendProfile
+            {
+                Name = s.GetProperty("name").GetString(), PilgrimsPath = B(s, "pilgrimsPath"), ShrineBlessing = B(s, "shrineBlessing"), StarterOffer = B(s, "starterOffer"),
+                PackDollarsPerMonth = N(s, "packDollarsPerMonth"), DevotionRefillsPerDay = N(s, "devotionRefillsPerDay"),
+            });
         c.FightOverhead = N(pl, "secondsPerFightOverhead"); c.ReplaySpeed = N(pl, "replaySpeed"); c.AttemptsBeforeUpgrading = (int)N(pl, "attemptsBeforeUpgrading");
 
         var ta = r.GetProperty("targets");
         c.NormalDays = Map(ta.GetProperty("normalDays")); c.HardDays = Map(ta.GetProperty("hardDays"));
         c.WallDays = N(ta, "wallDays"); c.NewHeroEveryDays = N(ta, "newHeroEveryDays"); c.FirstLegendaryDay = N(ta, "firstLegendaryDay");
         c.MaxDaysWithoutBig = N(ta, "maxDaysWithoutBigMoment"); c.LightFaster = Arr(ta, "lightSpenderFaster");
+        var cl = ta.GetProperty("collection");
+        foreach (var kv in cl.GetProperty("rosterShare").EnumerateObject()) c.CollectionShare[int.Parse(kv.Name)] = kv.Value.EnumerateArray().Select(x => x.GetDouble()).ToArray();
+        c.LegendaryShareMax = N(cl, "legendaryShareMax");
+        c.TimePays = N(ta, "timePays"); c.LateWallDays = N(ta, "lateWallDays");
+        c.PullsMonth1 = Arr(ta.GetProperty("pullsPerDayFree"), "month1"); c.PullsLater = Arr(ta.GetProperty("pullsPerDayFree"), "later");
         return c;
     }
 
