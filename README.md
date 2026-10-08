@@ -9,7 +9,7 @@ A mobile auto-battle gacha game, built in Unity. Design docs live in the project
 | `Unity/` | The game. Open this folder in Unity Hub. |
 | `Unity/Assets/BattleCore/` | The battle rules: plain C# with no Unity code, shared by the game and the simulator. |
 | `Unity/Assets/Resources/BattleData/` | Heroes, enemies, stages and rules as JSON. The one copy both the game and the simulators read. |
-| `Unity/Assets/Game/` | The game screens. Right now: the battle screen with placeholder cards. |
+| `Unity/Assets/Game/` | The game screens, built in code with placeholder art: stage select, team and formation, battle, results. |
 | `tools/BattleSim/` | The balance simulator, compiled from the same `BattleCore` files. |
 | `sim-js/` | The original JavaScript simulator, kept until the C# one fully replaces it. |
 | `reports/latest.md` | The latest balance report. |
@@ -18,10 +18,10 @@ A mobile auto-battle gacha game, built in Unity. Design docs live in the project
 
 1. Install **Unity Hub**, then **Unity 6.3 LTS** with *Android Build Support* (and *iOS Build Support* on a Mac).
 2. In Unity Hub: **Add > Add project from disk**, pick the `Unity` folder, and open it with Unity 6.3 LTS. The first open takes a few minutes while Unity imports everything.
-3. The battle scene is created automatically (`Assets/Scenes/Battle.unity`). Open it and press **Play**. If it's missing, use the menu **Shattered Pantheon > Rebuild Battle Scene**.
+3. The game's scene is created automatically (`Assets/Scenes/Main.unity`). Open it and press **Play**. If it's missing, use the menu **Shattered Pantheon > Rebuild Main Scene**.
 4. In the Game view, pick a portrait phone resolution (for example 1080x1920) to see it as on a phone.
 
-The screen plays a fight on its own: tap the speed button for 1x/2x/3x, **Stage** to switch stage, **Restart** for a new fight.
+Pick a stage, set your team and formation (tap a slot, then a hero), and press **Fight!**. The fight plays itself (tap the speed button for 1x/2x/3x, **Retreat** to go back), then the results show what each hero did.
 
 ## Run the simulator
 
@@ -32,6 +32,13 @@ dotnet run --project tools/BattleSim                                    # full r
 dotnet run --project tools/BattleSim -- --team hilde,solenne,thessaly,maren,pip --stage saint --runs 500
 dotnet run --project tools/BattleSim -- --log hilde,solenne,thessaly,maren,pip --stage saint --seed 1
 ```
+
+## Checks without Unity
+
+Every pull request runs these on GitHub (`.github/workflows/`):
+- **Unity compile:** the game and editor scripts are compiled against the real Unity 6.3 libraries, taken from an official Unity editor image. No Unity licence is needed.
+- **Screen smoke test:** `dotnet run --project tools/ScreenSmokeTest` plays the screens on a stand-in for Unity, like a player would, and fails on errors or on fights that differ from the engine.
+- **Parity:** the C# and JavaScript engines give identical fights (below).
 
 ## Keeping the engines in step
 

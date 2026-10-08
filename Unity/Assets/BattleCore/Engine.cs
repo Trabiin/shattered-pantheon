@@ -136,15 +136,18 @@ namespace ShatteredPantheon.Battle
             return x - f >= 0.5 ? f + 1 : f;
         }
 
-        public static double Matchup(Rules r, Unit src, Unit tgt)
+        public static double Matchup(Rules r, Unit src, Unit tgt) => Matchup(r, src.Faction, src.Type, tgt.Faction, tgt.Type);
+
+        // Damage multiplier when an attacker of this faction and type hits a target (faction wheel x type chart, clamped).
+        public static double Matchup(Rules r, string srcFaction, string srcType, string tgtFaction, string tgtType)
         {
             double m = 1;
-            if (r.FactionWheel.TryGetValue(src.Faction ?? "", out var beats) && beats == tgt.Faction) m *= 1 + r.FactionAdvantage;
-            else if (r.FactionWheel.TryGetValue(tgt.Faction ?? "", out var beaten) && beaten == src.Faction) m *= 1 - r.FactionAdvantage;
-            if (r.TypeChart.TryGetValue(src.Type ?? "", out var tc))
+            if (r.FactionWheel.TryGetValue(srcFaction ?? "", out var beats) && beats == tgtFaction) m *= 1 + r.FactionAdvantage;
+            else if (r.FactionWheel.TryGetValue(tgtFaction ?? "", out var beaten) && beaten == srcFaction) m *= 1 - r.FactionAdvantage;
+            if (r.TypeChart.TryGetValue(srcType ?? "", out var tc))
             {
-                if (tc.Strong.Contains(tgt.Type)) m *= 1 + r.TypeStrong;
-                if (tc.ResistedBy.Contains(tgt.Type)) m *= 1 - r.TypeResisted;
+                if (tc.Strong.Contains(tgtType)) m *= 1 + r.TypeStrong;
+                if (tc.ResistedBy.Contains(tgtType)) m *= 1 - r.TypeResisted;
             }
             return Math.Min(r.MatchupMax, Math.Max(r.MatchupMin, m));
         }
