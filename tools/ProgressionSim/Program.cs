@@ -64,7 +64,7 @@ static class Program
         string outPath = Arg("out", Path.Combine(root, "reports", "progression.md"));
         File.WriteAllText(outPath, report);
         Console.WriteLine(report);
-        Console.Error.WriteLine($"{players.Sum(p => p.RealFights)} campaign fights simulated");
+        Console.Error.WriteLine($"{players.Sum(p => p.RealFights)} campaign fights simulated, plus {players.Sum(p => p.PracticeFights)} practice fights");
         return 0;
     }
 

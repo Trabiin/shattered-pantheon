@@ -51,7 +51,7 @@ class Player
     readonly HashSet<string> codexDone = new HashSet<string>();
     public readonly List<DayLog> Days = new List<DayLog>();
     DayLog today;
-    public int RealFights;
+    public int RealFights, PracticeFights;
     public Dictionary<string, int> DoneDay = new Dictionary<string, int>();   // milestone -> day
     public int FirstLegendaryDay = -1;
 
@@ -361,19 +361,19 @@ class Player
 
     // After a couple of losses the player studies the fight and tries counters (doc 10: rearrange
     // before grinding). Modelled as picking, from the best line-up and a spread of other line-ups,
-    // the one that does best in a few practice fights. Re-thought every few losses as the roster grows.
+    // the one that does best in a few practice fights. Re-thought now and then as the roster grows.
     readonly Dictionary<(int, int), (int at, List<Owned> team)> plans = new Dictionary<(int, int), (int, List<Owned>)>();
     List<Owned> Counter(string stage, List<UnitDef> enemies, int tries)
     {
-        if (plans.TryGetValue((Diff, Battle), out var plan) && tries - plan.at < 4) return plan.team;
+        if (plans.TryGetValue((Diff, Battle), out var plan) && tries < plan.at * 2 + 4) return plan.team;   // re-think less and less often
         var candidates = new List<List<Owned>> { BestTeam(enemies) };
-        for (int v = 0; v < 15; v++) candidates.Add(VariantTeam(enemies, tries * 100 + v));
+        for (int v = 0; v < 9; v++) candidates.Add(VariantTeam(enemies, tries * 100 + v));
         List<Owned> best = null; int bestWins = -1;
         foreach (var team in candidates)
         {
             int wins = 0;
-            for (int i = 0; i < 4; i++)
-                if (ShatteredPantheon.Battle.Battle.Run(data, Place(team), stage, seed * 7 + tries * 1009 + i * 13 + 5, null).Result == "win") wins++;
+            for (int i = 0; i < 3; i++)
+                { PracticeFights++; if (ShatteredPantheon.Battle.Battle.Run(data, Place(team), stage, seed * 7 + tries * 1009 + i * 13 + 5, null).Result == "win") wins++; }
             if (wins > bestWins) { best = team; bestWins = wins; }
         }
         plans[(Diff, Battle)] = (tries, best);
