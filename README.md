@@ -11,7 +11,6 @@ A mobile auto-battle gacha game, built in Unity. Design docs live in the project
 | `Unity/Assets/Resources/BattleData/` | Heroes, enemies, stages and rules as JSON. The one copy both the game and the simulators read. |
 | `Unity/Assets/Game/` | The game screens, built in code with placeholder art: stage select, team and formation, battle, results. |
 | `tools/BattleSim/` | The balance simulator, compiled from the same `BattleCore` files. |
-| `sim-js/` | The original JavaScript simulator, kept until the C# one fully replaces it. |
 | `reports/latest.md` | The latest balance report. |
 
 ## Open the game
@@ -38,14 +37,4 @@ dotnet run --project tools/BattleSim -- --log hilde,solenne,thessaly,maren,pip -
 Every pull request runs these on GitHub (`.github/workflows/`):
 - **Unity compile:** the game and editor scripts are compiled against the real Unity 6.3 libraries, taken from an official Unity editor image. No Unity licence is needed.
 - **Screen smoke test:** `dotnet run --project tools/ScreenSmokeTest` plays the screens on a stand-in for Unity, like a player would, and fails on errors or on fights that differ from the engine.
-- **Parity:** the C# and JavaScript engines give identical fights (below).
-
-## Keeping the engines in step
-
-Until the JavaScript simulator is retired, every rules change goes into both `BattleCore` and `sim-js/engine.js`, and this must print nothing:
-
-```
-node sim-js/parity.js 2000 > js.txt
-dotnet run --project tools/BattleSim -c Release -- --parity 2000 > cs.txt
-cmp js.txt cs.txt
-```
+- **Replays:** the same seed always gives the same fight, so replays and server checks work.

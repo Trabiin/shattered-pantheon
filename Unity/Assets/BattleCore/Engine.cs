@@ -1,7 +1,7 @@
 // Headless battle engine: the rules of a fight, with no graphics. The Unity client and the
 // balance simulator both run this code, so simulated results are what players will get.
-// Ported line for line from sim-js/engine.js; seeded fights give identical results in both
-// (checked by `BattleSim --parity` against sim-js/parity.js). Keep the two in step until the JavaScript one is retired.
+// Seeded: the same teams and seed always give the same fight (checked in CI by `BattleSim --fingerprint`),
+// which replays, server checks and bug reports rely on.
 using System;
 using System.Collections.Generic;
 using System.Linq;

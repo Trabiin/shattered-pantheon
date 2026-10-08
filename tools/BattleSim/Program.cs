@@ -1,9 +1,9 @@
 // Battle simulator on the shared C# engine (the same files the Unity game compiles).
-// Port of sim-js/sim.js; produces the same report. Run from the repository root:
+// Run from the repository root:
 //   dotnet run --project tools/BattleSim                 -> full report, writes reports/latest.md
 //   dotnet run --project tools/BattleSim -- --team hilde,solenne,thessaly,maren,pip --stage saint --runs 500
 //   dotnet run --project tools/BattleSim -- --log hilde,solenne,thessaly,maren,pip --stage saint --seed 1   -> one fight, event by event
-//   dotnet run --project tools/BattleSim -- --parity 300       -> per-fight lines for comparing with sim-js/parity.js
+//   dotnet run --project tools/BattleSim -- --fingerprint 300  -> one line per fight; two runs must match (same seed, same fight)
 // Options: --data <dir> (default Unity/Assets/Resources/BattleData), --out <file>, --teams N, --runs N.
 using System;
 using System.Collections.Generic;
@@ -27,7 +27,7 @@ static class Program
         string root = args.ContainsKey("data") ? null : FindRoot();
         data = GameData.LoadDirectory(Arg("data", root != null ? Path.Combine(root, DataPath) : null));
 
-        if (args.ContainsKey("parity")) { Parity(int.Parse(Arg("parity", "300"))); return 0; }
+        if (args.ContainsKey("fingerprint")) { Fingerprint(int.Parse(Arg("fingerprint", "300"))); return 0; }
 
         if (args.ContainsKey("log"))
         {
@@ -161,8 +161,8 @@ static class Program
         return o.ToString();
     }
 
-    // One line per fight with every number the engine produces; sim-js/parity.js prints the same.
-    static void Parity(int teamCount)
+    // One line per fight with every number the engine produces, to check that a seed always replays the same fight.
+    static void Fingerprint(int teamCount)
     {
         var teams = SampleTeams(teamCount);
         string N(double x) => x.ToString("R", CultureInfo.InvariantCulture);
