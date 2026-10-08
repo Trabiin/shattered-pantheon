@@ -1,4 +1,4 @@
-// A placeholder hero or enemy on the battle screen: faction-coloured card with health, shield and energy bars.
+// A placeholder hero or enemy on the battle screen: faction-coloured card with health, shield and mana bars.
 namespace ShatteredPantheon.Game
 {
     using System.Collections;
@@ -11,7 +11,7 @@ namespace ShatteredPantheon.Game
     {
         public readonly RectTransform Root;
         public readonly string Name;
-        readonly Image face, hpFill, shieldFill, energyFill;
+        readonly Image face, hpFill, shieldFill, manaFill;
         readonly Text hpText, statusText;
         readonly CanvasGroup group;
         // Card animations run on the card itself, so they stop when the card is destroyed (on restart).
@@ -38,7 +38,7 @@ namespace ShatteredPantheon.Game
             shieldFill = Ui.Panel(hpFill.transform.parent, "Shield", new Color(Palette.Shield.r, Palette.Shield.g, Palette.Shield.b, 0.7f));
             Ui.Fill(shieldFill.rectTransform, 0, 0.25f);
             hpText.transform.SetAsLastSibling();
-            energyFill = Bar(Root, new Vector2(0, -95), 14, Palette.Ult, out _);
+            manaFill = Bar(Root, new Vector2(0, -95), 14, Palette.Ult, out _);
             Refresh(u);
         }
 
@@ -58,9 +58,11 @@ namespace ShatteredPantheon.Game
             Ui.Fill(hpFill.rectTransform, hp, 1);
             hpFill.color = hp > 0.5f ? Palette.Heal : hp > 0.25f ? Palette.Burn : Palette.Damage;
             Ui.Fill(shieldFill.rectTransform, Mathf.Min(1, (float)(u.Shield / u.MaxHp)), 0.3f);
-            Ui.Fill(energyFill.rectTransform, (float)(u.Energy / 100), 1);
+            Ui.Fill(manaFill.rectTransform, (float)(u.Mana / 100), 1);
             hpText.text = $"{u.Hp:0} / {u.MaxHp:0}";
-            statusText.text = string.Join("  ", u.St.Select(s => s.Type == "channel" ? "RITUAL" : s.Type.ToUpperInvariant()).Distinct());
+            // At most three effects are shown; the rest are counted (doc 04 section 9).
+            var labels = u.St.Where(s => Effects.Label(s.Type) != null).Select(s => Effects.Label(s.Type) + (s.Stacks > 1 ? " x" + s.Stacks : "")).Distinct().ToList();
+            statusText.text = string.Join("  ", labels.Take(3)) + (labels.Count > 3 ? $"  +{labels.Count - 3}" : "");
             group.alpha = u.Alive ? 1 : 0.25f;
         }
 

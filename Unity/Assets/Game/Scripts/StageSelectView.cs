@@ -46,14 +46,16 @@ namespace ShatteredPantheon.Game
         public static List<string> StageNotes(GameData data, StageDef stage)
         {
             var notes = new List<string>();
-            var defs = stage.Enemies.Select(e => data.Enemies.First(x => x.Id == e.Id)).Distinct().ToList();
-            IEnumerable<ActionDef> Actions(UnitDef d) => (d.Skill?.Actions ?? new List<ActionDef>()).Concat(d.Ult?.Actions ?? new List<ActionDef>());
+            var defs = stage.Enemies.Select(e => data.Enemy(e.Id)).Distinct().ToList();
+            IEnumerable<ActionDef> Actions(UnitDef d) => d.Skills.Append(d.Ult).Where(k => k != null).SelectMany(k => k.Actions);
             foreach (var d in defs)
             {
-                if (Actions(d).Any(a => a.Effect == "channel")) notes.Add($"{d.Name} heals with a ritual: bring a stun or silence.");
-                if (Actions(d).Any(a => a.Target == "backRow" && a.Effect == "damage")) notes.Add($"{d.Name} hits your back row.");
+                if (Actions(d).Any(a => a.Effect == "channel")) notes.Add($"{d.Name} heals with a ritual: bring Godstruck or Hush.");
+                if (Actions(d).Any(a => (a.Target == "backRow" || a.Target == "back") && a.Effect == "damage")) notes.Add($"{d.Name} hits your back row.");
                 if (Actions(d).Any(a => a.Target == "lowestAlly" && a.Effect == "heal")) notes.Add($"{d.Name} heals allies: focus it down.");
             }
+            var factions = defs.GroupBy(d => d.Faction).Where(g => stage.Enemies.Count(e => data.Enemy(e.Id).Faction == g.Key) >= 2).Select(g => g.Key);
+            foreach (var f in factions) notes.Add($"{f} doctrine active.");
             return notes.Distinct().ToList();
         }
     }

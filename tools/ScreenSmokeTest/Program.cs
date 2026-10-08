@@ -48,6 +48,10 @@ static class Program
         Click("Hero: " + frontHero);
         Expect(Has(frontHero, "back2") && Has("ysolde", "front0"), "tapping a hero already in the team swaps them into the selected slot");
         var picked = Team();
+        Click("Formation Button");
+        Expect(((TeamView)Current).Formation == "3-2" && Team().Count == 5 && Team().Count(t => t.Row == "front") == 3, "the formation button switches to 3-2 and keeps all five heroes");
+        Click("Formation Button");
+        Expect(((TeamView)Current).Formation == "2-3" && TeamSet(Team()) == TeamSet(picked), "switching back to 2-3 restores the same placement");
         Expect(Scheduler.Errors.Count == 0, "team editing throws nothing");
 
         // Fight with that team, then check results.
@@ -85,6 +89,19 @@ static class Program
             Click("Stages Button");
         }
 
+        // A fight in the 3-2 formation.
+        var wide = data.Stages.Last();
+        Click("Stage: " + wide.Id);
+        Click("Formation Button");
+        var three = Team();
+        Expect(three.Count(t => t.Row == "front") == 3, "3-2 puts three heroes in front");
+        Click("Fight! Button");
+        Expect(((BattleView)Current).Battle.HeroFormation == "3-2", "the fight uses the 3-2 formation");
+        CheckFight(data, wide, three);
+        Click("Change team Button");
+        Expect(((TeamView)Current).Formation == "3-2", "the team screen remembers the 3-2 formation");
+        Click("Stages Button".Replace("Stages", "Back"));
+
         // The first stage remembers its own team; cleared stages are marked.
         Click("Stage: " + first.Id);
         Expect(Team().Select(t => t.Id + "@" + t.Slot).SequenceEqual(picked.Select(t => t.Id + "@" + t.Slot)), "a stage reopens with the team last used on it");
@@ -101,7 +118,7 @@ static class Program
     {
         var view = (BattleView)Current;
         float t = RunUntil(() => Current is ResultsView, 3600);
-        var direct = Battle.Run(data, team, stage.Id, view.Seed);
+        var direct = Battle.Run(data, team, stage.Id, view.Seed, new BattleOptions { Formation = view.Battle.HeroFormation });
         var shown = view.Battle;
         var results = Current as ResultsView;
         Console.WriteLine($"{stage.Name}: {results?.Title ?? "no results"} after {shown.Actions} actions ({t:0}s at {GameApp.Speeds[app.SpeedIndex]}x)");

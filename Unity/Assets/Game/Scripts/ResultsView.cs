@@ -51,7 +51,7 @@ namespace ShatteredPantheon.Game
                 StatBar(row, new Vector2(400, 0), u.Stats.Taken / maxTaken, u.Stats.Taken, new Color(1, 1, 1, 0.45f), 200);
             }
 
-            Ui.MakeButton(Root, "Retry", new Vector2(-340, -620), new Vector2(300, 120), () => App.ShowBattle(stage, team));
+            Ui.MakeButton(Root, "Retry", new Vector2(-340, -620), new Vector2(300, 120), () => App.ShowBattle(stage, team, battle.HeroFormation));
             Ui.MakeButton(Root, "Change team", new Vector2(0, -620), new Vector2(340, 120), () => App.ShowTeam(stage));
             Ui.MakeButton(Root, "Stages", new Vector2(340, -620), new Vector2(300, 120), App.ShowStages);
         }
@@ -67,10 +67,10 @@ namespace ShatteredPantheon.Game
         string Hint()
         {
             if (battle.Result == "timeout") return "Too slow: bring more damage, or stop the enemy healing.";
-            if (battle.Log.Any(l => l.Contains("completes a ritual"))) return "The ritual healed the boss. A stun or silence can interrupt it.";
+            if (battle.Log.Any(l => l.Contains("completes a ritual"))) return "The ritual healed the boss. Godstruck or Hush interrupts it.";
             var firstDown = battle.Units.Where(u => u.Side == "A" && !u.Alive).OrderBy(u => u.Stats.DiedAt).FirstOrDefault();
-            if (firstDown != null && firstDown.Row == "back") return $"{firstDown.Def.Name} fell first from the back row. A tank or more shields could help.";
-            return "Try a different team or formation: faction and type match-ups matter.";
+            if (firstDown != null && firstDown.Row == "back") return $"{firstDown.Def.Name} fell first from the back row. Put a sturdier hero in front of them, or a tank who can intercept.";
+            return "Try a different team or formation: placement, type match-ups and doctrines all matter.";
         }
     }
 }

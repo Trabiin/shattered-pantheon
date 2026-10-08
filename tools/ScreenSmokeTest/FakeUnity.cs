@@ -199,6 +199,7 @@ namespace UnityEngine
         public static string GetString(string k, string d = "") => store.TryGetValue(k, out var v) ? (string)v : d;
         public static void SetString(string k, string v) => store[k] = v;
         public static void Save() { }
+        public static bool HasKey(string k) => store.ContainsKey(k);
         public static void DeleteAll() => store.Clear();
     }
     public class Font : Object { }

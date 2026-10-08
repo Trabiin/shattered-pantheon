@@ -1,32 +1,1794 @@
 [
- {"id":"hilde","name":"Hilde Ashanvil","faction":"Forge","type":"Stone","role":"Tank","hp":1500,"atk":60,"def":55,"spd":80,
-  "skill":{"name":"Anvil Guard","cd":3,"actions":[{"target":"self","effect":"shield","value":180},{"target":"lowestAlly","effect":"shield","value":180}]},
-  "ult":{"name":"Hold the Line","actions":[{"target":"self","effect":"status","status":"taunt","turns":2},{"target":"self","effect":"status","status":"guard","turns":2,"value":0.5}]}},
- {"id":"brannoc","name":"Brannoc Thickhide","faction":"Wild","type":"Verdant","role":"Tank","hp":1600,"atk":65,"def":45,"spd":75,
-  "skill":{"name":"Bear's Roar","cd":3,"actions":[{"target":"self","effect":"status","status":"taunt","turns":1},{"target":"self","effect":"status","status":"guard","turns":1,"value":0.3}]},
-  "ult":{"name":"Wall of Fur","actions":[{"target":"allAllies","effect":"shield","casterMaxHp":0.12}]}},
- {"id":"solenne","name":"Solenne of the Noon","faction":"Sun","type":"Radiant","role":"Warrior","hp":950,"atk":125,"def":30,"spd":105,
-  "skill":{"name":"Dawnpierce","cd":3,"actions":[{"target":"front","effect":"damage","mult":1.3},{"target":"back","effect":"damage","mult":0.7}]},
-  "ult":{"name":"Shard of Noon","actions":[{"target":"front","effect":"damage","mult":2.6,"pierce":0.4}]}},
- {"id":"varkhul","name":"Varkhul the Ashen","faction":"Night","type":"Flame","role":"Warrior","hp":1000,"atk":135,"def":35,"spd":95,
-  "skill":{"name":"Hungering Blade","cd":3,"actions":[{"target":"front","effect":"damage","mult":1.5,"lifesteal":0.5}]},
-  "ult":{"name":"Cinderfall","actions":[{"target":"frontRow","effect":"damage","mult":1.7}]}},
- {"id":"thessaly","name":"Old Thessaly","faction":"Sun","type":"Flame","role":"Caster","hp":650,"atk":150,"def":15,"spd":90,
-  "skill":{"name":"Old Flame","cd":3,"actions":[{"target":"front","effect":"damage","mult":1.4},{"target":"same","effect":"status","status":"burn","turns":2,"atkScale":0.35}]},
-  "ult":{"name":"Sunfall","actions":[{"target":"allEnemies","effect":"damage","mult":1.5}]}},
- {"id":"ysolde","name":"Ysolde Nightglass","faction":"Night","type":"Umbral","role":"Ranger","hp":700,"atk":140,"def":18,"spd":115,"backline":true,
-  "skill":{"name":"Hunt the Weak","cd":2,"actions":[{"target":"weakest","effect":"damage","mult":1.6}]},
-  "ult":{"name":"Last Light","actions":[{"target":"weakest","effect":"damage","mult":3.0,"execute":0.2}]}},
- {"id":"maren","name":"Maren Saltsong","faction":"Sea","type":"Tide","role":"Support","hp":850,"atk":90,"def":25,"spd":100,
-  "skill":{"name":"Tidecall","cd":2,"actions":[{"target":"lowestAlly","effect":"heal","mult":1.8}]},
-  "ult":{"name":"High Water","actions":[{"target":"allAllies","effect":"heal","mult":1.5,"cleanse":true}]}},
- {"id":"grub","name":"Big Grub Marrow","faction":"Wild","type":"Verdant","role":"Support","hp":1100,"atk":80,"def":30,"spd":85,
-  "skill":{"name":"Second Helping","cd":3,"actions":[{"target":"strongestAlly","effect":"status","status":"atkup","turns":2,"value":0.3}]},
-  "ult":{"name":"Feast for Everyone","actions":[{"target":"allAllies","effect":"heal","mult":1.2},{"target":"same","effect":"status","status":"atkup","turns":2,"value":0.2}]}},
- {"id":"pip","name":"Pip the Tinker Golem","faction":"Forge","type":"Storm","role":"Controller","hp":900,"atk":85,"def":35,"spd":110,
-  "skill":{"name":"Wind-up Punch","cd":3,"actions":[{"target":"control","effect":"damage","mult":1.0},{"target":"same","effect":"status","status":"stun","turns":1}]},
-  "ult":{"name":"Clockwork Carnival","actions":[{"target":"frontRow","effect":"damage","mult":0.8},{"target":"same","effect":"status","status":"stun","turns":1}]}},
- {"id":"seraphine","name":"Seraphine of the Deep","faction":"Sea","type":"Tide","role":"Controller","hp":750,"atk":110,"def":20,"spd":100,
-  "skill":{"name":"Hush of the Deep","cd":3,"actions":[{"target":"control","effect":"damage","mult":0.9},{"target":"same","effect":"status","status":"silence","turns":2}]},
-  "ult":{"name":"Undertow","actions":[{"target":"allEnemies","effect":"damage","mult":1.1},{"target":"same","effect":"status","status":"slow","turns":2,"value":0.3}]}}
+ {
+  "id": "solenne",
+  "name": "Solenne of the Noon",
+  "faction": "Sun",
+  "type": "Radiant",
+  "role": "Warrior",
+  "rarity": "epic",
+  "kind": "phys",
+  "hp": 700,
+  "atk": 130,
+  "armour": 50,
+  "spirit": 35,
+  "spd": 102,
+  "skills": [
+   {
+    "name": "Dawnstrike",
+    "cd": 3,
+    "actions": [
+     {
+      "target": "opposite",
+      "effect": "damage",
+      "mult": 1.4
+     }
+    ]
+   },
+   {
+    "name": "Searing Verdict",
+    "cd": 4,
+    "actions": [
+     {
+      "target": "lowest",
+      "effect": "damage",
+      "mult": 1.3,
+      "execute": 0.12
+     }
+    ]
+   },
+   {
+    "name": "Noon's Blessing",
+    "cd": 5,
+    "startCd": 1,
+    "actions": [
+     {
+      "target": "allAllies",
+      "effect": "status",
+      "status": "grace",
+      "mult": 0.25,
+      "turns": 2
+     }
+    ]
+   }
+  ],
+  "ult": {
+   "name": "Executioner's Verdict",
+   "actions": [
+    {
+     "target": "lowest",
+     "effect": "damage",
+     "mult": 2.2,
+     "repeatOnKill": 2
+    }
+   ]
+  },
+  "passives": [
+   {
+    "name": "Unbowed",
+    "trigger": "hpBelow",
+    "hpBelow": 0.4,
+    "once": true,
+    "actions": [
+     {
+      "target": "self",
+      "effect": "shield",
+      "casterMaxHp": 0.2
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "oriel",
+  "name": "Oriel of the Last Light",
+  "faction": "Sun",
+  "type": "Radiant",
+  "role": "Support",
+  "rarity": "epic",
+  "kind": "magic",
+  "hp": 600,
+  "atk": 100,
+  "armour": 40,
+  "spirit": 60,
+  "spd": 104,
+  "skills": [
+   {
+    "name": "Kindle",
+    "cd": 3,
+    "actions": [
+     {
+      "target": "lowestAlly",
+      "effect": "heal",
+      "mult": 1.6
+     }
+    ]
+   },
+   {
+    "name": "Halo",
+    "cd": 4,
+    "actions": [
+     {
+      "target": "lowestAlly",
+      "effect": "shield",
+      "mult": 1.8
+     },
+     {
+      "target": "same",
+      "effect": "status",
+      "status": "bulwark",
+      "pct": 0.2,
+      "turns": 2
+     }
+    ]
+   },
+   {
+    "name": "Dawn Chorus",
+    "cd": 5,
+    "startCd": 2,
+    "actions": [
+     {
+      "target": "allAllies",
+      "effect": "heal",
+      "mult": 0.7
+     }
+    ]
+   }
+  ],
+  "ult": {
+   "name": "Sunrise",
+   "actions": [
+    {
+     "target": "allAllies",
+     "effect": "heal",
+     "mult": 1.0
+    },
+    {
+     "target": "allAllies",
+     "effect": "cleanse",
+     "n": 1
+    }
+   ]
+  },
+  "passives": [
+   {
+    "name": "Lantern",
+    "trigger": "always",
+    "stats": {
+     "healPower": 0.1
+    }
+   }
+  ]
+ },
+ {
+  "id": "mordecai",
+  "name": "Mordecai the Ferryman",
+  "faction": "Grave",
+  "type": "Umbral",
+  "role": "Controller",
+  "rarity": "epic",
+  "kind": "magic",
+  "hp": 580,
+  "atk": 110,
+  "armour": 40,
+  "spirit": 55,
+  "spd": 106,
+  "effect": 0.1,
+  "skills": [
+   {
+    "name": "Grave Toll",
+    "cd": 3,
+    "actions": [
+     {
+      "target": "mostMana",
+      "effect": "damage",
+      "mult": 1.1
+     },
+     {
+      "target": "same",
+      "effect": "mana",
+      "value": -30
+     },
+     {
+      "target": "lowestManaAlly",
+      "effect": "mana",
+      "value": 30
+     }
+    ]
+   },
+   {
+    "name": "Hush of the Tomb",
+    "cd": 4,
+    "actions": [
+     {
+      "target": "fastest",
+      "effect": "status",
+      "status": "hush",
+      "chance": 0.7,
+      "turns": 1
+     }
+    ]
+   },
+   {
+    "name": "Bone Chill",
+    "cd": 5,
+    "actions": [
+     {
+      "target": "all",
+      "effect": "status",
+      "status": "blight",
+      "chance": 0.5,
+      "mult": 0.15,
+      "turns": 2
+     }
+    ]
+   }
+  ],
+  "ult": {
+   "name": "Last Rites",
+   "actions": [
+    {
+     "target": "all",
+     "effect": "damage",
+     "mult": 1.0
+    },
+    {
+     "target": "fallenAlly",
+     "effect": "revive",
+     "pct": 0.25
+    }
+   ]
+  },
+  "passives": [
+   {
+    "name": "Ferryman's Due",
+    "trigger": "allyFalls",
+    "actions": [
+     {
+      "target": "contextAttacker",
+      "effect": "damage",
+      "mult": 1.2
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "vesna",
+  "name": "Vesna Gravebloom",
+  "faction": "Grave",
+  "type": "Venom",
+  "role": "Warrior",
+  "rarity": "epic",
+  "kind": "phys",
+  "hp": 700,
+  "atk": 125,
+  "armour": 50,
+  "spirit": 35,
+  "spd": 102,
+  "skills": [
+   {
+    "name": "Rotbloom",
+    "cd": 3,
+    "actions": [
+     {
+      "target": "highest",
+      "effect": "status",
+      "status": "blight",
+      "chance": 0.8,
+      "mult": 0.3,
+      "turns": 2
+     },
+     {
+      "target": "same",
+      "effect": "damage",
+      "mult": 0.8
+     }
+    ]
+   },
+   {
+    "name": "Reaper's Arc",
+    "cd": 4,
+    "actions": [
+     {
+      "target": "splash",
+      "effect": "damage",
+      "mult": 1.1
+     }
+    ]
+   },
+   {
+    "name": "Feast of the Fallen",
+    "cd": 5,
+    "startCd": 2,
+    "actions": [
+     {
+      "target": "opposite",
+      "effect": "damage",
+      "mult": 1.6,
+      "lifesteal": 0.4
+     }
+    ]
+   }
+  ],
+  "ult": {
+   "name": "Plaguewind",
+   "actions": [
+    {
+     "target": "all",
+     "effect": "status",
+     "status": "blight",
+     "chance": 0.7,
+     "mult": 0.25,
+     "turns": 3
+    },
+    {
+     "target": "all",
+     "effect": "damage",
+     "mult": 0.7
+    }
+   ]
+  },
+  "passives": [
+   {
+    "name": "Deathless",
+    "trigger": "hpBelow",
+    "hpBelow": 0.25,
+    "once": true,
+    "actions": [
+     {
+      "target": "self",
+      "effect": "heal",
+      "targetMaxHp": 0.25
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "varkhul",
+  "name": "Varkhul the Ashen",
+  "faction": "War",
+  "type": "Flame",
+  "role": "Warrior",
+  "rarity": "epic",
+  "kind": "phys",
+  "hp": 720,
+  "atk": 125,
+  "armour": 50,
+  "spirit": 35,
+  "spd": 102,
+  "skills": [
+   {
+    "name": "Cleave",
+    "cd": 3,
+    "actions": [
+     {
+      "target": "splash",
+      "effect": "damage",
+      "mult": 1.0
+     },
+     {
+      "target": "same",
+      "effect": "status",
+      "status": "pyre",
+      "chance": 0.6,
+      "mult": 0.15
+     }
+    ]
+   },
+   {
+    "name": "Spearwall",
+    "cd": 4,
+    "actions": [
+     {
+      "target": "pierce",
+      "effect": "damage",
+      "mult": 1.3,
+      "bonusVsExposed": 1.0
+     }
+    ]
+   },
+   {
+    "name": "Battle Cry",
+    "cd": 5,
+    "actions": [
+     {
+      "target": "self",
+      "effect": "status",
+      "status": "bloodrite",
+      "pct": 0.1,
+      "turns": 3
+     }
+    ]
+   }
+  ],
+  "ult": {
+   "name": "Red Harvest",
+   "actions": [
+    {
+     "target": "frontRow",
+     "effect": "damage",
+     "mult": 1.6
+    },
+    {
+     "target": "same",
+     "effect": "status",
+     "status": "pyre",
+     "chance": 0.8,
+     "mult": 0.2
+    }
+   ]
+  },
+  "passives": [
+   {
+    "name": "Bloodlust",
+    "trigger": "onKill",
+    "actions": [
+     {
+      "target": "self",
+      "effect": "status",
+      "status": "bloodrite",
+      "pct": 0.1,
+      "turns": 3
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "brannoc",
+  "name": "Brannoc Thickhide",
+  "faction": "War",
+  "type": "Metal",
+  "role": "Tank",
+  "rarity": "epic",
+  "kind": "phys",
+  "hp": 1000,
+  "atk": 82,
+  "armour": 90,
+  "spirit": 70,
+  "spd": 88,
+  "skills": [
+   {
+    "name": "Challenge",
+    "cd": 4,
+    "actions": [
+     {
+      "target": "self",
+      "effect": "status",
+      "status": "challenge",
+      "turns": 2
+     },
+     {
+      "target": "self",
+      "effect": "status",
+      "status": "bulwark",
+      "pct": 0.25,
+      "turns": 2
+     }
+    ]
+   },
+   {
+    "name": "Shield Bash",
+    "cd": 3,
+    "actions": [
+     {
+      "target": "opposite",
+      "effect": "damage",
+      "mult": 0.9
+     },
+     {
+      "target": "same",
+      "effect": "status",
+      "status": "godstruck",
+      "chance": 0.35
+     }
+    ]
+   },
+   {
+    "name": "Iron Hide",
+    "cd": 5,
+    "actions": [
+     {
+      "target": "self",
+      "effect": "shield",
+      "casterMaxHp": 0.15
+     }
+    ]
+   }
+  ],
+  "ult": {
+   "name": "Warlord's Roar",
+   "actions": [
+    {
+     "target": "self",
+     "effect": "status",
+     "status": "challenge",
+     "turns": 2
+    },
+    {
+     "target": "allAllies",
+     "effect": "status",
+     "status": "bloodrite",
+     "pct": 0.1,
+     "turns": 3
+    }
+   ]
+  },
+  "passives": [
+   {
+    "name": "Thick Hide",
+    "trigger": "always",
+    "stats": {
+     "armourPct": 0.1
+    }
+   }
+  ]
+ },
+ {
+  "id": "hilde",
+  "name": "Grandmother Hilde Ashanvil",
+  "faction": "Hearth",
+  "type": "Stone",
+  "role": "Tank",
+  "rarity": "epic",
+  "kind": "phys",
+  "hp": 950,
+  "atk": 78,
+  "armour": 90,
+  "spirit": 70,
+  "spd": 88,
+  "description": "Takes dives aimed at the heroes behind her.",
+  "skills": [
+   {
+    "name": "Anvil Guard",
+    "cd": 3,
+    "actions": [
+     {
+      "target": "self",
+      "effect": "shield",
+      "casterMaxHp": 0.1
+     },
+     {
+      "target": "behind",
+      "effect": "shield",
+      "casterMaxHp": 0.1
+     }
+    ]
+   },
+   {
+    "name": "Stoke the Hearth",
+    "cd": 4,
+    "actions": [
+     {
+      "target": "behind",
+      "effect": "status",
+      "status": "grace",
+      "targetMaxHp": 0.05,
+      "turns": 2
+     }
+    ]
+   },
+   {
+    "name": "Old Iron",
+    "cd": 5,
+    "actions": [
+     {
+      "target": "self",
+      "effect": "status",
+      "status": "bulwark",
+      "pct": 0.3,
+      "turns": 2
+     },
+     {
+      "target": "self",
+      "effect": "status",
+      "status": "challenge",
+      "turns": 1
+     }
+    ]
+   }
+  ],
+  "ult": {
+   "name": "Hold the Line",
+   "actions": [
+    {
+     "target": "self",
+     "effect": "status",
+     "status": "challenge",
+     "turns": 2
+    },
+    {
+     "target": "self",
+     "effect": "status",
+     "status": "bulwark",
+     "pct": 0.5,
+     "turns": 2
+    },
+    {
+     "target": "allAllies",
+     "effect": "shield",
+     "casterMaxHp": 0.06
+    }
+   ]
+  },
+  "passives": [
+   {
+    "name": "Hearthwarden",
+    "trigger": "always",
+    "mods": {
+     "intercept": 1
+    }
+   }
+  ]
+ },
+ {
+  "id": "grub",
+  "name": "Big Grub Marrow",
+  "faction": "Hearth",
+  "type": "Verdant",
+  "role": "Support",
+  "rarity": "epic",
+  "kind": "magic",
+  "hp": 600,
+  "atk": 100,
+  "armour": 40,
+  "spirit": 60,
+  "spd": 104,
+  "skills": [
+   {
+    "name": "Hearty Stew",
+    "cd": 3,
+    "actions": [
+     {
+      "target": "lowestAlly",
+      "effect": "heal",
+      "mult": 1.5
+     }
+    ]
+   },
+   {
+    "name": "Second Helping",
+    "cd": 4,
+    "actions": [
+     {
+      "target": "allAllies",
+      "effect": "status",
+      "status": "grace",
+      "mult": 0.2,
+      "turns": 2
+     }
+    ]
+   },
+   {
+    "name": "Kitchen Brawl",
+    "cd": 5,
+    "startCd": 2,
+    "actions": [
+     {
+      "target": "opposite",
+      "effect": "damage",
+      "mult": 1.2
+     },
+     {
+      "target": "same",
+      "effect": "status",
+      "status": "godstruck",
+      "chance": 0.3
+     }
+    ]
+   }
+  ],
+  "ult": {
+   "name": "Harvest Feast",
+   "actions": [
+    {
+     "target": "allAllies",
+     "effect": "heal",
+     "mult": 1.0
+    },
+    {
+     "target": "allAllies",
+     "effect": "cleanse",
+     "n": 1
+    }
+   ]
+  },
+  "passives": [
+   {
+    "name": "Well Fed",
+    "trigger": "battleStart",
+    "actions": [
+     {
+      "target": "allAllies",
+      "effect": "shield",
+      "targetMaxHp": 0.05
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "kesh",
+  "name": "Kesh Swiftclaw",
+  "faction": "Wild",
+  "type": "Storm",
+  "role": "Ranger",
+  "rarity": "epic",
+  "kind": "phys",
+  "hp": 520,
+  "atk": 140,
+  "armour": 30,
+  "spirit": 30,
+  "spd": 110,
+  "skills": [
+   {
+    "name": "Hunter's Mark",
+    "cd": 4,
+    "actions": [
+     {
+      "target": "fastest",
+      "effect": "mark",
+      "turns": 3
+     },
+     {
+      "target": "same",
+      "effect": "damage",
+      "mult": 1.0
+     }
+    ]
+   },
+   {
+    "name": "Chain of Storms",
+    "cd": 3,
+    "actions": [
+     {
+      "target": "chain",
+      "effect": "damage",
+      "mult": 0.9,
+      "n": 4,
+      "kind": "magic"
+     }
+    ]
+   },
+   {
+    "name": "Pounce",
+    "cd": 5,
+    "actions": [
+     {
+      "target": "back",
+      "effect": "damage",
+      "mult": 1.5
+     }
+    ]
+   }
+  ],
+  "ult": {
+   "name": "Stampede",
+   "actions": [
+    {
+     "target": "random",
+     "effect": "damage",
+     "mult": 0.7,
+     "n": 6
+    }
+   ]
+  },
+  "passives": [
+   {
+    "name": "Pack Instinct",
+    "trigger": "always",
+    "mods": {
+     "dmgVsmark": 0.25
+    }
+   }
+  ]
+ },
+ {
+  "id": "gorran",
+  "name": "Gorran Bramblehorn",
+  "faction": "Wild",
+  "type": "Verdant",
+  "role": "Warrior",
+  "rarity": "epic",
+  "kind": "phys",
+  "hp": 780,
+  "atk": 118,
+  "armour": 50,
+  "spirit": 35,
+  "spd": 102,
+  "description": "Basic attacks chase the target his team has marked.",
+  "basic": {
+   "name": "Hunt",
+   "actions": [
+    {
+     "target": "marked",
+     "effect": "damage",
+     "mult": 1.0
+    }
+   ]
+  },
+  "skills": [
+   {
+    "name": "Gore",
+    "cd": 3,
+    "actions": [
+     {
+      "target": "opposite",
+      "effect": "damage",
+      "mult": 1.3
+     },
+     {
+      "target": "same",
+      "effect": "status",
+      "status": "sunder",
+      "chance": 0.6,
+      "pct": 0.15
+     }
+    ]
+   },
+   {
+    "name": "Thornhide",
+    "cd": 4,
+    "actions": [
+     {
+      "target": "self",
+      "effect": "shield",
+      "casterMaxHp": 0.1
+     },
+     {
+      "target": "self",
+      "effect": "status",
+      "status": "grace",
+      "targetMaxHp": 0.04,
+      "turns": 2
+     }
+    ]
+   },
+   {
+    "name": "Trample",
+    "cd": 5,
+    "actions": [
+     {
+      "target": "frontRow",
+      "effect": "damage",
+      "mult": 0.9
+     }
+    ]
+   }
+  ],
+  "ult": {
+   "name": "Wild Charge",
+   "actions": [
+    {
+     "target": "pierce",
+     "effect": "damage",
+     "mult": 2.0
+    },
+    {
+     "target": "same",
+     "effect": "gauge",
+     "value": 0.3
+    }
+   ]
+  },
+  "passives": [
+   {
+    "name": "Bramble",
+    "trigger": "always",
+    "mods": {
+     "thorns": 0.08
+    }
+   }
+  ]
+ },
+ {
+  "id": "pip",
+  "name": "Pip the Tinker Golem",
+  "faction": "Forge",
+  "type": "Metal",
+  "role": "Controller",
+  "rarity": "epic",
+  "kind": "phys",
+  "hp": 580,
+  "atk": 110,
+  "armour": 40,
+  "spirit": 55,
+  "spd": 106,
+  "effect": 0.1,
+  "skills": [
+   {
+    "name": "Rivet Shot",
+    "cd": 3,
+    "actions": [
+     {
+      "target": "strongest",
+      "effect": "damage",
+      "mult": 1.0
+     },
+     {
+      "target": "same",
+      "effect": "status",
+      "status": "sunder",
+      "chance": 0.7,
+      "pct": 0.2
+     }
+    ]
+   },
+   {
+    "name": "Overclock",
+    "cd": 4,
+    "actions": [
+     {
+      "target": "manaAlly",
+      "effect": "mana",
+      "value": 25
+     },
+     {
+      "target": "same",
+      "effect": "status",
+      "status": "tailwind",
+      "pct": 0.2,
+      "turns": 2
+     }
+    ]
+   },
+   {
+    "name": "Spanner in the Works",
+    "cd": 5,
+    "actions": [
+     {
+      "target": "fastest",
+      "effect": "status",
+      "status": "godstruck",
+      "chance": 0.5
+     },
+     {
+      "target": "same",
+      "effect": "damage",
+      "mult": 0.8
+     }
+    ]
+   }
+  ],
+  "ult": {
+   "name": "Grand Contraption",
+   "actions": [
+    {
+     "target": "all",
+     "effect": "damage",
+     "mult": 0.8
+    },
+    {
+     "target": "all",
+     "effect": "status",
+     "status": "sunder",
+     "chance": 0.6,
+     "pct": 0.2
+    }
+   ]
+  },
+  "passives": [
+   {
+    "name": "Self-Repair",
+    "trigger": "turnStart",
+    "every": 3,
+    "actions": [
+     {
+      "target": "self",
+      "effect": "shield",
+      "casterMaxHp": 0.06
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "dagna",
+  "name": "Dagna Ironvow",
+  "faction": "Forge",
+  "type": "Stone",
+  "role": "Tank",
+  "rarity": "epic",
+  "kind": "phys",
+  "hp": 950,
+  "atk": 82,
+  "armour": 90,
+  "spirit": 70,
+  "spd": 88,
+  "skills": [
+   {
+    "name": "Molten Aegis",
+    "cd": 3,
+    "actions": [
+     {
+      "target": "self",
+      "effect": "shield",
+      "casterMaxHp": 0.12
+     },
+     {
+      "target": "self",
+      "effect": "status",
+      "status": "bulwark",
+      "pct": 0.2,
+      "turns": 2
+     }
+    ]
+   },
+   {
+    "name": "Hammerfall",
+    "cd": 4,
+    "actions": [
+     {
+      "target": "opposite",
+      "effect": "damage",
+      "mult": 1.0
+     },
+     {
+      "target": "same",
+      "effect": "status",
+      "status": "godstruck",
+      "chance": 0.35
+     }
+    ]
+   },
+   {
+    "name": "Rockslide",
+    "cd": 5,
+    "actions": [
+     {
+      "target": "splash",
+      "effect": "damage",
+      "mult": 0.8
+     },
+     {
+      "target": "same",
+      "effect": "status",
+      "status": "sunder",
+      "chance": 0.5,
+      "pct": 0.15
+     }
+    ]
+   }
+  ],
+  "ult": {
+   "name": "Mountain's Oath",
+   "actions": [
+    {
+     "target": "self",
+     "effect": "status",
+     "status": "challenge",
+     "turns": 2
+    },
+    {
+     "target": "allAllies",
+     "effect": "shield",
+     "casterMaxHp": 0.07
+    },
+    {
+     "target": "frontRow",
+     "effect": "damage",
+     "mult": 0.8
+    }
+   ]
+  },
+  "passives": [
+   {
+    "name": "Anvil-Born",
+    "trigger": "always",
+    "stats": {
+     "armourPct": 0.1
+    }
+   }
+  ]
+ },
+ {
+  "id": "maren",
+  "name": "Maren Saltsong",
+  "faction": "Sea",
+  "type": "Tide",
+  "role": "Support",
+  "rarity": "epic",
+  "kind": "magic",
+  "hp": 600,
+  "atk": 100,
+  "armour": 40,
+  "spirit": 60,
+  "spd": 104,
+  "skills": [
+   {
+    "name": "Brine Mending",
+    "cd": 3,
+    "actions": [
+     {
+      "target": "lowestAlly",
+      "effect": "heal",
+      "mult": 1.6
+     }
+    ]
+   },
+   {
+    "name": "Undertow",
+    "cd": 4,
+    "actions": [
+     {
+      "target": "strongest",
+      "effect": "status",
+      "status": "hush",
+      "chance": 0.6
+     },
+     {
+      "target": "same",
+      "effect": "gauge",
+      "value": 0.25
+     }
+    ]
+   },
+   {
+    "name": "Tidal Ward",
+    "cd": 5,
+    "actions": [
+     {
+      "target": "allAllies",
+      "effect": "cleanse",
+      "n": 1
+     }
+    ]
+   }
+  ],
+  "ult": {
+   "name": "High Tide",
+   "actions": [
+    {
+     "target": "allAllies",
+     "effect": "heal",
+     "mult": 0.8
+    },
+    {
+     "target": "allAllies",
+     "effect": "status",
+     "status": "ward",
+     "turns": 2
+    }
+   ]
+  },
+  "passives": [
+   {
+    "name": "Revenge of the Drowned",
+    "trigger": "allyFalls",
+    "once": true,
+    "actions": [
+     {
+      "target": "contextAttacker",
+      "effect": "damage",
+      "mult": 1.5
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "seraphine",
+  "name": "Seraphine of the Deep",
+  "faction": "Sea",
+  "type": "Frost",
+  "role": "Controller",
+  "rarity": "epic",
+  "kind": "magic",
+  "hp": 580,
+  "atk": 110,
+  "armour": 40,
+  "spirit": 55,
+  "spd": 106,
+  "effect": 0.1,
+  "skills": [
+   {
+    "name": "Glacial Spear",
+    "cd": 3,
+    "actions": [
+     {
+      "target": "pierce",
+      "effect": "damage",
+      "mult": 1.1
+     }
+    ]
+   },
+   {
+    "name": "Riptide",
+    "cd": 4,
+    "actions": [
+     {
+      "target": "fastest",
+      "effect": "gauge",
+      "value": 0.4
+     },
+     {
+      "target": "same",
+      "effect": "damage",
+      "mult": 0.7
+     }
+    ]
+   },
+   {
+    "name": "Deep Freeze",
+    "cd": 5,
+    "startCd": 1,
+    "actions": [
+     {
+      "target": "opposite",
+      "effect": "status",
+      "status": "godstruck",
+      "chance": 0.5
+     },
+     {
+      "target": "same",
+      "effect": "damage",
+      "mult": 1.0
+     }
+    ]
+   }
+  ],
+  "ult": {
+   "name": "Glacier Prison",
+   "actions": [
+    {
+     "target": "fastest",
+     "effect": "status",
+     "status": "godstruck",
+     "chance": 0.8,
+     "n": 2
+    },
+    {
+     "target": "same",
+     "effect": "damage",
+     "mult": 1.2
+    }
+   ]
+  },
+  "passives": [
+   {
+    "name": "Cold Current",
+    "trigger": "always",
+    "mods": {
+     "dmgVsgodstruck": 0.2
+    }
+   }
+  ]
+ },
+ {
+  "id": "thessaly",
+  "name": "Old Thessaly",
+  "faction": "Arcana",
+  "type": "Flame",
+  "role": "Caster",
+  "rarity": "epic",
+  "kind": "magic",
+  "hp": 500,
+  "atk": 142,
+  "armour": 25,
+  "spirit": 50,
+  "spd": 100,
+  "description": "An elderly, frail-looking archmage who hits harder than anyone.",
+  "skills": [
+   {
+    "name": "Firebolt",
+    "cd": 2,
+    "actions": [
+     {
+      "target": "front",
+      "effect": "damage",
+      "mult": 1.3
+     },
+     {
+      "target": "same",
+      "effect": "status",
+      "status": "pyre",
+      "chance": 0.7,
+      "mult": 0.15
+     }
+    ]
+   },
+   {
+    "name": "Flame Wreath",
+    "cd": 4,
+    "actions": [
+     {
+      "target": "splash",
+      "effect": "damage",
+      "mult": 1.0
+     },
+     {
+      "target": "same",
+      "effect": "status",
+      "status": "pyre",
+      "chance": 0.5,
+      "mult": 0.15
+     }
+    ]
+   },
+   {
+    "name": "Borrowed Time",
+    "cd": 5,
+    "actions": [
+     {
+      "target": "manaAlly",
+      "effect": "mana",
+      "value": 30
+     },
+     {
+      "target": "same",
+      "effect": "resetCd",
+      "n": 1
+     }
+    ]
+   }
+  ],
+  "ult": {
+   "name": "Meteor",
+   "actions": [
+    {
+     "target": "all",
+     "effect": "damage",
+     "mult": 1.3
+    },
+    {
+     "target": "all",
+     "effect": "status",
+     "status": "pyre",
+     "chance": 0.5,
+     "mult": 0.15
+    }
+   ]
+  },
+  "passives": [
+   {
+    "name": "Study of Ruin",
+    "trigger": "always",
+    "mods": {
+     "dmgVspyre": 0.2
+    }
+   }
+  ]
+ },
+ {
+  "id": "quill",
+  "name": "Quill the Inkwright",
+  "faction": "Arcana",
+  "type": "Storm",
+  "role": "Caster",
+  "rarity": "epic",
+  "kind": "magic",
+  "hp": 500,
+  "atk": 142,
+  "armour": 25,
+  "spirit": 50,
+  "spd": 100,
+  "skills": [
+   {
+    "name": "Lightning Script",
+    "cd": 3,
+    "actions": [
+     {
+      "target": "chain",
+      "effect": "damage",
+      "mult": 1.0,
+      "n": 3
+     }
+    ]
+   },
+   {
+    "name": "Runic Seal",
+    "cd": 4,
+    "actions": [
+     {
+      "target": "mostBuffs",
+      "effect": "strip",
+      "n": 1
+     },
+     {
+      "target": "same",
+      "effect": "status",
+      "status": "hush",
+      "chance": 0.6
+     }
+    ]
+   },
+   {
+    "name": "Static Field",
+    "cd": 5,
+    "actions": [
+     {
+      "target": "backRow",
+      "effect": "damage",
+      "mult": 0.8
+     },
+     {
+      "target": "same",
+      "effect": "status",
+      "status": "godstruck",
+      "chance": 0.25
+     }
+    ]
+   }
+  ],
+  "ult": {
+   "name": "Thunder Codex",
+   "actions": [
+    {
+     "target": "chain",
+     "effect": "damage",
+     "mult": 1.4,
+     "n": 5,
+     "falloff": 0.15
+    }
+   ]
+  },
+  "passives": [
+   {
+    "name": "Annotated",
+    "trigger": "always",
+    "stats": {
+     "haste": 0.1
+    }
+   }
+  ]
+ },
+ {
+  "id": "pell",
+  "name": "Pell the Gambler",
+  "faction": "Trickster",
+  "type": "Venom",
+  "role": "Ranger",
+  "rarity": "epic",
+  "kind": "phys",
+  "hp": 520,
+  "atk": 140,
+  "armour": 30,
+  "spirit": 30,
+  "spd": 110,
+  "skills": [
+   {
+    "name": "Ninefold Lots",
+    "cd": 3,
+    "actions": [
+     {
+      "target": "random",
+      "effect": "damage",
+      "mult": 0.55,
+      "n": 4
+     },
+     {
+      "target": "same",
+      "effect": "status",
+      "status": "pyre",
+      "chance": 0.35,
+      "mult": 0.1
+     },
+     {
+      "target": "same",
+      "effect": "status",
+      "status": "eclipse",
+      "chance": 0.35,
+      "pct": 0.15
+     },
+     {
+      "target": "same",
+      "effect": "status",
+      "status": "sunder",
+      "chance": 0.35,
+      "pct": 0.15
+     }
+    ]
+   },
+   {
+    "name": "Loaded Dice",
+    "cd": 4,
+    "range": "wild",
+    "actions": [
+     {
+      "target": "lowest",
+      "effect": "damage",
+      "mult": 1.4
+     }
+    ]
+   },
+   {
+    "name": "Sleight",
+    "cd": 5,
+    "actions": [
+     {
+      "target": "mostBuffs",
+      "effect": "steal",
+      "n": 1
+     }
+    ]
+   }
+  ],
+  "ult": {
+   "name": "Jackpot",
+   "range": "wild",
+   "actions": [
+    {
+     "target": "random",
+     "effect": "damage",
+     "mult": 0.6,
+     "n": 7
+    }
+   ]
+  },
+  "passives": [
+   {
+    "name": "Lucky Coin",
+    "trigger": "onDodge",
+    "stats": {
+     "dodge": 0.08
+    },
+    "actions": [
+     {
+      "target": "self",
+      "effect": "mana",
+      "value": 15
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "wren",
+  "name": "Wren Twofaces",
+  "faction": "Trickster",
+  "type": "Umbral",
+  "role": "Warrior",
+  "rarity": "epic",
+  "kind": "phys",
+  "hp": 620,
+  "atk": 132,
+  "armour": 50,
+  "spirit": 35,
+  "spd": 110,
+  "description": "An assassin who dives the back row.",
+  "skills": [
+   {
+    "name": "Backstab",
+    "cd": 3,
+    "actions": [
+     {
+      "target": "back",
+      "effect": "damage",
+      "mult": 1.5,
+      "bonusVsExposed": 0.5
+     }
+    ]
+   },
+   {
+    "name": "Smoke and Mirrors",
+    "cd": 4,
+    "actions": [
+     {
+      "target": "self",
+      "effect": "status",
+      "status": "ward",
+      "turns": 2
+     },
+     {
+      "target": "self",
+      "effect": "status",
+      "status": "tailwind",
+      "pct": 0.25,
+      "turns": 2
+     }
+    ]
+   },
+   {
+    "name": "Cutpurse",
+    "cd": 5,
+    "actions": [
+     {
+      "target": "mostMana",
+      "effect": "damage",
+      "mult": 1.0
+     },
+     {
+      "target": "same",
+      "effect": "mana",
+      "value": -25
+     },
+     {
+      "target": "self",
+      "effect": "mana",
+      "value": 25
+     }
+    ]
+   }
+  ],
+  "ult": {
+   "name": "Vanishing Act",
+   "actions": [
+    {
+     "target": "back",
+     "effect": "damage",
+     "mult": 2.5
+    },
+    {
+     "target": "self",
+     "effect": "status",
+     "status": "ward",
+     "turns": 2
+    }
+   ]
+  },
+  "passives": [
+   {
+    "name": "Two Faces",
+    "trigger": "always",
+    "stats": {
+     "dodge": 0.1,
+     "crit": 0.1
+    }
+   }
+  ]
+ },
+ {
+  "id": "ysolde",
+  "name": "Ysolde Nightglass",
+  "faction": "Night",
+  "type": "Frost",
+  "role": "Ranger",
+  "rarity": "epic",
+  "kind": "phys",
+  "hp": 520,
+  "atk": 140,
+  "armour": 30,
+  "spirit": 30,
+  "spd": 110,
+  "skills": [
+   {
+    "name": "Moonshot",
+    "cd": 3,
+    "actions": [
+     {
+      "target": "back",
+      "effect": "damage",
+      "mult": 1.3
+     },
+     {
+      "target": "same",
+      "effect": "status",
+      "status": "eclipse",
+      "chance": 0.6,
+      "pct": 0.2
+     }
+    ]
+   },
+   {
+    "name": "Silver Volley",
+    "cd": 4,
+    "actions": [
+     {
+      "target": "random",
+      "effect": "damage",
+      "mult": 0.8,
+      "n": 3,
+      "distinct": true
+     }
+    ]
+   },
+   {
+    "name": "Dream Thief",
+    "cd": 5,
+    "actions": [
+     {
+      "target": "mostBuffs",
+      "effect": "steal",
+      "n": 1
+     }
+    ]
+   }
+  ],
+  "ult": {
+   "name": "Eclipse Arrow",
+   "actions": [
+    {
+     "target": "lowest",
+     "effect": "damage",
+     "mult": 2.4
+    }
+   ]
+  },
+  "passives": [
+   {
+    "name": "Night Sight",
+    "trigger": "always",
+    "stats": {
+     "crit": 0.1,
+     "acc": 0.1
+    }
+   }
+  ]
+ },
+ {
+  "id": "somna",
+  "name": "Somna the Dreamwarden",
+  "faction": "Night",
+  "type": "Tide",
+  "role": "Support",
+  "rarity": "epic",
+  "kind": "magic",
+  "hp": 600,
+  "atk": 100,
+  "armour": 40,
+  "spirit": 60,
+  "spd": 104,
+  "skills": [
+   {
+    "name": "Moonwell",
+    "cd": 3,
+    "actions": [
+     {
+      "target": "lowestAlly",
+      "effect": "heal",
+      "mult": 1.4
+     },
+     {
+      "target": "same",
+      "effect": "status",
+      "status": "grace",
+      "mult": 0.2,
+      "turns": 2
+     }
+    ]
+   },
+   {
+    "name": "Lull",
+    "cd": 4,
+    "actions": [
+     {
+      "target": "strongest",
+      "effect": "status",
+      "status": "godstruck",
+      "chance": 0.45
+     }
+    ]
+   },
+   {
+    "name": "Dream Veil",
+    "cd": 5,
+    "startCd": 2,
+    "actions": [
+     {
+      "target": "allAllies",
+      "effect": "status",
+      "status": "ward",
+      "turns": 2
+     }
+    ]
+   }
+  ],
+  "ult": {
+   "name": "Sweet Dreams",
+   "actions": [
+    {
+     "target": "allAllies",
+     "effect": "heal",
+     "mult": 0.9
+    },
+    {
+     "target": "all",
+     "effect": "status",
+     "status": "hush",
+     "chance": 0.35
+    }
+   ]
+  },
+  "passives": [
+   {
+    "name": "Moonlit",
+    "trigger": "always",
+    "stats": {
+     "dodge": 0.05,
+     "healPower": 0.1
+    }
+   }
+  ]
+ }
 ]

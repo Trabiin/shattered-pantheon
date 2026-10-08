@@ -18,10 +18,13 @@ namespace ShatteredPantheon.Game
         public int Seed { get; private set; }
         Text speedLabel, logLine;
 
-        public BattleView(GameApp app, StageDef stage, List<TeamSlot> team) : base(app)
+        readonly string formation;
+
+        public BattleView(GameApp app, StageDef stage, List<TeamSlot> team, string formation) : base(app)
         {
             this.stage = stage;
             this.team = team;
+            this.formation = formation;
         }
 
         float SecondsPerAction => (float)(App.Data.Rules.SecondsPerActionAt1x / GameApp.Speeds[App.SpeedIndex]);
@@ -29,7 +32,7 @@ namespace ShatteredPantheon.Game
         protected override void Build()
         {
             Seed = Random.Range(1, int.MaxValue);
-            Battle = new Battle(App.Data, team, stage.Id, Seed);
+            Battle = new Battle(App.Data, team, stage.Id, Seed, new BattleOptions { Formation = formation });
 
             Ui.Label(Root, $"{stage.Name}\n<size=26>{Ui.Capitalise(stage.Difficulty)}</size>", 40, Color.white, TextAnchor.MiddleLeft, new Vector2(-180, 860), new Vector2(660, 120)).Bold();
             speedLabel = Ui.MakeButton(Root, GameApp.Speeds[App.SpeedIndex] + "x", new Vector2(250, 860), new Vector2(130, 90), CycleSpeed, "Speed Button");
@@ -41,12 +44,11 @@ namespace ShatteredPantheon.Game
             Host.StartCoroutine(Play());
         }
 
-        // Enemies on top (back row highest), heroes below (front row nearest the middle).
-        Vector2 CardPosition(Unit u)
+        // Enemies on top (back row highest), heroes below (front row nearest the middle). Positions across
+        // the field come from the engine, so a row of two stands in the gaps of a row of three.
+        static Vector2 CardPosition(Unit u)
         {
-            var row = Battle.Units.Where(x => x.Side == u.Side && x.Row == u.Row).ToList();
-            int i = row.IndexOf(u);
-            float x = (i - (row.Count - 1) / 2f) * 340f;
+            float x = (float)u.X * 330f;
             float y = u.Side == "E" ? (u.Row == "back" ? 560 : 250) : (u.Row == "front" ? -170 : -480);
             return new Vector2(x, y);
         }
@@ -78,17 +80,22 @@ namespace ShatteredPantheon.Game
             {
                 case EventKind.Turn:
                     actor.Pulse(SecondsPerAction);
-                    if (e.Detail == "stunned") { Popup(actor, "Stunned", Palette.Status, 30); logLine.text = $"{actor.Name} is stunned"; }
+                    if (e.Detail == "stunned") { Popup(actor, "Godstruck", Palette.Status, 30); logLine.text = $"{actor.Name} is Godstruck"; }
                     else if (e.Detail.StartsWith("ult:")) { Popup(actor, e.Detail.Substring(4), Palette.Ult, 34); logLine.text = $"{actor.Name} unleashes <b>{e.Detail.Substring(4)}</b>"; }
                     else if (e.Detail.StartsWith("skill:")) logLine.text = $"{actor.Name} uses <b>{e.Detail.Substring(6)}</b>";
+                    else if (e.Detail.StartsWith("echo:")) logLine.text = $"{actor.Name}'s <b>{e.Detail.Substring(5)}</b> echoes";
+                    else if (e.Detail.StartsWith("passive:")) Popup(actor, e.Detail.Substring(8), Palette.Ritual, 26);
                     else logLine.text = $"{actor.Name} attacks";
                     break;
                 case EventKind.Damage:
                     Popup(target, e.Crit ? $"-{e.Amount}!" : $"-{e.Amount}", Palette.Damage, e.Crit ? 46 : 36);
                     target.Flash();
                     break;
-                case EventKind.BurnTick:
-                    Popup(target, $"-{e.Amount} burn", Palette.Burn, 30);
+                case EventKind.Miss:
+                    Popup(target, "Miss", Palette.Muted, 30);
+                    break;
+                case EventKind.DotTick:
+                    Popup(target, $"-{e.Amount} {Effects.Label(e.Detail) ?? Ui.Capitalise(e.Detail)}", Palette.Burn, 30);
                     break;
                 case EventKind.Heal:
                     if (e.Amount > 0) Popup(target, $"+{e.Amount}", Palette.Heal, 36);
@@ -97,7 +104,21 @@ namespace ShatteredPantheon.Game
                     Popup(target, $"+{e.Amount} shield", Palette.Shield, 30);
                     break;
                 case EventKind.StatusAdded:
-                    Popup(target, Ui.Capitalise(e.Detail), Palette.Status, 28);
+                    if (Effects.Label(e.Detail) != null) Popup(target, Effects.Label(e.Detail), Palette.Status, 28);
+                    break;
+                case EventKind.Resisted:
+                    Popup(target, "Resisted", Palette.Muted, 26);
+                    break;
+                case EventKind.Blocked:
+                    Popup(target, e.Detail == "misdirection" ? "Misdirected!" : "Warded", Palette.Shield, 28);
+                    break;
+                case EventKind.Intercept:
+                    Popup(actor, "Intercepts!", Palette.Shield, 30);
+                    logLine.text = $"{actor.Name} steps in front of {target.Name}";
+                    break;
+                case EventKind.Revive:
+                    Popup(target, "Rises again!", Palette.Heal, 34);
+                    logLine.text = $"{target.Name} rises again";
                     break;
                 case EventKind.Interrupt:
                     Popup(target, "Interrupted!", Palette.Ult, 36);
@@ -105,7 +126,7 @@ namespace ShatteredPantheon.Game
                     break;
                 case EventKind.RitualStart:
                     Popup(target, "Ritual begins...", Palette.Ritual, 32);
-                    logLine.text = $"{target.Name} begins a healing ritual. Stun or silence to stop it!";
+                    logLine.text = $"{target.Name} begins a healing ritual. Godstruck or Hush stops it!";
                     break;
                 case EventKind.RitualComplete:
                     Popup(target, "Ritual complete", Palette.Ritual, 32);

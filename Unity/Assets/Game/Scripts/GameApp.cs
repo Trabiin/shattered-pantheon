@@ -3,6 +3,7 @@
 namespace ShatteredPantheon.Game
 {
     using System.Collections.Generic;
+    using System.Linq;
     using ShatteredPantheon.Battle;
     using UnityEngine;
     using UnityEngine.EventSystems;
@@ -53,7 +54,7 @@ namespace ShatteredPantheon.Game
 
         public void ShowStages() => Show(new StageSelectView(this));
         public void ShowTeam(StageDef stage) => Show(new TeamView(this, stage));
-        public void ShowBattle(StageDef stage, List<TeamSlot> team) => Show(new BattleView(this, stage, team));
+        public void ShowBattle(StageDef stage, List<TeamSlot> team, string formation) => Show(new BattleView(this, stage, team, formation));
         public void ShowResults(StageDef stage, List<TeamSlot> team, Battle battle) => Show(new ResultsView(this, stage, team, battle));
 
         void Show(View next)
@@ -110,12 +111,22 @@ namespace ShatteredPantheon.Game
         public bool IsCleared(string stageId) => PlayerPrefs.GetInt("cleared." + stageId, 0) == 1;
         public void MarkCleared(string stageId) { PlayerPrefs.SetInt("cleared." + stageId, 1); PlayerPrefs.Save(); }
 
-        public void SaveTeam(string stageId, List<TeamSlot> team)
+        public void SaveTeam(string stageId, List<TeamSlot> team, string formation)
         {
             var s = string.Join(";", team.ConvertAll(t => t.Id + ":" + t.Row + ":" + t.Slot));
             PlayerPrefs.SetString("team." + stageId, s);
             PlayerPrefs.SetString("team.last", s);
+            PlayerPrefs.SetString("formation." + stageId, formation);
+            PlayerPrefs.SetString("formation.last", formation);
             PlayerPrefs.Save();
+        }
+
+        // The formation saved with that team ("2-3" or "3-2"); a team that doesn't fill its row of three can't show it.
+        public string LoadFormation(string stageId, List<TeamSlot> team)
+        {
+            string key = PlayerPrefs.HasKey("team." + stageId) ? "formation." + stageId : "formation.last";
+            string f = PlayerPrefs.GetString(key, "");
+            return (f == "2-3" || f == "3-2") && team.All(t => Battle.SlotsOf(f).Contains(t.Slot)) ? f : Battle.FormationOf(team.Select(t => t.Slot));
         }
 
         // The team last used on this stage, else the last team used anywhere, else a sensible default.
@@ -135,7 +146,10 @@ namespace ShatteredPantheon.Game
                 if (p.Length != 3 || data.Heroes.Find(h => h.Id == p[0]) == null) return null; // hero renamed or removed
                 team.Add(new TeamSlot(p[0], p[1], p[2]));
             }
-            return team.Count > 0 ? team : null;
+            if (team.Count == 0 || team.Select(t => t.Slot).Distinct().Count() != team.Count) return null;
+            string formation = Battle.FormationOf(team.Select(t => t.Slot));
+            if (!team.All(t => Battle.SlotsOf(formation).Contains(t.Slot))) return null; // saved before formations changed
+            return team;
         }
     }
 }
