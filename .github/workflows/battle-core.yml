@@ -23,3 +23,5 @@ jobs:
           echo "$(wc -l < a.txt) fights replayed identically"
       - name: The balance report runs
         run: dotnet tools/BattleSim/bin/Release/net8.0/BattleSim.dll --out report.md
+      - name: The progression simulator runs (60 days, 1 player per type)
+        run: dotnet run --project tools/ProgressionSim -c Release -- --days 60 --seeds 1 --out progression.md
