@@ -47,6 +47,7 @@ static class Program
         var cards = Cards(cfg, data);
 
         if (args.ContainsKey("check")) { Check(cfg, data, cards); return 0; }
+        if (args.ContainsKey("probe")) { Probe(cfg, data, args["probe"]); return 0; }
 
         int days = int.Parse(Arg("days", "365")), seeds = int.Parse(Arg("seeds", "6"));
         var jobs = (from t in cfg.Times from s in cfg.Spends from k in Enumerable.Range(0, seeds) select (t, s, k)).ToList();
@@ -58,7 +59,7 @@ static class Program
             for (int d = 1; d <= days; d++) p.PlayDay(d);
             players[i] = p;
         });
-        string report = Report(cfg, players, days, seeds, cards.Count);
+        string report = Report(cfg, players, days, seeds, cards.Count(h => h.ReleaseDay == 0));
         string outPath = Arg("out", Path.Combine(root, "reports", "progression.md"));
         File.WriteAllText(outPath, report);
         Console.WriteLine(report);
@@ -73,22 +74,47 @@ static class Program
         throw new DirectoryNotFoundException("Run from inside the repository");
     }
 
-    // The simulator's roster: every test kit under one name per rarity listed in progression.json.
+    // The simulator's roster: the launch heroes, then new ones every month for a year. Each card uses
+    // one of the test kits; kits are dealt out in turn so each kit appears at several rarities.
     static List<HeroCard> Cards(Cfg c, GameData data)
     {
         var list = new List<HeroCard>();
-        for (int i = 0; i < data.Heroes.Count && i < c.Copies.Count; i++)
+        int next = 0;
+        void Make(string rarity, int day)
         {
-            var h = data.Heroes[i];
-            for (int j = 0; j < c.Copies[i].Length; j++)
-                list.Add(new HeroCard
-                {
-                    Id = j == 0 ? h.Id : $"{h.Id}-{c.Copies[i][j].ToLowerInvariant()}", Kit = h.Id, Rarity = c.Copies[i][j],
-                    Name = h.Name + (j == 0 ? "" : $" ({c.Copies[i][j]})"), Faction = h.Faction, Role = h.Role,
-                    KitPower = Math.Sqrt(h.Stats.Get("hp") * h.Stats.Get("atk")),
-                });
+            var h = data.Heroes[next++ % data.Heroes.Count];
+            list.Add(new HeroCard
+            {
+                Id = $"{h.Id}-{rarity.ToLowerInvariant()}-{list.Count}", Kit = h.Id, Rarity = rarity, ReleaseDay = day,
+                Name = $"{h.Name} ({rarity})", Faction = h.Faction, Role = h.Role,
+                KitPower = Math.Sqrt(h.Stats.Get("hp") * h.Stats.Get("atk")),
+            });
         }
+        foreach (var r in new[] { c.StarterRarity }.Concat(c.Rarities.Where(x => x != c.StarterRarity)))
+            for (int i = 0; i < c.Launch[r]; i++) Make(r, 0);
+        for (int day = c.ReleaseEvery; day <= 400; day += c.ReleaseEvery)
+            foreach (var r in c.Release) Make(r, day);
         return list;
+    }
+
+    // Win rate of random teams on one battle at 90 to 120% of its recommended power, e.g. --probe c3-167.
+    static void Probe(Cfg c, GameData data, string id)
+    {
+        var parts = id.Substring(1).Split('-');
+        int d = int.Parse(parts[0]), k = int.Parse(parts[1]);
+        foreach (double m in new[] { 0.9, 1.0, 1.1, 1.2 })
+        {
+            var rng = new Random(11);
+            int wins = 0, n = 200;
+            for (int i = 0; i < n; i++)
+            {
+                var ids = data.Heroes.OrderBy(_ => rng.Next()).Take(5).Select(h => h.Id).ToList();
+                var team = Formation.AutoPlace(data, ids);
+                foreach (var s in team) s.HpScale = s.AtkScale = c.RecScale(d, k) * m;
+                if (Battle.Run(data, team, id, i + 1).Result == "win") wins++;
+            }
+            Console.WriteLine($"{id} at {m * 100:0}% of recommended power: random teams win {100 * wins / n}%");
+        }
     }
 
     // Win rate of random Epic teams at exactly the recommended power, per difficulty and stage band.
@@ -126,7 +152,7 @@ static class Program
         var sb = new StringBuilder();
         sb.AppendLine("# Progression Report");
         sb.AppendLine();
-        sb.AppendLine($"*Generated {DateTime.UtcNow:yyyy-MM-dd HH:mm} UTC by `dotnet run --project tools/ProgressionSim -c Release`. {players.Length / seeds} player types × {seeds} players each, {days} days. Every campaign battle is a real fight on the battle engine ({players.Sum(p => p.RealFights):N0} fights); rewards, upgrades, summons and star challenges follow `progression.json`. Roster: the 20 test kits as {rosterSize} heroes (Rare, Epic and Legendary versions). Numbers are medians across the players of each type.*");
+        sb.AppendLine($"*Generated {DateTime.UtcNow:yyyy-MM-dd HH:mm} UTC by `dotnet run --project tools/ProgressionSim -c Release`. {players.Length / seeds} player types × {seeds} players each, {days} days. Every campaign battle is a real fight on the battle engine ({players.Sum(p => p.RealFights):N0} fights); rewards, upgrades, summons and star challenges follow `progression.json`. Roster: the 20 test kits stand in for {rosterSize} launch heroes ({string.Join(", ", c.Rarities.Select(r => $"{c.Launch[r]} {r}"))}), plus {string.Join(", ", c.Release.GroupBy(x => x).Select(g => $"{g.Count()} {g.Key}"))} every {c.ReleaseEvery} days. Numbers are medians across the players of each type.*");
         sb.AppendLine();
 
         var groups = players.GroupBy(p => p.Name).ToList();
@@ -166,13 +192,24 @@ static class Program
             else if (n < tn * 0.75) flags.Add($"**{t.Name} Free** finishes Normal on day {F(n)}, much sooner than the target of about day {F(tn)}.");
             if (days >= th * 1.25 && (double.IsNaN(h) || h > th * 1.25)) flags.Add($"**{t.Name} Free** finishes Hard on {Day(h)}; the target is about day {F(th)}.");
             else if (!double.IsNaN(h) && h < th * 0.75) flags.Add($"**{t.Name} Free** finishes Hard on day {F(h)}, much sooner than the target of about day {F(th)}.");
-            double ln = reach[($"{t.Name} Light", "Normal 40")];
+            double ln = reach.TryGetValue(($"{t.Name} Light", "Normal 40"), out var lv) ? lv : double.NaN;
             if (!double.IsNaN(n) && !double.IsNaN(ln))
             {
                 double faster = 1 - ln / n;
                 if (faster < c.LightFaster[0] - 0.1 || faster > c.LightFaster[1] + 0.1) flags.Add($"**{t.Name}:** a light spender finishes Normal {F(faster * 100)}% sooner than a free player; the target is {F(c.LightFaster[0] * 100)} to {F(c.LightFaster[1] * 100)}%.");
             }
         }
+
+        // Playing longer should pay (Ojon, 2026-10-08): each step up in daily time gets there clearly sooner.
+        foreach (var sp in c.Spends.Take(1))
+            for (int i = 1; i < c.Times.Count; i++)
+                foreach (var m in new[] { "Normal 40", "Hard 40", "Nightmare 40" })
+                {
+                    double slow = reach[($"{c.Times[i - 1].Name} {sp.Name}", m)], fast = reach[($"{c.Times[i].Name} {sp.Name}", m)];
+                    if (double.IsNaN(fast)) continue;
+                    double ratio = double.IsNaN(slow) ? days / fast : slow / fast;
+                    if (ratio < c.TimePays) flags.Add($"**Time:** {c.Times[i].Name} free players reach {m} only {ratio:0.00}× as fast as {c.Times[i - 1].Name} ones; the target is at least {c.TimePays:0.0}×.");
+                }
 
         // Rhythm
         sb.AppendLine("## Reward rhythm");
@@ -182,7 +219,7 @@ static class Program
         foreach (var g in groups)
         {
             double leg = Median(g.Select(p => (double)p.FirstLegendaryDay));
-            double heroGap = Median(g.Select(p => (double)LongestGap(p.Days, d => d.NewHero, d => d.Roster >= rosterSize)));
+            double heroGap = Median(g.Select(p => (double)LongestGap(p.Days, d => d.NewHero, d => d.Roster >= d.Released)));
             double bigGap = Median(g.Select(p => (double)LongestGap(p.Days, d => d.BigMoment, d => d.Difficulty >= c.Difficulties.Count)));
             // Walls count on Normal and Hard; Nightmare and Godless are meant to be a long climb.
             double wall = Median(g.Select(p => (double)LongestGap(p.Days, d => d.Progressed, d => d.Difficulty >= 2)));
@@ -193,6 +230,7 @@ static class Program
             if (leg < 0 || leg > c.FirstLegendaryDay) flags.Add($"**{g.Key}:** first Legendary on {Day(leg)}; the target is day {F(c.FirstLegendaryDay)}.");
             if (bigGap > c.MaxDaysWithoutBig) flags.Add($"**{g.Key}:** up to {F(bigGap)} days in a row without a big moment; the target is at most {F(c.MaxDaysWithoutBig)}.");
             if (wall > c.WallDays) flags.Add($"**{g.Key}:** stuck on one battle for up to {F(wall)} days; the limit is {F(c.WallDays)}.");
+            if (lateWall > c.LateWallDays) flags.Add($"**{g.Key}:** stuck on one Nightmare or Godless battle for up to {F(lateWall)} days; the limit is {F(c.LateWallDays)}.");
         }
         sb.AppendLine();
         sb.AppendLine("A **big moment** is a new Epic or Legendary hero, a stage chest, a star chest, an ascension or a large Codex reward. A **wall** is a stretch of days with no new campaign battle cleared.");
@@ -206,25 +244,101 @@ static class Program
             sb.AppendLine();
         }
 
+        // Collection
+        int[] cDays = { 7, 30, 90, 180, 365 };
+        sb.AppendLine("## Collection");
+        sb.AppendLine();
+        sb.AppendLine("Share of the released roster owned (it grows every month), then Epics and Legendaries owned of those released. Commons and Uncommons are all owned within days; the chase is the Epics and Legendaries.");
+        sb.AppendLine();
+        sb.AppendLine("| Player | " + string.Join(" | ", cDays.Where(d => d <= days).Select(d => "Day " + d)) + " | Summons per day, month 1 | Summons per day, later |");
+        sb.AppendLine("|---|" + string.Concat(cDays.Where(d => d <= days).Select(_ => "---|")) + "---|---|");
+        foreach (var g in groups)
+        {
+            var cells = cDays.Where(d => d <= days).Select(d =>
+            {
+                double share = Median(g.Select(p => (double)p.Days[d - 1].Roster / p.Days[d - 1].Released));
+                double leg = Median(g.Select(p => (double)p.Days[d - 1].Legendaries)), legR = g.First().Days[d - 1].LegendariesReleased;
+                double ep = Median(g.Select(p => (double)p.Days[d - 1].Epics)), epR = g.First().Days[d - 1].EpicsReleased;
+                return $"{F(share * 100)}% · E {F(ep)}/{F(epR)} · L {F(leg)}/{F(legR)}";
+            });
+            double m1 = Median(g.Select(p => p.Days.Take(30).Average(d => d.Pulls)));
+            double later = Median(g.Select(p => p.Days.Skip(30).DefaultIfEmpty(new DayLog()).Average(d => d.Pulls)));
+            sb.AppendLine($"| {g.Key} | {string.Join(" | ", cells)} | {m1:0.0} | {later:0.0} |");
+            if (g.Key.EndsWith("Free"))
+            {
+                if (m1 < c.PullsMonth1[0] || m1 > c.PullsMonth1[1]) flags.Add($"**{g.Key}:** {m1:0.0} summons a day in month 1; the target is {c.PullsMonth1[0]} to {c.PullsMonth1[1]}.");
+                if (days > 60 && (later < c.PullsLater[0] || later > c.PullsLater[1])) flags.Add($"**{g.Key}:** {later:0.0} summons a day after month 1; the target is {c.PullsLater[0]} to {c.PullsLater[1]}.");
+            }
+        }
+        sb.AppendLine();
+        var reg = groups.FirstOrDefault(g => g.Key == $"{c.Times[Math.Min(1, c.Times.Count - 1)].Name} Free");
+        if (reg != null)
+        {
+            foreach (var kv in c.CollectionShare.Where(kv => kv.Key <= days))
+            {
+                double share = Median(reg.Select(p => (double)(p.Days[kv.Key - 1].Epics + p.Days[kv.Key - 1].Legendaries) / (p.Days[kv.Key - 1].EpicsReleased + p.Days[kv.Key - 1].LegendariesReleased)));
+                if (share < kv.Value[0] || share > kv.Value[1]) flags.Add($"**Collection:** {reg.Key} players own {F(share * 100)}% of Epics and Legendaries on day {kv.Key}; the target is {F(kv.Value[0] * 100)} to {F(kv.Value[1] * 100)}%.");
+            }
+            var lastDay = reg.Select(p => p.Days[^1]);
+            double legShare = Median(lastDay.Select(d => (double)d.Legendaries / Math.Max(1, d.LegendariesReleased)));
+            if (legShare > c.LegendaryShareMax) flags.Add($"**Collection:** {reg.Key} players own {F(legShare * 100)}% of Legendaries on day {days}; the target is at most {F(c.LegendaryShareMax * 100)}%.");
+        }
+
+        // Sources, for the free player types
+        sb.AppendLine("Where free players' Godshards, hero shards and heroes came from over the whole run (per day, median player):");
+        sb.AppendLine();
+        var srcs = players.SelectMany(p => p.GodshardsFrom.Keys.Concat(p.HeroShardsFrom.Keys)).Distinct().OrderBy(x => x).ToList();
+        sb.AppendLine("| Player | " + string.Join(" | ", srcs) + " | Heroes gained by source (whole run) |");
+        sb.AppendLine("|---|" + string.Concat(srcs.Select(_ => "---|")) + "---|");
+        foreach (var g in groups.Where(g => g.Key.EndsWith("Free")))
+        {
+            var cells = srcs.Select(x =>
+            {
+                double gs = Median(g.Select(p => (p.GodshardsFrom.TryGetValue(x, out var v) ? v : 0) / days));
+                double hs = Median(g.Select(p => (p.HeroShardsFrom.TryGetValue(x, out var v) ? v : 0) / days));
+                return gs == 0 && hs == 0 ? "" : $"{F(gs)}" + (hs > 0 ? $" + {hs:0.0} shards" : "");
+            });
+            var how = g.SelectMany(p => p.HeroesFrom.Keys).Distinct().OrderBy(x => x).Select(x => $"{x} {F(Median(g.Select(p => (double)(p.HeroesFrom.TryGetValue(x, out var v) ? v : 0))))}");
+            sb.AppendLine($"| {g.Key} | {string.Join(" | ", cells)} | {string.Join(", ", how)} |");
+        }
+        sb.AppendLine();
+
+        // Spending
+        sb.AppendLine("## Spending (doc 08 shop)");
+        sb.AppendLine();
+        sb.AppendLine("| Spend profile | What they buy | Dollars per month |");
+        sb.AppendLine("|---|---|---|");
+        foreach (var sp in c.Spends)
+        {
+            var buys = new List<string>();
+            if (sp.PilgrimsPath) buys.Add("Pilgrim's Path");
+            if (sp.ShrineBlessing) buys.Add("Shrine Blessing");
+            if (sp.PackDollarsPerMonth > 0) buys.Add($"${sp.PackDollarsPerMonth:0} of Godshards");
+            if (sp.DevotionRefillsPerDay > 0) buys.Add($"{sp.DevotionRefillsPerDay:0} Devotion refills a day (with Godshards)");
+            sb.AppendLine($"| {sp.Name} | {(buys.Count == 0 ? "nothing" : string.Join(", ", buys))} | ${c.DollarsPerMonth(sp):0.00} |");
+        }
+        sb.AppendLine();
+
         // Energy
         sb.AppendLine("## Energy (Devotion)");
         sb.AppendLine();
-        sb.AppendLine("| Player | Days out of energy with time left (while campaign remains) | First day out | Farm fights per day | Campaign fights per day (first 30 days) |");
-        sb.AppendLine("|---|---|---|---|---|");
+        sb.AppendLine("| Player | Days out of energy with time left (while campaign remains) | First day out | Farm fights per day | Boss Hunts per day | Campaign fights per day (first 30 days) |");
+        sb.AppendLine("|---|---|---|---|---|---|");
         foreach (var g in groups)
         {
             double share = Median(g.Select(p => p.Days.Count(d => d.OutOfEnergy && d.Difficulty < c.Difficulties.Count) / (double)Math.Max(1, p.Days.Count(d => d.Difficulty < c.Difficulties.Count))));
             double first = Median(g.Select(p => (double)(p.Days.FirstOrDefault(d => d.OutOfEnergy && d.Difficulty < c.Difficulties.Count)?.Day ?? -1)));
             double farm = Median(g.Select(p => p.Days.Average(d => d.FarmFights)));
             double fights = Median(g.Select(p => p.Days.Take(30).Average(d => d.Fights)));
-            sb.AppendLine($"| {g.Key} | {F(share * 100)}% | {Day(first)} | {farm:0.0} | {fights:0.0} |");
+            double hunts = Median(g.Select(p => p.Days.Average(d => d.Hunts)));
+            sb.AppendLine($"| {g.Key} | {F(share * 100)}% | {Day(first)} | {farm:0.0} | {hunts:0.0} | {fights:0.0} |");
         }
         sb.AppendLine();
         sb.AppendLine("Campaign fights never cost energy (doc 10 section 4). Energy runs out only when a player has time left after the campaign and the daily round and wants to keep farming.");
         sb.AppendLine();
 
         // Trajectory
-        foreach (var name in new[] { "Regular Free", "Casual Free" })
+        foreach (var name in new[] { "Regular Free", "Casual Free", "Dedicated Free" })
         {
             var p = groups.First(g => g.Key == name).OrderBy(x => x.Diff * 1000 + x.Battle).ElementAt(seeds / 2);
             sb.AppendLine($"## One {name.ToLowerInvariant()} player, day by day");

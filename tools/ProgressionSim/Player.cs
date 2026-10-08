@@ -1,5 +1,6 @@
 // One simulated player, played day by day. Campaign battles are real fights on the battle engine;
-// everything else (rewards, upgrades, summons, star challenges, farming) follows progression.json.
+// everything else (rewards, upgrades, summons, star challenges, farming, Boss Hunts, Endless and the
+// shop) follows progression.json.
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,6 +10,7 @@ class HeroCard
 {
     public string Id, Kit, Name, Rarity, Faction, Role;
     public double KitPower;   // sqrt(health x attack) of the kit, so heroes compare across roles
+    public int ReleaseDay;    // 0 = in the launch roster
 }
 
 class Owned
@@ -19,7 +21,7 @@ class Owned
 
 class DayLog
 {
-    public int Day, Difficulty, Battle, Roster, TeamLevel, Stars, Fights, FarmFights;
+    public int Day, Difficulty, Battle, Roster, TeamLevel, Stars, Fights, FarmFights, Hunts, Pulls, Released, Legendaries, LegendariesReleased, Epics, EpicsReleased;
     public double TeamStars, TeamGear, TeamSkill;
     public double TeamScale, RecScale, Godshards, GodshardsEarned, MinutesUnused;
     public bool OutOfEnergy, BigMoment, NewHero, Progressed;
@@ -36,9 +38,12 @@ class Player
     readonly long seed;
 
     public readonly Dictionary<string, Owned> Roster = new Dictionary<string, Owned>();
-    readonly Dictionary<int, int> fodder = new Dictionary<int, int> { [3] = 0, [4] = 0, [5] = 0, [6] = 0 };
-    double xp, gold, shards, devotion, gearMats, tomes, tickets, shardsEarned;
-    int pullsSinceEpic, pullsSinceLegendary, pullsTotal;
+    // Fodder by star rank: duplicates and Vessels, which count as any hero of that rank when ascending.
+    readonly Dictionary<int, int> fodder = Enumerable.Range(1, 6).ToDictionary(r => r, r => 0);
+    double xp, gold, shards, devotion, gearMats, tomes, tickets, shardsEarned, heroShards;
+    readonly Dictionary<string, int> sinceRarity = new Dictionary<string, int>();   // pulls since at least this rarity
+    int pullsTotal;
+    public double Dollars;
     public int Diff, Battle;   // next campaign battle: difficulty and index within it
     int[,] stars;              // stars earned per difficulty and battle (0 = not cleared, 1 = won, 2-5 challenges)
     int starsTotal, starChestsGiven, battlesCleared, attemptsToday;
@@ -55,9 +60,14 @@ class Player
         C = c; this.data = data; this.cards = cards; this.time = time; this.spend = spend; this.seed = seed;
         rng = new Random((int)(seed * 7919 % int.MaxValue));
         stars = new int[c.Difficulties.Count, c.BattlesPerDifficulty];
-        foreach (var kit in c.Starters) Gain(cards.First(h => h.Kit == kit && h.Rarity == "Rare"), false);
+        foreach (var kit in c.Starters) Gain(cards.First(h => h.Kit == kit && h.Rarity == c.StarterRarity), false, "Starters");
+        foreach (var g in c.Guarantees) sinceRarity[g.rarity] = 0;
         shards = c.StartingGodshards;   // the first 10-pull, a few minutes in
     }
+
+    int Day => today?.Day ?? 0;
+    IEnumerable<HeroCard> Released => cards.Where(h => h.ReleaseDay <= Day);
+    int Rank(string rarity) => C.Rarities.IndexOf(rarity);   // 0 = rarest
 
     public string Name => $"{time.Name} {spend.Name}";
 
@@ -77,25 +87,29 @@ class Player
             double minutes = minutesPerSession;
             // Shrine and energy fill while away.
             double away = 24.0 / time.Sessions;
-            Add(C.ShrinePerHour, Math.Min(away, C.ShrineCapHours));
+            src = "Shrine"; Add(C.ShrinePerHour, Math.Min(away, C.ShrineCapHours));
             devotion += Math.Min(C.DevotionRegenCap, C.DevotionRegenPerDay / time.Sessions);
             if (s == 0)
             {
                 minutes -= C.DailyMinutes;
-                Add(C.Daily, 1);
+                src = "Dailies"; Add(C.Daily, 1);
                 var team = BestTeam(null);
-                if (TeamScale(team) >= C.RecScale(Math.Min(Diff, C.Difficulties.Count - 1), Math.Min(Battle, C.BattlesPerDifficulty - 1)) * C.DailyHardPower) Earn(C.DailyHardGodshards * C.DailyHardCount);
-                if (day % 7 == 0) Add(C.Weekly, 1);
+                src = "Dailies"; if (TeamScale(team) >= C.RecScale(Math.Min(Diff, C.Difficulties.Count - 1), Math.Min(Battle, C.BattlesPerDifficulty - 1)) * C.DailyHardPower) Earn(C.DailyHardGodshards * C.DailyHardCount);
+                src = "Weekly"; if (day % 7 == 0) Add(C.Weekly, 1);
                 if (day % C.LoginEvery == 0) { tickets += C.LoginTickets; today.BigMoment = true; }
-                Earn(spend.GodshardsPerDay);
-                devotion += spend.DevotionRefills * C.DevotionRegenCap;
+                Shop(day);
                 if (day == C.EpicPickDay && !epicPicked) { epicPicked = true; Pick("Epic"); }
+                // Endless: one run a week for its milestone rewards.
+                src = "Endless"; if (day % 7 == 3 && battlesCleared >= C.Endless.UnlockBattles) { Add(C.Endless.ByDifficulty[HuntTier()], 1, false); minutes -= C.Endless.Minutes; }
             }
+            // The day's free Boss Hunts are part of the daily round; extra hunts with Devotion come later.
+            if (s == 0) minutes = Hunts(minutes, C.BossHunts.FreePerDay, false);
             Upgrade();
             Summon();
             minutes = PushCampaign(minutes);
             Upgrade();
             minutes = Challenges(minutes);
+            minutes = Hunts(minutes, 0, true);
             minutes = FarmFights(minutes);
             today.MinutesUnused += Math.Max(0, minutes);
             Upgrade();
@@ -106,9 +120,13 @@ class Player
         today.Difficulty = Diff; today.Battle = Battle; today.Roster = Roster.Count;
         today.TeamLevel = t.Count == 0 ? 0 : (int)Math.Round(t.Average(o => o.Level));
         if (t.Count > 0) { today.TeamStars = t.Average(o => o.Stars); today.TeamGear = t.Average(o => o.Gear); today.TeamSkill = t.Average(o => o.Skill); }
+        today.Released = Released.Count();
+        today.Epics = Roster.Values.Count(o => o.Card.Rarity == C.Rarities[1]); today.EpicsReleased = Released.Count(h => h.Rarity == C.Rarities[1]); today.Legendaries = Roster.Values.Count(o => o.Card.Rarity == C.Rarities[0]);
+        today.LegendariesReleased = Released.Count(h => h.Rarity == C.Rarities[0]);
         today.TeamScale = TeamScale(t); today.RecScale = C.RecScale(Math.Min(Diff, C.Difficulties.Count - 1), Math.Min(Battle, C.BattlesPerDifficulty - 1));
         today.Stars = starsTotal; today.Godshards = shards; today.GodshardsEarned = shardsEarned - before;
         today.Progressed = battlesCleared > clearedBefore;
+        if (Debug && !today.Progressed && Diff < C.Difficulties.Count && Days.Count >= 20 && Days.Skip(Days.Count - 20).All(x => !x.Progressed) && Days[^20].Progressed == false && !debugged.Contains((Diff, Battle))) DebugWall();
         today.NewHero |= Roster.Count > rosterBefore;
         Days.Add(today);
     }
@@ -127,7 +145,7 @@ class Player
             var enemies = data.Stages.First(s => s.Id == stage).Enemies.Select(e => data.Enemy(e.Id)).ToList();
             // After a loss, alternate between the best line-up and a different one, as a player would.
             lossesHere.TryGetValue((Diff, Battle), out int tries);
-            var team = tries % 2 == 0 ? BestTeam(enemies) : VariantTeam(enemies, tries);
+            var team = tries < 2 ? BestTeam(enemies) : Counter(stage, enemies, tries);
             var slots = Place(team);
             var r = ShatteredPantheon.Battle.Battle.Run(data, slots, stage, seed * 1000003 + Diff * 10007 + Battle * 31 + attemptsToday, null);
             RealFights++; attemptsToday++; today.Fights++;
@@ -155,8 +173,8 @@ class Player
         int d = Diff, k = Battle;
         stars[d, k] = Math.Max(stars[d, k], 1);
         starsTotal++; battlesCleared++;
-        Add(C.FirstClear, 1);
-        if (k % C.BattlesPerStage == C.BattlesPerStage - 1) { Add(C.StageClear, 1); today.BigMoment = true; }
+        src = "Campaign"; Add(C.FirstClear, 1);
+        src = "Campaign"; if (k % C.BattlesPerStage == C.BattlesPerStage - 1) { Add(C.StageClear, 1); AddVessels(C.StageClearVessels[d], 1); today.BigMoment = true; }
         CheckStarChest();
         if (battlesCleared == C.LegendaryPickBattles && !legendaryPicked) { legendaryPicked = true; Pick("Legendary"); }
         Battle++;
@@ -178,7 +196,7 @@ class Player
                 while (stars[d, k] < 5 && team >= need * C.StarSteps[stars[d, k] - 1] && minutes > 0)
                 {
                     stars[d, k]++; starsTotal++;
-                    Earn(C.StarGodshards);
+                    src = "Stars"; Earn(C.StarGodshards);
                     minutes -= FightSeconds(60) / 60;
                     CheckStarChest();
                 }
@@ -191,7 +209,7 @@ class Player
         while (starsTotal >= (starChestsGiven + 1) * C.StarChestEvery)
         {
             starChestsGiven++;
-            Add(C.StarChest, 1);
+            src = "Stars"; Add(C.StarChest, 1);
             today.BigMoment = true;
         }
     }
@@ -203,11 +221,84 @@ class Player
         {
             if (devotion < C.FarmCost) { today.OutOfEnergy = true; break; }
             devotion -= C.FarmCost;
-            Add(C.Farm, 1);
+            src = "Farming"; Add(C.Farm, 1);
+            src = "Farming"; Add(C.FarmByDifficulty[HuntTier()], 1, false);
             minutes -= each;
             today.FarmFights++;
         }
         return minutes;
+    }
+
+    // Boss Hunts (doc 06): free attempts each day, then a few more with Devotion, on the highest
+    // difficulty where the player has beaten a boss. A stand-in for real fights: the player picks a
+    // tier they've already beaten.
+    int huntsToday;
+    double Hunts(double minutes, int free, bool paid)
+    {
+        if (battlesCleared < C.BossHunts.UnlockBattles) return minutes;
+        if (free > 0) huntsToday = 0;
+        while (minutes >= C.BossHunts.Minutes)
+        {
+            if (free > 0) free--;
+            else if (paid && huntsToday < C.BossHunts.FreePerDay + 4 && devotion >= C.BossHunts.DevotionCost) devotion -= C.BossHunts.DevotionCost;
+            else break;
+            huntsToday++; today.Hunts++;
+            src = "Boss Hunts"; Add(C.BossHunts.ByDifficulty[HuntTier()], 1, false);
+            minutes -= C.BossHunts.Minutes;
+        }
+        return minutes;
+    }
+
+    int HuntTier()
+    {
+        if (Diff >= C.Difficulties.Count) return C.Difficulties.Count - 1;
+        return Battle >= C.BattlesPerStage || Diff == 0 ? Diff : Diff - 1;
+    }
+
+    // ---------- Shop (doc 08) ----------
+
+    void Shop(int day)
+    {
+        int cycle = (int)C.PassDays;
+        bool newMonth = (day - 1) % cycle == 0;
+        src = "Shop"; if (day == 1 && spend.StarterOffer) { Add(C.StarterOffer, 1); Dollars += C.StarterPrice; }
+        if (spend.PilgrimsPath)
+        {
+            // The pass pays out along its track; spread evenly over the month here.
+            src = "Shop"; Earn(C.PassReward.Godshards / cycle);
+            tickets += C.PassReward.SummonTickets / cycle;
+            if (newMonth) { AddVessels(C.PassReward.Vessels, 1); Dollars += C.PassPrice; }
+        }
+        if (spend.ShrineBlessing)
+        {
+            src = "Shop"; if (newMonth) { Earn(C.BlessingNow); Dollars += C.BlessingPrice; }
+            src = "Shop"; Earn(C.BlessingPerDay); devotion += C.BlessingDevotion;
+        }
+        if (newMonth && spend.PackDollarsPerMonth > 0)
+        {
+            src = "Shop"; Earn(C.PackGodshards(spend.PackDollarsPerMonth) * (day == 1 ? 2 : 1));   // first purchases count double
+            Dollars += C.DollarsPerMonth(new SpendProfile { PackDollarsPerMonth = spend.PackDollarsPerMonth });
+        }
+        for (int i = 0; i < spend.DevotionRefillsPerDay && i < C.RefillCosts.Length; i++)
+            if (shards >= C.RefillCosts[i]) { shards -= C.RefillCosts[i]; devotion += C.RefillDevotion; }
+    }
+
+    static readonly bool Debug = Environment.GetEnvironmentVariable("SIM_DEBUG") == "1";
+    readonly HashSet<(int, int)> debugged = new HashSet<(int, int)>();
+    void DebugWall()
+    {
+        debugged.Add((Diff, Battle));
+        var stage = Cfg.StageId(Diff, Battle);
+        var enemies = data.Stages.First(x => x.Id == stage).Enemies.Select(e => data.Enemy(e.Id)).ToList();
+        var team = BestTeam(enemies);
+        int wins = 0, n = 40, winsVar = 0;
+        for (int i = 0; i < n; i++)
+        {
+            if (ShatteredPantheon.Battle.Battle.Run(data, Place(team), stage, 99000 + i, null).Result == "win") wins++;
+            if (ShatteredPantheon.Battle.Battle.Run(data, Place(VariantTeam(enemies, i)), stage, 98000 + i, null).Result == "win") winsVar++;
+        }
+        Console.Error.WriteLine($"[{Name} {seed}] day {today.Day} stuck 20+ days on {stage}: team {TeamScale(team) / C.RecScale(Diff, Battle):P0} of recommended, wins {wins}/{n}, variants {winsVar}/{n}. " +
+            string.Join(", ", team.Select(o => $"{o.Card.Kit}/{o.Card.Rarity[0]} L{o.Level} {o.Stars}* g{o.Gear} s{o.Skill}")) + $" | fodder {string.Join(" ", fodder.Select(kv => kv.Key + ":" + kv.Value))} xp {xp:0} gold {gold:0} mats {gearMats:0} tomes {tomes:0}");
     }
 
     // ---------- Team ----------
@@ -245,11 +336,14 @@ class Player
 
     readonly Dictionary<(int, int), int> lossesHere = new Dictionary<(int, int), int>();
 
-    // A line-up drawn from the 10 strongest heroes, keeping at least one front-liner.
+    // A different line-up after a loss: any 5 kits whose best hero is close to the strongest ones,
+    // keeping at least one front-liner. Players rearrange and try counters before grinding (doc 10).
     List<Owned> VariantTeam(List<UnitDef> enemies, int variant)
     {
         var best = BestTeam(enemies);
-        var pool = Roster.Values.OrderByDescending(Power).GroupBy(o => o.Card.Kit).Select(g => g.First()).Take(10).ToList();
+        var byKit = Roster.Values.OrderByDescending(HeroScale).GroupBy(o => o.Card.Kit).Select(g => g.First()).ToList();
+        double bar = byKit.Count >= 5 ? HeroScale(byKit[4]) * 0.85 : 0;
+        var pool = byKit.Where(o => HeroScale(o) >= bar).ToList();
         if (pool.Count <= 5) return best;
         var r = new Random(variant * 7919 + Diff * 31 + Battle);
         for (int tries = 0; tries < 20; tries++)
@@ -257,6 +351,27 @@ class Player
             var team = pool.OrderBy(_ => r.Next()).Take(5).ToList();
             if (team.Any(t => t.Card.Role == "Tank" || t.Card.Role == "Warrior")) return team;
         }
+        return best;
+    }
+
+    // After a couple of losses the player studies the fight and tries counters (doc 10: rearrange
+    // before grinding). Modelled as picking, from the best line-up and a spread of other line-ups,
+    // the one that does best in a few practice fights. Re-thought every few losses as the roster grows.
+    readonly Dictionary<(int, int), (int at, List<Owned> team)> plans = new Dictionary<(int, int), (int, List<Owned>)>();
+    List<Owned> Counter(string stage, List<UnitDef> enemies, int tries)
+    {
+        if (plans.TryGetValue((Diff, Battle), out var plan) && tries - plan.at < 4) return plan.team;
+        var candidates = new List<List<Owned>> { BestTeam(enemies) };
+        for (int v = 0; v < 15; v++) candidates.Add(VariantTeam(enemies, tries * 100 + v));
+        List<Owned> best = null; int bestWins = -1;
+        foreach (var team in candidates)
+        {
+            int wins = 0;
+            for (int i = 0; i < 4; i++)
+                if (ShatteredPantheon.Battle.Battle.Run(data, Place(team), stage, seed * 7 + tries * 1009 + i * 13 + 5, null).Result == "win") wins++;
+            if (wins > bestWins) { best = team; bestWins = wins; }
+        }
+        plans[(Diff, Battle)] = (tries, best);
         return best;
     }
 
@@ -306,7 +421,7 @@ class Player
             {
                 o.Stars++;
                 today.BigMoment = true;
-                if (C.CodexStars.TryGetValue(o.Stars, out var r) && codexDone.Add(o.Card.Id + "*" + o.Stars)) Earn(r);
+                if (C.CodexStars.TryGetValue(o.Stars, out var r) && codexDone.Add(o.Card.Id + "*" + o.Stars)) EarnFrom("Codex", r);
             }
     }
 
@@ -335,7 +450,7 @@ class Player
     {
         while (fodder[rank] < count)
         {
-            if (rank <= 3) return false;
+            if (rank <= 1) return false;
             int need = 1 + C.AscendFodder[rank - 1];
             if (!Ensure(rank - 1, need)) return false;
             fodder[rank - 1] -= need;
@@ -346,23 +461,24 @@ class Player
 
     // ---------- Heroes and summons ----------
 
-    void Gain(HeroCard card, bool fromPull)
+    void Gain(HeroCard card, bool fromPull, string how = "Summons")
     {
+        HeroesFrom[how + (Roster.ContainsKey(card.Id) ? " (duplicate)" : "")] = (HeroesFrom.TryGetValue(how + (Roster.ContainsKey(card.Id) ? " (duplicate)" : ""), out var n) ? n : 0) + 1;
         if (Roster.ContainsKey(card.Id))
         {
             fodder[(int)C.RarityStars[card.Rarity]]++;
             return;
         }
         Roster[card.Id] = new Owned { Card = card, Stars = (int)C.RarityStars[card.Rarity] };
-        if (today != null) { today.NewHero = true; if (card.Rarity != "Rare") today.BigMoment = true; }
-        if (card.Rarity == "Legendary" && FirstLegendaryDay < 0) FirstLegendaryDay = today?.Day ?? 0;
+        if (today != null) { today.NewHero = true; if (Rank(card.Rarity) <= 1) today.BigMoment = true; }
+        if (card.Rarity == C.Rarities[0] && FirstLegendaryDay < 0) FirstLegendaryDay = today?.Day ?? 0;
         if (fromPull || today != null)
         {
-            Earn(C.CodexFirst[card.Rarity]);
-            var faction = cards.Where(h => h.Faction == card.Faction).ToList();
+            EarnFrom("Codex", C.CodexFirst[card.Rarity]);
+            var faction = Released.Where(h => h.Faction == card.Faction).ToList();
             double share = (double)faction.Count(h => Roster.ContainsKey(h.Id)) / faction.Count;
             foreach (var kv in C.CodexFaction)
-                if (share >= kv.Key - 1e-9 && codexDone.Add(card.Faction + "%" + kv.Key)) { Earn(kv.Value); if (kv.Value >= 300 && today != null) today.BigMoment = true; }
+                if (share >= kv.Key - 1e-9 && codexDone.Add(card.Faction + "%" + kv.Key)) { EarnFrom("Codex", kv.Value); if (kv.Value >= 300 && today != null) today.BigMoment = true; }
         }
     }
 
@@ -371,24 +487,49 @@ class Player
         while (tickets >= 1 || shards >= C.SummonCost)
         {
             if (tickets >= 1) tickets--; else shards -= C.SummonCost;
-            pullsTotal++; pullsSinceEpic++; pullsSinceLegendary++;
-            string rarity;
-            double roll = rng.NextDouble();
-            if (pullsSinceLegendary >= C.LegendaryPity || roll < C.Rates["Legendary"]) rarity = "Legendary";
-            else if (pullsSinceEpic >= C.EpicEvery || (C.FirstTenEpic && pullsTotal == 10 && !Roster.Values.Any(o => o.Card.Rarity != "Rare")) || roll < C.Rates["Legendary"] + C.Rates["Epic"]) rarity = "Epic";
-            else rarity = "Rare";
-            if (rarity != "Rare") pullsSinceEpic = 0;
-            if (rarity == "Legendary") pullsSinceLegendary = 0;
-            var pool = cards.Where(h => h.Rarity == rarity).ToList();
+            pullsTotal++; if (today != null) today.Pulls++;
+            foreach (var g in C.Guarantees) sinceRarity[g.rarity]++;
+            // Roll a rarity, then lift it to the rarest guarantee that's due.
+            double roll = rng.NextDouble(), acc = 0;
+            int rank = C.Rarities.Count - 1;
+            for (int i = 0; i < C.Rarities.Count; i++) { acc += C.Rates[C.Rarities[i]]; if (roll < acc) { rank = i; break; } }
+            foreach (var g in C.Guarantees) if (sinceRarity[g.rarity] >= g.every) rank = Math.Min(rank, Rank(g.rarity));
+            if (C.FirstTenEpic && pullsTotal == 10 && !Roster.Values.Any(o => Rank(o.Card.Rarity) <= Rank("Epic"))) rank = Math.Min(rank, Rank("Epic"));
+            foreach (var g in C.Guarantees) if (rank <= Rank(g.rarity)) sinceRarity[g.rarity] = 0;
+            var pool = Released.Where(h => h.Rarity == C.Rarities[rank]).ToList();
             Gain(pool[rng.Next(pool.Count)], true);
+        }
+    }
+
+    // Hero shards go to the top of the wish list: the rarest, strongest released hero not yet owned.
+    void SpendHeroShards()
+    {
+        while (true)
+        {
+            var wish = Released.Where(h => !Roster.ContainsKey(h.Id)).OrderBy(h => Rank(h.Rarity)).ThenByDescending(h => h.KitPower).FirstOrDefault();
+            if (wish == null || heroShards < C.ShardUnlock[wish.Rarity]) return;
+            heroShards -= C.ShardUnlock[wish.Rarity];
+            Gain(wish, true, "Hero shards");
+            if (today != null) today.BigMoment = true;
+        }
+    }
+
+    void AddVessels(Dictionary<int, double> v, double times)
+    {
+        foreach (var kv in v)
+        {
+            double n = kv.Value * times;
+            int whole = (int)n;
+            if (rng.NextDouble() < n - whole) whole++;
+            fodder[kv.Key] += whole;
         }
     }
 
     // A free pick: the strongest hero of that rarity not yet owned.
     void Pick(string rarity)
     {
-        var c = cards.Where(h => h.Rarity == rarity && !Roster.ContainsKey(h.Id)).OrderByDescending(h => h.KitPower).FirstOrDefault();
-        if (c != null) { Gain(c, true); today.BigMoment = true; }
+        var c = Released.Where(h => h.Rarity == rarity && !Roster.ContainsKey(h.Id)).OrderByDescending(h => h.KitPower).FirstOrDefault();
+        if (c != null) { Gain(c, true, "Free picks"); today.BigMoment = true; }
     }
 
     // ---------- Rewards ----------
@@ -409,17 +550,33 @@ class Player
         return from + (C.Difficulties[d].RewardScale - from) * t;
     }
 
-    void Add(Reward r, double times)
+    // Gear materials and tomes follow the difficulty's rewardScale, except from Boss Hunts and Endless,
+    // whose tables already list the amount for each difficulty.
+    void Add(Reward r, double times, bool scaled = true)
     {
-        double lc = LevelCost(), rs = RewardScale();
-        xp += r.XpLevels * lc * times * (1 + spend.Bonus);
-        gold += r.GoldLevels * lc * C.GoldPerXp * times * (1 + spend.Bonus);
+        double lc = LevelCost(), rs = scaled ? RewardScale() : 1;
+        double bonus = spend.PilgrimsPath ? C.PassBonus : 0;
+        xp += r.XpLevels * lc * times * (1 + bonus);
+        gold += r.GoldLevels * lc * C.GoldPerXp * times * (1 + bonus);
         Earn(r.Godshards * times);
         devotion += r.Devotion * times;
         gearMats += r.GearMats * times * rs;
         tomes += r.SkillTomes * times * rs;
         tickets += r.SummonTickets * times;
+        heroShards += r.HeroShards * times;
+        if (r.HeroShards > 0) HeroShardsFrom[src] = (HeroShardsFrom.TryGetValue(src, out var hv) ? hv : 0) + r.HeroShards * times;
+        AddVessels(r.Vessels, times);
+        if (r.HeroShards > 0) SpendHeroShards();
     }
 
-    void Earn(double g) { shards += g; shardsEarned += g; }
+    // Where Godshards and hero shards come from, for the report.
+    string src = "Other";
+    public readonly Dictionary<string, double> GodshardsFrom = new Dictionary<string, double>(), HeroShardsFrom = new Dictionary<string, double>();
+    public readonly Dictionary<string, int> HeroesFrom = new Dictionary<string, int>();
+    void EarnFrom(string from, double g) { var was = src; src = from; Earn(g); src = was; }
+    void Earn(double g)
+    {
+        shards += g; shardsEarned += g;
+        GodshardsFrom[src] = (GodshardsFrom.TryGetValue(src, out var v) ? v : 0) + g;
+    }
 }
