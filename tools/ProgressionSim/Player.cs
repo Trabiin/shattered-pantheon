@@ -342,11 +342,11 @@ class Player
 
     // A different line-up after a loss: any 5 kits whose best hero is close to the strongest ones,
     // keeping a tank and a healer when the pool has them. Players rearrange and try counters before grinding (doc 10).
-    List<Owned> VariantTeam(List<UnitDef> enemies, int variant)
+    List<Owned> VariantTeam(List<UnitDef> enemies, int variant, double barFactor = 0.85)
     {
         var best = BestTeam(enemies);
         var byKit = Roster.Values.OrderByDescending(HeroScale).GroupBy(o => o.Card.Kit).Select(g => g.First()).ToList();
-        double bar = byKit.Count >= 5 ? HeroScale(byKit[4]) * 0.85 : 0;
+        double bar = byKit.Count >= 5 ? HeroScale(byKit[4]) * barFactor : 0;
         var pool = byKit.Where(o => HeroScale(o) >= bar).ToList();
         if (pool.Count <= 5) return best;
         var r = new Random(variant * 7919 + Diff * 31 + Battle);
@@ -366,27 +366,31 @@ class Player
     List<Owned> Counter(string stage, List<UnitDef> enemies, int tries)
     {
         if (plans.TryGetValue((Diff, Battle), out var plan) && tries < plan.at * 2 + 4) return plan.team;   // re-think less and less often
-        var candidates = new List<List<Owned>> { BestTeam(enemies) };
+        var main = BestTeam(enemies);
+        var candidates = new List<List<Owned>> { main };
         for (int v = 0; v < 9; v++) candidates.Add(VariantTeam(enemies, tries * 100 + v));
         List<Owned> best = null; int bestWins = -1;
         foreach (var team in candidates)
         {
             int wins = 0;
             for (int i = 0; i < 3; i++)
-                { PracticeFights++; if (ShatteredPantheon.Battle.Battle.Run(data, Place(team), stage, seed * 7 + tries * 1009 + i * 13 + 5, null).Result == "win") wins++; }
-            if (wins > bestWins) { best = team; bestWins = wins; }
+            {
+                PracticeFights++;
+                if (ShatteredPantheon.Battle.Battle.Run(data, Place(team), stage, seed * 7 + tries * 1009 + i * 13 + 5, null).Result == "win") wins++;
+            }
+            if (wins > bestWins || (wins == bestWins && team == main)) { best = team; bestWins = wins; }
         }
         plans[(Diff, Battle)] = (tries, best);
         return best;
     }
 
-    List<TeamSlot> Place(List<Owned> team)
+    List<TeamSlot> Place(List<Owned> team, double scale = 0)
     {
         var placed = Formation.AutoPlace(data, team.Select(o => o.Card.Kit).ToList());
         foreach (var s in placed)
         {
             var o = team.First(t => t.Card.Kit == s.Id);
-            s.HpScale = s.AtkScale = HeroScale(o);
+            s.HpScale = s.AtkScale = scale > 0 ? scale : HeroScale(o);
         }
         return placed;
     }
@@ -396,15 +400,16 @@ class Player
     void Upgrade()
     {
         var team = BestTeam(null);
-        var core = Roster.Values.OrderByDescending(Power).Take(8).ToList();
+        // A bench of 10 is levelled together, so there are real line-ups to switch to when a battle needs a counter.
+        var core = Roster.Values.OrderByDescending(Power).GroupBy(o => o.Card.Kit).Select(g => g.First()).Take(10).ToList();
         // Gear first, up to what the current battle recommends, so gold isn't all spent on levels.
         var rec = C.Recommended(Math.Min(Diff, C.Difficulties.Count - 1), Math.Min(Battle, C.BattlesPerDifficulty - 1));
         UpgradeGear(team, (int)Math.Ceiling(rec.gear));
-        // Levels: the lowest-level team hero first; the bench only once the team is capped.
-        foreach (var group in new[] { team, core })
+        // Levels: the team up to the recommended level first, then the whole bench, lowest first.
+        foreach (var (group, upTo) in new[] { (team, (int)Math.Ceiling(rec.level)), (core, int.MaxValue) })
             while (true)
             {
-                var o = group.Where(h => h.Level < C.Cap(h.Stars)).OrderBy(h => h.Level).FirstOrDefault();
+                var o = group.Where(h => h.Level < Math.Min(upTo, C.Cap(h.Stars))).OrderBy(h => h.Level).FirstOrDefault();
                 if (o == null) break;
                 double cost = C.XpToNext(o.Level);
                 if (xp < cost || gold < cost * C.GoldPerXp) break;
