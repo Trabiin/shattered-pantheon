@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Compiles the game's scripts against the real Unity libraries (copied out of a Unity editor
+       image by .github/workflows/unity-compile.yml), so API mistakes show up without opening Unity.
+       Build with -p:UnityData=<folder holding Managed/ and UnityEngine.UI.dll> and -p:WithEditor=true|false. -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <DisableImplicitFrameworkReferences>false</DisableImplicitFrameworkReferences>
+    <!-- Deprecated Unity APIs fail the check. -->
+    <WarningsAsErrors>CS0618;CS0612</WarningsAsErrors>
+    <WithEditor Condition="'$(WithEditor)' == ''">false</WithEditor>
+    <DefineConstants Condition="'$(WithEditor)' == 'true'">$(DefineConstants);UNITY_EDITOR</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../Unity/Assets/BattleCore/**/*.cs" />
+    <Compile Include="../../Unity/Assets/Game/Scripts/**/*.cs" />
+    <Compile Include="../../Unity/Assets/Game/Editor/**/*.cs" Condition="'$(WithEditor)' == 'true'" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="$(UnityData)/Managed/UnityEngine/UnityEngine*.dll" Exclude="$(UnityData)/Managed/UnityEngine/UnityEngine.dll" Private="false" />
+    <Reference Include="$(UnityData)/UnityEngine.UI.dll" Private="false" />
+    <Reference Include="$(UnityData)/Managed/UnityEngine/UnityEditor*.dll" Exclude="$(UnityData)/Managed/UnityEngine/UnityEditor.dll" Condition="'$(WithEditor)' == 'true'" Private="false" />
+  </ItemGroup>
+</Project>
