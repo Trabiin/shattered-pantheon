@@ -1,5 +1,6 @@
 // Plays the game's screens on fake Unity (FakeUnity.cs) the way a player would: the campaign screen,
-// team and formation editing, every realm 1 battle in order, retreating mid-fight, results, retry.
+// team and formation editing, every realm 1 battle in order, retreating mid-fight, results, retry,
+// closing and reopening the game with its save, and resetting progress.
 // Fails on any exception a screen throws, on a fight that differs from the engine run directly,
 // on screens or animations left behind, or on a team that isn't what the player picked.
 //   dotnet run --project tools/ScreenSmokeTest
@@ -27,6 +28,8 @@ static class Program
         string dir = Path.Combine(UnityEngine.Resources.Root, "BattleData");
         string R(string f) => File.ReadAllText(Path.Combine(dir, f + ".json"));
         var data = GameData.FromJson(R("rules"), R("heroes"), R("enemies"), R("campaign"));
+        Application.persistentDataPath = Path.Combine(Path.GetTempPath(), "sp-smoke-" + Guid.NewGuid().ToString("N"));
+        string saveFile = Path.Combine(Application.persistentDataPath, SaveStore.FileName);
         var realm = CampaignView.Battles(data);
         Expect(realm.Count == 40 && realm.GroupBy(b => b.StageNumber).Count() == 10 && realm.GroupBy(b => b.StageNumber).All(g => g.Count() == 4), "realm 1 on Normal has 10 stages of 4 battles");
         Expect(realm.All(b => (b.BattleNumber == 4) == (b.Boss != null)) && realm.Count(b => b.Boss == "realm") == 1 && realm.Last().Boss == "realm", "battle 4 of each stage is its boss, and stage 10's is the realm boss");
@@ -102,10 +105,10 @@ static class Program
             Click("Fight! Button");
             int tries = 1;
             while (!CheckFight(data, stage, team) && tries < MaxTries) { Click("Retry Button"); tries++; }
-            Expect(PlayerPrefs.GetInt("cleared." + stage.Id) == 1, $"{stage.Name}: won within {MaxTries} tries ({tries})");
+            Expect(app.Progress.IsCleared(stage.Id), $"{stage.Name}: won within {MaxTries} tries ({tries})");
             Click("Stages Button");
         }
-        Expect(realm.All(b => Find("Battle: " + b.Id).transform.Cast<Transform>().Any(t => t.GetComponent<Text>()?.text.Contains("Cleared") == true)), "every won battle shows as cleared");
+        Expect(realm.All(b => IsShownCleared(b)), "every won battle shows as cleared");
 
         // A fight in the 3-2 formation, on the realm boss.
         var wide = realm.Last();
@@ -125,6 +128,30 @@ static class Program
         Expect(Team().Select(t => t.Id + "@" + t.Slot).SequenceEqual(picked.Select(t => t.Id + "@" + t.Slot)), "a battle reopens with the team last used on it");
         Click("Back Button");
         Expect(Current is CampaignView, "Back returns to the campaign");
+
+        // Close the game (the phone pauses it first) and open it again: everything comes back from the save.
+        app.GetType().GetMethod("OnApplicationPause", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(app, new object[] { true });
+        string saved = File.ReadAllText(saveFile);
+        UnityEngine.Object.Destroy(app.gameObject);
+        app = new GameObject("Game").AddComponent<GameApp>();
+        Call(app, "Start");
+        Expect(Current is CampaignView, "the reopened game starts on the campaign");
+        Expect(realm.All(b => IsShownCleared(b)), "after reopening, every won battle still shows as cleared");
+        Expect(realm.All(b => app.Progress.Stars(b.Id).SequenceEqual(new[] { 1 })), "after reopening, every won battle has its 1 star");
+        Expect(app.Progress.Furthest("normal") == realm.Last().Id, "after reopening, the furthest battle reached is the realm boss");
+        Click("Battle: " + first.Id);
+        Expect(Team().Select(t => t.Id + "@" + t.Slot).SequenceEqual(picked.Select(t => t.Id + "@" + t.Slot)), "after reopening, a battle still opens with the team last used on it");
+        Click("Back Button");
+        Expect(File.ReadAllText(saveFile) == saved, "reopening the game doesn't change the save");
+        Expect(Debug.Warnings.Count == 0, "no save warnings");
+
+        // Reset progress (testing only) takes two taps and starts a new game.
+        Click("Reset progress Button");
+        Expect(IsShownCleared(first) && File.Exists(saveFile), "one tap on Reset progress only asks to confirm");
+        Click("Reset progress Button");
+        Expect(Current is CampaignView && realm.All(b => !IsShownCleared(b)) && !File.Exists(saveFile), "the second tap clears all progress and the save");
+        Expect(app.Progress.Furthest("normal") == null, "after a reset nothing has been reached");
+        Directory.Delete(Application.persistentDataPath, true);
 
         foreach (var e in Scheduler.Errors.Distinct().Take(5)) Console.WriteLine("ERROR " + e);
         Expect(Scheduler.Errors.Count == 0, "no errors on any screen");
@@ -148,7 +175,8 @@ static class Program
         Expect(TeamSet(shown.Units.Where(u => u.Side == "A").Select(u => new TeamSlot(u.Id, u.Row, u.Slot)).ToList()) == TeamSet(team), $"{stage.Name}: the fight used the picked team and formation");
         Expect(results != null && results.Title == (direct.Result == "win" ? "Victory" : direct.Result == "lose" ? "Defeat" : "Time's up"), $"{stage.Name}: result title is right");
         Expect(((List<TeamSlot>)Field(view, "team")).All(s => s.HpScale == stage.HeroScale && s.AtkScale == stage.HeroScale), $"{stage.Name}: heroes fight at the battle's expected strength ({stage.HeroScale}x)");
-        Expect(direct.Result != "win" || PlayerPrefs.GetInt("cleared." + stage.Id) == 1, $"{stage.Name}: a win marks the battle cleared");
+        Expect(direct.Result != "win" || app.Progress.IsCleared(stage.Id), $"{stage.Name}: a win marks the battle cleared");
+        Expect(SaveData.FromJson(File.ReadAllText(Path.Combine(Application.persistentDataPath, SaveStore.FileName))).Stars.ContainsKey(stage.Id) == app.Progress.IsCleared(stage.Id), $"{stage.Name}: the save on the device matches after the fight");
         Expect(direct.Heroes.All(h => Find("Row: " + h.Id) != null), $"{stage.Name}: every hero has a results row");
         Expect(Scheduler.Running == 0, $"{stage.Name}: no animations left running ({Scheduler.Running})");
         Expect(CanvasChildren() == 2, $"{stage.Name}: old screens are cleaned up ({CanvasChildren()} canvas children)");
@@ -161,6 +189,8 @@ static class Program
     static List<TeamSlot> Team() => ((TeamView)Current).Team();
     static bool Has(string id, string slot) => Team().Any(t => t.Id == id && t.Slot == slot);
     static string TeamSet(List<TeamSlot> team) => string.Join(",", team.Select(t => t.Id + "@" + t.Row + "/" + t.Slot).OrderBy(x => x));
+
+    static bool IsShownCleared(StageDef b) => Find("Battle: " + b.Id).transform.Cast<Transform>().Any(t => t.GetComponent<Text>()?.text.Contains("Cleared") == true);
 
     static void RunFor(float seconds) { for (float t = 0; t < seconds; t += 1 / 60f) Scheduler.Frame(1 / 60f); }
     static float RunUntil(Func<bool> done, float limit) { float t = 0; while (!done() && t < limit) { Scheduler.Frame(1 / 60f); t += 1 / 60f; } return t; }

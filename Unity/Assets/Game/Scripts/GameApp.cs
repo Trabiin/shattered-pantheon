@@ -3,7 +3,6 @@
 namespace ShatteredPantheon.Game
 {
     using System.Collections.Generic;
-    using System.Linq;
     using ShatteredPantheon.Battle;
     using UnityEngine;
     using UnityEngine.EventSystems;
@@ -25,10 +24,14 @@ namespace ShatteredPantheon.Game
             Screen.orientation = ScreenOrientation.Portrait;
             Application.targetFrameRate = 60;
             Data = LoadData();
-            Progress = new PlayerProgress(Data);
+            Progress = new PlayerProgress(Data, new SaveStore(Application.persistentDataPath), Debug.LogWarning);
             BuildCanvas();
             ShowStages();
         }
+
+        // Phones close paused apps without warning, so pausing (or quitting) writes the save.
+        void OnApplicationPause(bool paused) { if (paused) Progress?.Write(); }
+        void OnApplicationQuit() => Progress?.Write();
 
         static GameData LoadData()
         {
@@ -100,57 +103,6 @@ namespace ShatteredPantheon.Game
             if (back != null) Ui.MakeButton(Root, "Back", new Vector2(-430, 860), new Vector2(160, 90), back);
             var t = Ui.Label(Root, $"{title}\n<size=26>{subtitle}</size>", 40, Color.white, TextAnchor.MiddleLeft, new Vector2(back != null ? 90 : -10, 860), new Vector2(back != null ? 820 : 1000, 120)).Bold();
             return t;
-        }
-    }
-
-    // What the player has done, saved on the device: battles cleared and the last team used on each battle.
-    public class PlayerProgress
-    {
-        readonly GameData data;
-        public PlayerProgress(GameData data) { this.data = data; }
-
-        public bool IsCleared(string stageId) => PlayerPrefs.GetInt("cleared." + stageId, 0) == 1;
-        public void MarkCleared(string stageId) { PlayerPrefs.SetInt("cleared." + stageId, 1); PlayerPrefs.Save(); }
-
-        public void SaveTeam(string stageId, List<TeamSlot> team, string formation)
-        {
-            var s = string.Join(";", team.ConvertAll(t => t.Id + ":" + t.Row + ":" + t.Slot));
-            PlayerPrefs.SetString("team." + stageId, s);
-            PlayerPrefs.SetString("team.last", s);
-            PlayerPrefs.SetString("formation." + stageId, formation);
-            PlayerPrefs.SetString("formation.last", formation);
-            PlayerPrefs.Save();
-        }
-
-        // The formation saved with that team ("2-3" or "3-2"); a team that doesn't fill its row of three can't show it.
-        public string LoadFormation(string stageId, List<TeamSlot> team)
-        {
-            string key = PlayerPrefs.HasKey("team." + stageId) ? "formation." + stageId : "formation.last";
-            string f = PlayerPrefs.GetString(key, "");
-            return (f == "2-3" || f == "3-2") && team.All(t => Battle.SlotsOf(f).Contains(t.Slot)) ? f : Battle.FormationOf(team.Select(t => t.Slot));
-        }
-
-        // The team last used on this stage, else the last team used anywhere, else a sensible default.
-        public List<TeamSlot> LoadTeam(string stageId)
-        {
-            var team = Parse(PlayerPrefs.GetString("team." + stageId, "")) ?? Parse(PlayerPrefs.GetString("team.last", ""));
-            return team ?? Formation.AutoPlace(data, new[] { "hilde", "solenne", "thessaly", "maren", "pip" });
-        }
-
-        List<TeamSlot> Parse(string s)
-        {
-            if (string.IsNullOrEmpty(s)) return null;
-            var team = new List<TeamSlot>();
-            foreach (var part in s.Split(';'))
-            {
-                var p = part.Split(':');
-                if (p.Length != 3 || data.Heroes.Find(h => h.Id == p[0]) == null) return null; // hero renamed or removed
-                team.Add(new TeamSlot(p[0], p[1], p[2]));
-            }
-            if (team.Count == 0 || team.Select(t => t.Slot).Distinct().Count() != team.Count) return null;
-            string formation = Battle.FormationOf(team.Select(t => t.Slot));
-            if (!team.All(t => Battle.SlotsOf(formation).Contains(t.Slot))) return null; // saved before formations changed
-            return team;
         }
     }
 }
