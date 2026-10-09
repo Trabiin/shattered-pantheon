@@ -194,8 +194,11 @@
         "rewardScale": 0.05
       }
     ],
-    "stages": 40,
-    "battlesPerStage": 10,
+    "_layout": "Doc 06 section 1.1: 10 realms x 10 stages x 4 battles per difficulty. Battle 4 of a stage is its boss; stage 10's boss is the realm boss. Realm order from doc 12 section 9.",
+    "stages": 100,
+    "battlesPerStage": 4,
+    "stagesPerRealm": 10,
+    "realms": ["Hearth", "War", "Grave", "Sun", "Night", "Trickster", "Arcana", "Sea", "Forge", "Wild"],
     "enemyFactor": 1.4,
     "bossFactor": 1.0,
     "starSteps": [
@@ -211,6 +214,10 @@
     "bossWinBand": [
       0.72,
       0.9
+    ],
+    "realmBossWinBand": [
+      0.6,
+      0.8
     ],
     "earlyBattles": 30,
     "earlyWinBand": [
@@ -233,10 +240,20 @@
       "godshards": 5,
       "gearMats": 1
     },
+    "_stageClear": "Every 4th battle is a stage boss now (100 stage clears per difficulty, was 40), so stage-clear rewards are 40% of the old ones: the same total.",
     "stageClear": {
-      "godshards": 50,
-      "gearMats": 6,
-      "skillTomes": 6
+      "godshards": 20,
+      "gearMats": 2.4,
+      "skillTomes": 2.4
+    },
+    "stageChests": {
+      "_about": "Doc 06 section 1.4: small, medium and large chest at 6, 12 and 20 of a stage's 20 stars. XP and gold are in level-ups at the recommended level, scaled like other campaign rewards.",
+      "stars": [6, 12, 20],
+      "rewards": [
+        { "xpLevels": 0.3, "goldLevels": 0.3 },
+        { "godshards": 20 },
+        { "gearMats": 3, "skillTomes": 2 }
+      ]
     },
     "star": {
       "godshards": 1
@@ -313,17 +330,17 @@
     },
     "stageClearVessels": [
       {
-        "2": 1
+        "2": 0.4
       },
       {
-        "3": 1
+        "3": 0.4
       },
       {
-        "4": 0.5
+        "4": 0.2
       },
       {
-        "4": 0.5,
-        "5": 0.2
+        "4": 0.2,
+        "5": 0.08
       }
     ],
     "farmByDifficulty": [

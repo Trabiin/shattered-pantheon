@@ -150,12 +150,12 @@ static class Program
         }
     }
 
-    // Win rate of random Epic teams at exactly the recommended power, per difficulty and stage band.
+    // Win rate of random Epic teams at exactly the recommended power, a few battles and bosses per difficulty.
     static void Check(Cfg c, GameData data, List<HeroCard> cards)
     {
         var rng = new Random(5);
         for (int d = 0; d < c.Difficulties.Count; d++)
-            foreach (int k in new[] { 5, 9, 55, 99, 155, 199, 255, 299, 355, 399 })
+            foreach (int k in new[] { 5, 7, 39, 157, 199, 357, 399 })
             {
                 int wins = 0, n = 60; double secs = 0;
                 double scale = c.RecScale(d, k);
@@ -167,7 +167,7 @@ static class Program
                     var r = Battle.Run(data, team, Cfg.StageId(d, k), i + 1);
                     if (r.Result == "win") { wins++; secs += r.Seconds; }
                 }
-                Console.WriteLine($"{c.Difficulties[d].Name,-10} battle {k + 1,3}: win {100 * wins / n,3}% at recommended power, avg win {Mmss(wins > 0 ? secs / wins : 0)}");
+                Console.WriteLine($"{c.Difficulties[d].Name,-10} {c.BattleName(k),-14}{(c.IsRealmBoss(k) ? " realm boss" : c.IsBoss(k) ? " boss" : ""),-11}: win {100 * wins / n,3}% at recommended power, avg win {Mmss(wins > 0 ? secs / wins : 0)}");
             }
     }
 
@@ -178,7 +178,7 @@ static class Program
     static double Median(IEnumerable<double> xs) { var a = xs.OrderBy(x => x).ToArray(); return a.Length == 0 ? double.NaN : a[a.Length / 2]; }
     static string Day(double d) => double.IsNaN(d) || d < 0 ? "not reached" : "day " + F(d);
 
-    static string Position(Cfg c, int diff, int battle) => diff >= c.Difficulties.Count ? "all done" : $"{c.Difficulties[diff].Name} {battle / c.BattlesPerStage + 1}-{battle % c.BattlesPerStage + 1}";
+    static string Position(Cfg c, int diff, int battle) => diff >= c.Difficulties.Count ? "all done" : $"{c.Difficulties[diff].Name} {c.BattleName(battle)}";
 
     static string Report(Cfg c, Player[] players, int days, int seeds, int rosterSize)
     {
@@ -192,7 +192,7 @@ static class Program
         var flags = new List<string>();
 
         // Milestones
-        string[] milestones = { "Normal 10", "Normal 20", "Normal 40", "Hard 20", "Hard 40", "Nightmare 40", "Godless 40" };
+        string[] milestones = { "Normal realm 3", "Normal realm 5", "Normal realm 10", "Hard realm 5", "Hard realm 10", "Nightmare realm 10", "Godless realm 10" };
         sb.AppendLine("## When each player type gets there");
         sb.AppendLine();
         sb.AppendLine("| Player | " + string.Join(" | ", milestones) + " | Where on day " + days + " |");
@@ -214,18 +214,18 @@ static class Program
             sb.AppendLine($"| {g.Key} | {string.Join(" | ", cells)} | {Position(c, last.Diff, last.Battle)} |");
         }
         sb.AppendLine();
-        sb.AppendLine("Targets (doc 10 section 9): Normal 40 by day " + string.Join(", ", c.NormalDays.Select(kv => $"{F(kv.Value)} ({kv.Key})")) + "; Hard 40 by day " + string.Join(", ", c.HardDays.Select(kv => $"{F(kv.Value)} ({kv.Key})")) + ". A dash means most players of that type hadn't reached it by day " + days + ".");
+        sb.AppendLine("Targets (doc 10 section 9): Normal done (realm 10) by day " + string.Join(", ", c.NormalDays.Select(kv => $"{F(kv.Value)} ({kv.Key})")) + "; Hard done by day " + string.Join(", ", c.HardDays.Select(kv => $"{F(kv.Value)} ({kv.Key})")) + ". A dash means most players of that type hadn't reached it by day " + days + ".");
         sb.AppendLine();
 
         foreach (var t in c.Times)
         {
-            double n = reach[($"{t.Name} Free", "Normal 40")], h = reach[($"{t.Name} Free", "Hard 40")];
+            double n = reach[($"{t.Name} Free", "Normal realm 10")], h = reach[($"{t.Name} Free", "Hard realm 10")];
             double tn = c.NormalDays[t.Name], th = c.HardDays[t.Name];
             if (double.IsNaN(n) || n > tn * 1.25) flags.Add($"**{t.Name} Free** finishes Normal on {Day(n)}; the target is about day {F(tn)}.");
             else if (n < tn * 0.75) flags.Add($"**{t.Name} Free** finishes Normal on day {F(n)}, much sooner than the target of about day {F(tn)}.");
             if (days >= th * 1.25 && (double.IsNaN(h) || h > th * 1.25)) flags.Add($"**{t.Name} Free** finishes Hard on {Day(h)}; the target is about day {F(th)}.");
             else if (!double.IsNaN(h) && h < th * 0.75) flags.Add($"**{t.Name} Free** finishes Hard on day {F(h)}, much sooner than the target of about day {F(th)}.");
-            double ln = reach.TryGetValue(($"{t.Name} Light", "Normal 40"), out var lv) ? lv : double.NaN;
+            double ln = reach.TryGetValue(($"{t.Name} Light", "Normal realm 10"), out var lv) ? lv : double.NaN;
             if (!double.IsNaN(n) && !double.IsNaN(ln))
             {
                 double faster = 1 - ln / n;
@@ -236,7 +236,7 @@ static class Program
         // Playing longer should pay (Ojon, 2026-10-08): each step up in daily time gets there clearly sooner.
         foreach (var sp in c.Spends.Take(1))
             for (int i = 1; i < c.Times.Count; i++)
-                foreach (var m in new[] { "Normal 40", "Hard 40", "Nightmare 40" })
+                foreach (var m in new[] { "Normal realm 10", "Hard realm 10", "Nightmare realm 10" })
                 {
                     double slow = reach[($"{c.Times[i - 1].Name} {sp.Name}", m)], fast = reach[($"{c.Times[i].Name} {sp.Name}", m)];
                     if (double.IsNaN(fast)) continue;
@@ -247,7 +247,7 @@ static class Program
         // Late spender gap (Ojon, 2026-10-09): spending speeds up the late game, but not by more than this.
         foreach (var t in c.Times)
             foreach (var sp in c.Spends.Skip(1))
-                foreach (var m in new[] { "Nightmare 40", "Godless 40" })
+                foreach (var m in new[] { "Nightmare realm 10", "Godless realm 10" })
                 {
                     double free = reach[($"{t.Name} {c.Spends[0].Name}", m)], paid = reach[($"{t.Name} {sp.Name}", m)];
                     if (double.IsNaN(paid)) continue;
@@ -267,7 +267,7 @@ static class Program
             double bigGap = Median(g.Select(p => (double)LongestGap(p.Days, d => d.BigMoment, d => d.Difficulty >= c.Difficulties.Count)));
             // Walls count on Normal and Hard; Nightmare and Godless are meant to be a long climb.
             double wall = Median(g.Select(p => (double)LongestGap(p.Days, d => d.Progressed, d => d.Difficulty >= 2)));
-            double walls = Median(g.Select(p => (double)Walls(p.Days, c.WallDays, 2).Count));
+            double walls = Median(g.Select(p => (double)Walls(c, p.Days, c.WallDays, 2).Count));
             double lateWall = Median(g.Select(p => (double)LongestGap(p.Days.Where(d => d.Difficulty >= 2).ToList(), d => d.Progressed, d => d.Difficulty >= c.Difficulties.Count)));
             double gpd = Median(g.Select(p => p.Days.Take(30).Average(d => d.GodshardsEarned)));
             sb.AppendLine($"| {g.Key} | {Day(leg)} | {F(heroGap)} days | {F(bigGap)} days | {F(wall)} days | {F(walls)} | {F(lateWall)} days | {F(gpd)} |");
@@ -281,10 +281,10 @@ static class Program
         sb.AppendLine();
 
         // Where the walls are
-        var wallSpots = players.Where(p => p.Name.EndsWith("Free")).SelectMany(p => Walls(p.Days, c.WallDays, 2)).GroupBy(w => w.Item1).OrderByDescending(x => x.Count()).Take(6).ToList();
+        var wallSpots = players.Where(p => p.Name.EndsWith("Free")).SelectMany(p => Walls(c, p.Days, c.WallDays, 2)).GroupBy(w => w.Item1).OrderByDescending(x => x.Count()).Take(6).ToList();
         if (wallSpots.Count > 0)
         {
-            sb.AppendLine("Free players' walls by difficulty and stage band: " + string.Join(", ", wallSpots.Select(x => $"{x.Key} ({x.Count()})")) + ".");
+            sb.AppendLine("Free players' walls by difficulty and realm: " + string.Join(", ", wallSpots.Select(x => $"{x.Key} ({x.Count()})")) + ".");
             sb.AppendLine();
         }
 
@@ -417,7 +417,7 @@ static class Program
         return best;
     }
 
-    static List<(string, int)> Walls(List<DayLog> days, double limit, int difficulties)
+    static List<(string, int)> Walls(Cfg c, List<DayLog> days, double limit, int difficulties)
     {
         var list = new List<(string, int)>();
         int run = 0;
@@ -425,7 +425,7 @@ static class Program
         {
             if (d.Difficulty >= difficulties) break;
             if (d.Progressed) run = 0;
-            else if (++run == (int)limit + 1) list.Add(($"{new[] { "Normal", "Hard", "Nightmare", "Godless" }[d.Difficulty]} {d.Battle / 100 * 10 + 1}-{d.Battle / 100 * 10 + 10}", run));
+            else if (++run == (int)limit + 1) list.Add(($"{c.Difficulties[d.Difficulty].Name} {c.Realms[c.RealmOf(Math.Min(d.Battle, c.BattlesPerDifficulty - 1))]}", run));
         }
         return list;
     }

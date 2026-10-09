@@ -46,6 +46,7 @@ class Player
     public double Dollars;
     public int Diff, Battle;   // next campaign battle: difficulty and index within it
     int[,] stars;              // stars earned per difficulty and battle (0 = not cleared, 1 = won, 2-5 challenges)
+    int[,] stageChests;   // chests opened per stage (0 to 3)
     int starsTotal, starChestsGiven, battlesCleared, attemptsToday;
     bool legendaryPicked, epicPicked;
     readonly HashSet<string> codexDone = new HashSet<string>();
@@ -60,6 +61,7 @@ class Player
         C = c; this.data = data; this.cards = cards; this.time = time; this.spend = spend; this.seed = seed;
         rng = new Random((int)(seed * 7919 % int.MaxValue));
         stars = new int[c.Difficulties.Count, c.BattlesPerDifficulty];
+        stageChests = new int[c.Difficulties.Count, c.Stages];
         foreach (var kit in c.Starters) Gain(cards.First(h => h.Kit == kit && h.Rarity == c.StarterRarity), false, "Starters");
         foreach (var g in c.Guarantees) sinceRarity[g.rarity] = 0;
         shards = c.StartingGodshards;   // the first 10-pull, a few minutes in
@@ -179,11 +181,10 @@ class Player
         starsTotal++; battlesCleared++;
         src = "Campaign"; Add(C.FirstClear, 1);
         src = "Campaign"; if (k % C.BattlesPerStage == C.BattlesPerStage - 1) { Add(C.StageClear, 1); AddVessels(C.StageClearVessels[d], 1); today.BigMoment = true; }
-        CheckStarChest();
+        CheckStarChest(); CheckStageChests(d, k);
         if (battlesCleared == C.LegendaryPickBattles && !legendaryPicked) { legendaryPicked = true; Pick("Legendary"); }
         Battle++;
-        int stage = k / C.BattlesPerStage + 1;
-        if (k % C.BattlesPerStage == C.BattlesPerStage - 1 && stage % 10 == 0) DoneDay.TryAdd($"{C.Difficulties[d].Name} {stage}", today.Day);
+        if (C.IsRealmBoss(k)) DoneDay.TryAdd($"{C.Difficulties[d].Name} realm {C.RealmOf(k) + 1}", today.Day);
         if (Battle >= C.BattlesPerDifficulty) { Diff++; Battle = 0; }
     }
 
@@ -202,10 +203,23 @@ class Player
                     stars[d, k]++; starsTotal++;
                     src = "Stars"; Earn(C.StarGodshards);
                     minutes -= FightSeconds(60) / 60;
-                    CheckStarChest();
+                    CheckStarChest(); CheckStageChests(d, k);
                 }
             }
         return minutes;
+    }
+
+    // Stage chests (doc 06 section 1.4): small, medium and large at 6, 12 and 20 of a stage's 20 stars.
+    void CheckStageChests(int d, int k)
+    {
+        int st = C.StageOf(k), first = st * C.BattlesPerStage, got = 0;
+        for (int b = first; b < first + C.BattlesPerStage; b++) got += stars[d, b];
+        while (stageChests[d, st] < C.StageChestStars.Length && got >= C.StageChestStars[stageChests[d, st]])
+        {
+            src = "Stage chests"; Add(C.StageChests[stageChests[d, st]], 1);
+            if (stageChests[d, st] == C.StageChestStars.Length - 1) today.BigMoment = true;
+            stageChests[d, st]++;
+        }
     }
 
     void CheckStarChest()

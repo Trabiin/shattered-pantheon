@@ -85,6 +85,9 @@ namespace ShatteredPantheon.Battle
     public class StageDef
     {
         public string Id, Name, Difficulty, Formation = "2-3", Notes;
+        // Campaign position (doc 06 section 1.1); empty for test stages. Boss is "stage", "realm" or null.
+        public string Realm, Boss;
+        public int RealmNumber, StageNumber, BattleNumber;
         public double HpScale = 1, AtkScale = 1;
         public List<StageEnemy> Enemies = new List<StageEnemy>();
     }
@@ -242,6 +245,8 @@ namespace ShatteredPantheon.Battle
             {
                 Id = Str(d, "id"), Name = Str(d, "name"), Difficulty = Str(d, "difficulty"),
                 Formation = Str(d, "formation", "2-3"), Notes = Str(d, "notes"),
+                Realm = Str(d, "realm"), Boss = Str(d, "boss"),
+                RealmNumber = (int)Num(d, "realmNumber"), StageNumber = (int)Num(d, "stage"), BattleNumber = (int)Num(d, "battle"),
                 HpScale = S("hpScale"), AtkScale = S("atkScale"),
             };
             var next = new Dictionary<string, int> { ["front"] = 0, ["back"] = 0 };
