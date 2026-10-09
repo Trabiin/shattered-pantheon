@@ -108,9 +108,10 @@ class Player
             Summon();
             minutes = PushCampaign(minutes);
             Upgrade();
-            minutes = Challenges(minutes);
+            // Devotion first (hunts, farming), then replays for challenge stars with the time left.
             minutes = Hunts(minutes, 0, true);
             minutes = FarmFights(minutes);
+            minutes = Challenges(minutes);
             today.MinutesUnused += Math.Max(0, minutes);
             Upgrade();
             Summon();
@@ -145,7 +146,7 @@ class Player
             var enemies = data.Stages.First(s => s.Id == stage).Enemies.Select(e => data.Enemy(e.Id)).ToList();
             // After a loss, alternate between the best line-up and a different one, as a player would.
             lossesHere.TryGetValue((Diff, Battle), out int tries);
-            var team = tries < 2 ? BestTeam(enemies) : Counter(stage, enemies, tries);
+            var team = tries < 2 || tries % 2 == 0 ? BestTeam(enemies) : Counter(stage, enemies, tries);
             var slots = Place(team);
             var r = ShatteredPantheon.Battle.Battle.Run(data, slots, stage, seed * 1000003 + Diff * 10007 + Battle * 31 + attemptsToday, null);
             RealFights++; attemptsToday++; today.Fights++;
@@ -158,6 +159,9 @@ class Player
             }
             losses++;
             lossesHere[(Diff, Battle)] = tries + 1;
+            // A player who has already lost a full session here tries once, then goes to grow the team
+            // (hunts, farming) instead of spending the whole session on the same battle.
+            if (tries >= C.AttemptsBeforeUpgrading * 2) { Upgrade(); Summon(); break; }
             if (losses >= C.AttemptsBeforeUpgrading)
             {
                 if (upgradedAfterLoss) break;   // stuck for this session
@@ -298,7 +302,7 @@ class Player
             if (ShatteredPantheon.Battle.Battle.Run(data, Place(VariantTeam(enemies, i)), stage, 98000 + i, null).Result == "win") winsVar++;
         }
         Console.Error.WriteLine($"[{Name} {seed}] day {today.Day} stuck 20+ days on {stage}: team {TeamScale(team) / C.RecScale(Diff, Battle):P0} of recommended, wins {wins}/{n}, variants {winsVar}/{n}. " +
-            string.Join(", ", team.Select(o => $"{o.Card.Kit}/{o.Card.Rarity[0]} L{o.Level} {o.Stars}* g{o.Gear} s{o.Skill}")) + $" | fodder {string.Join(" ", fodder.Select(kv => kv.Key + ":" + kv.Value))} xp {xp:0} gold {gold:0} mats {gearMats:0} tomes {tomes:0}");
+            string.Join(", ", team.Select(o => $"{o.Card.Kit}/{o.Card.Rarity[0]} L{o.Level} {o.Stars}* g{o.Gear} s{o.Skill}")) + $" | fodder {string.Join(" ", fodder.Select(kv => kv.Key + ":" + kv.Value))} xp {xp:0} gold {gold:0} mats {gearMats:0} tomes {tomes:0} farm {Days.Skip(Math.Max(0, Days.Count - 20)).Sum(x => x.FarmFights)} hunts {Days.Skip(Math.Max(0, Days.Count - 20)).Sum(x => x.Hunts)} unused {Days.Skip(Math.Max(0, Days.Count - 20)).Sum(x => x.MinutesUnused):0}m");
     }
 
     // ---------- Team ----------

@@ -550,6 +550,7 @@
     },
     "timePays": 1.3,
     "lateWallDays": 14,
+    "spendGapLate": 2.0,
     "pullsPerDayFree": {
       "month1": [
         1.5,
