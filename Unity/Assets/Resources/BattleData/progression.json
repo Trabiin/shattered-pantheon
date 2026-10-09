@@ -345,20 +345,25 @@
       },
       {
         "vessels": {
-          "3": 0.15
+          "3": 0.15,
+          "4": 0.06,
+          "5": 0.01
         },
         "heroShards": 0.02,
         "gearMats": 0.3,
-        "skillTomes": 0.2
+        "skillTomes": 0.2,
+        "goldLevels": 0.03
       },
       {
         "vessels": {
-          "3": 0.2,
-          "4": 0.03
+          "3": 0.1,
+          "4": 0.08,
+          "5": 0.02
         },
         "heroShards": 0.025,
         "gearMats": 0.25,
-        "skillTomes": 0.15
+        "skillTomes": 0.15,
+        "goldLevels": 0.03
       }
     ],
     "bossHunts": {

@@ -560,11 +560,12 @@ class Player
         return from + (C.Difficulties[d].RewardScale - from) * t;
     }
 
-    // Gear materials and tomes follow the difficulty's rewardScale, except from Boss Hunts and Endless,
-    // whose tables already list the amount for each difficulty.
+    // XP, gold, gear materials and tomes follow the difficulty's rewardScale, except from Boss Hunts,
+    // Endless and per-difficulty farm drops, whose tables already list the amount for each difficulty.
     void Add(Reward r, double times, bool scaled = true)
     {
-        double lc = LevelCost(), rs = scaled ? RewardScale() : 1;
+        double lc = scaled ? LevelCost() : C.XpToNext(Math.Max(1, C.RecLevel(Math.Min(Diff, C.Difficulties.Count - 1), Math.Min(Battle, C.BattlesPerDifficulty - 1))));
+        double rs = scaled ? RewardScale() : 1;
         double bonus = spend.PilgrimsPath ? C.PassBonus : 0;
         xp += r.XpLevels * lc * times * (1 + bonus);
         gold += r.GoldLevels * lc * C.GoldPerXp * times * (1 + bonus);
