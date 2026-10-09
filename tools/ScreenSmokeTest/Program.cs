@@ -1,5 +1,5 @@
-// Plays the game's screens on fake Unity (FakeUnity.cs) the way a player would: stage select,
-// team and formation editing, fights on every stage, retreating mid-fight, results, retry.
+// Plays the game's screens on fake Unity (FakeUnity.cs) the way a player would: the campaign screen,
+// team and formation editing, every realm 1 battle in order, retreating mid-fight, results, retry.
 // Fails on any exception a screen throws, on a fight that differs from the engine run directly,
 // on screens or animations left behind, or on a team that isn't what the player picked.
 //   dotnet run --project tools/ScreenSmokeTest
@@ -15,6 +15,8 @@ using UnityEngine.UI;
 
 static class Program
 {
+    const int MaxTries = 5;
+    static readonly string[] Starter = { "hilde", "solenne", "thessaly", "maren", "pip" };
     static int failures;
     static GameApp app;
 
@@ -22,17 +24,25 @@ static class Program
     {
         string root = FindRoot();
         UnityEngine.Resources.Root = Path.Combine(root, "Unity", "Assets", "Resources");
-        var data = GameData.LoadDirectory(Path.Combine(UnityEngine.Resources.Root, "BattleData"));
+        string dir = Path.Combine(UnityEngine.Resources.Root, "BattleData");
+        string R(string f) => File.ReadAllText(Path.Combine(dir, f + ".json"));
+        var data = GameData.FromJson(R("rules"), R("heroes"), R("enemies"), R("campaign"));
+        var realm = CampaignView.Battles(data);
+        Expect(realm.Count == 40 && realm.GroupBy(b => b.StageNumber).Count() == 10 && realm.GroupBy(b => b.StageNumber).All(g => g.Count() == 4), "realm 1 on Normal has 10 stages of 4 battles");
+        Expect(realm.All(b => (b.BattleNumber == 4) == (b.Boss != null)) && realm.Count(b => b.Boss == "realm") == 1 && realm.Last().Boss == "realm", "battle 4 of each stage is its boss, and stage 10's is the realm boss");
 
         app = new GameObject("Game").AddComponent<GameApp>();
         Call(app, "Start");
-        Expect(Current is StageSelectView, "game opens on stage select");
-        Expect(data.Stages.All(s => Find("Stage: " + s.Id) != null), "every stage is listed");
+        Expect(Current is CampaignView, "game opens on the campaign");
+        Expect(realm.All(b => Find("Battle: " + b.Id) != null), "every realm 1 battle is listed");
+        Expect(Named("Battle: ").Count() == realm.Count, $"only realm 1 battles are listed ({Named("Battle: ").Count()})");
+        var testStages = GameData.LoadDirectory(dir).Stages;
+        Expect(testStages.All(s => Named(": " + s.Id).Count() == 0 && Named(s.Name).Count() == 0), "the balance simulator's test stages are not shown");
 
-        // Team editing on the first stage.
-        var first = data.Stages[0];
-        Click("Stage: " + first.Id);
-        Expect(Current is TeamView, "tapping a stage opens the team screen");
+        // Team editing on the first battle.
+        var first = realm[0];
+        Click("Battle: " + first.Id);
+        Expect(Current is TeamView, "tapping a battle opens the team screen");
         Expect(Team().Count == 5, "a default team of 5 is ready");
         Click("Clear Button");
         Expect(Team().Count == 0, "Clear empties the team");
@@ -75,23 +85,31 @@ static class Program
         Expect(Label(Find("Speed Button")) == "3x", "speed button cycles to 3x");
         CheckFight(data, first, picked);
 
-        // Every stage with its default team, via the stage list.
+        // Realm 1 from start to finish with the starter team: every battle in order from the campaign
+        // screen, retrying a lost battle like a player would.
         Click("Stages Button");
-        Expect(Current is StageSelectView, "Stages returns to stage select");
-        foreach (var stage in data.Stages.Skip(1))
+        Expect(Current is CampaignView, "Stages returns to the campaign");
+        var last = picked;
+        foreach (var stage in realm.Skip(1))
         {
-            Click("Stage: " + stage.Id);
-            Expect(TeamSet(Team()) == TeamSet(picked), $"{stage.Name}: opens with the last team used");
-            Click("Clear Button"); Click("Auto Button");
-            var team = Team();
+            Click("Battle: " + stage.Id);
+            Expect(TeamSet(Team()) == TeamSet(last), $"{stage.Name}: opens with the last team used");
+            Click("Clear Button");
+            foreach (var id in Starter) Click("Hero: " + id);
+            Click("Auto Button");
+            var team = last = Team();
+            Expect(team.Select(t => t.Id).OrderBy(x => x).SequenceEqual(Starter.OrderBy(x => x)), $"{stage.Name}: the starter team is picked");
             Click("Fight! Button");
-            CheckFight(data, stage, team);
+            int tries = 1;
+            while (!CheckFight(data, stage, team) && tries < MaxTries) { Click("Retry Button"); tries++; }
+            Expect(PlayerPrefs.GetInt("cleared." + stage.Id) == 1, $"{stage.Name}: won within {MaxTries} tries ({tries})");
             Click("Stages Button");
         }
+        Expect(realm.All(b => Find("Battle: " + b.Id).transform.Cast<Transform>().Any(t => t.GetComponent<Text>()?.text.Contains("Cleared") == true)), "every won battle shows as cleared");
 
-        // A fight in the 3-2 formation.
-        var wide = data.Stages.Last();
-        Click("Stage: " + wide.Id);
+        // A fight in the 3-2 formation, on the realm boss.
+        var wide = realm.Last();
+        Click("Battle: " + wide.Id);
         Click("Formation Button");
         var three = Team();
         Expect(three.Count(t => t.Row == "front") == 3, "3-2 puts three heroes in front");
@@ -102,11 +120,11 @@ static class Program
         Expect(((TeamView)Current).Formation == "3-2", "the team screen remembers the 3-2 formation");
         Click("Stages Button".Replace("Stages", "Back"));
 
-        // The first stage remembers its own team; cleared stages are marked.
-        Click("Stage: " + first.Id);
-        Expect(Team().Select(t => t.Id + "@" + t.Slot).SequenceEqual(picked.Select(t => t.Id + "@" + t.Slot)), "a stage reopens with the team last used on it");
+        // The first battle remembers its own team.
+        Click("Battle: " + first.Id);
+        Expect(Team().Select(t => t.Id + "@" + t.Slot).SequenceEqual(picked.Select(t => t.Id + "@" + t.Slot)), "a battle reopens with the team last used on it");
         Click("Back Button");
-        Expect(Current is StageSelectView, "Back returns to stage select");
+        Expect(Current is CampaignView, "Back returns to the campaign");
 
         foreach (var e in Scheduler.Errors.Distinct().Take(5)) Console.WriteLine("ERROR " + e);
         Expect(Scheduler.Errors.Count == 0, "no errors on any screen");
@@ -114,11 +132,14 @@ static class Program
         return failures == 0 ? 0 : 1;
     }
 
-    static void CheckFight(GameData data, StageDef stage, List<TeamSlot> team)
+    // Plays the open fight to the end and checks it against the engine; true if it was won.
+    static bool CheckFight(GameData data, StageDef stage, List<TeamSlot> team)
     {
         var view = (BattleView)Current;
         float t = RunUntil(() => Current is ResultsView, 3600);
-        var direct = Battle.Run(data, team, stage.Id, view.Seed, new BattleOptions { Formation = view.Battle.HeroFormation });
+        // Until heroes have levels, they fight at the strength the battle was sim-checked for.
+        var strong = team.Select(s => new TeamSlot(s.Id, s.Row, s.Slot) { HpScale = stage.HeroScale, AtkScale = stage.HeroScale }).ToList();
+        var direct = Battle.Run(data, strong, stage.Id, view.Seed, new BattleOptions { Formation = view.Battle.HeroFormation });
         var shown = view.Battle;
         var results = Current as ResultsView;
         Console.WriteLine($"{stage.Name}: {results?.Title ?? "no results"} after {shown.Actions} actions ({t:0}s at {GameApp.Speeds[app.SpeedIndex]}x)");
@@ -126,10 +147,12 @@ static class Program
         Expect(shown.Result == direct.Result && shown.Actions == direct.Actions, $"{stage.Name}: fight on screen matches the engine run directly ({direct.Result}, {direct.Actions} actions)");
         Expect(TeamSet(shown.Units.Where(u => u.Side == "A").Select(u => new TeamSlot(u.Id, u.Row, u.Slot)).ToList()) == TeamSet(team), $"{stage.Name}: the fight used the picked team and formation");
         Expect(results != null && results.Title == (direct.Result == "win" ? "Victory" : direct.Result == "lose" ? "Defeat" : "Time's up"), $"{stage.Name}: result title is right");
-        Expect(direct.Result != "win" || PlayerPrefs.GetInt("cleared." + stage.Id) == 1, $"{stage.Name}: a win marks the stage cleared");
+        Expect(((List<TeamSlot>)Field(view, "team")).All(s => s.HpScale == stage.HeroScale && s.AtkScale == stage.HeroScale), $"{stage.Name}: heroes fight at the battle's expected strength ({stage.HeroScale}x)");
+        Expect(direct.Result != "win" || PlayerPrefs.GetInt("cleared." + stage.Id) == 1, $"{stage.Name}: a win marks the battle cleared");
         Expect(direct.Heroes.All(h => Find("Row: " + h.Id) != null), $"{stage.Name}: every hero has a results row");
         Expect(Scheduler.Running == 0, $"{stage.Name}: no animations left running ({Scheduler.Running})");
         Expect(CanvasChildren() == 2, $"{stage.Name}: old screens are cleaned up ({CanvasChildren()} canvas children)");
+        return direct.Result == "win";
     }
 
     static void Expect(bool ok, string what) { if (!ok) failures++; Console.WriteLine((ok ? "  ok   " : "  FAIL ") + what); }
@@ -142,6 +165,7 @@ static class Program
     static void RunFor(float seconds) { for (float t = 0; t < seconds; t += 1 / 60f) Scheduler.Frame(1 / 60f); }
     static float RunUntil(Func<bool> done, float limit) { float t = 0; while (!done() && t < limit) { Scheduler.Frame(1 / 60f); t += 1 / 60f; } return t; }
 
+    static IEnumerable<GameObject> Named(string part) => UnityEngine.Object.All.OfType<GameObject>().Where(g => g != null && g.name.Contains(part));
     static GameObject Find(string name) => UnityEngine.Object.All.OfType<GameObject>().LastOrDefault(g => g != null && g.name == name);
     static string Label(GameObject go) => go.transform.Cast<Transform>().Select(t => t.GetComponent<Text>()).First(t => t != null).text;
     static void Click(string name)

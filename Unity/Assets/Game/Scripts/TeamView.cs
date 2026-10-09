@@ -29,7 +29,8 @@ namespace ShatteredPantheon.Game
 
         protected override void Build()
         {
-            Header(stage.Name, "Choose your team and formation", App.ShowStages);
+            string boss = stage.Boss == "realm" ? "Realm boss  ·  " : stage.Boss == "stage" ? "Stage boss  ·  " : "";
+            Header(stage.Name, boss + "Choose your team and formation", App.ShowStages);
             Refresh();
         }
 
@@ -55,7 +56,7 @@ namespace ShatteredPantheon.Game
                 Ui.Label(chip, $"{e.Faction} · {e.Type}", 18, Palette.Muted, TextAnchor.MiddleCenter, new Vector2(0, -32), new Vector2(175, 30));
                 chip.gameObject.name = "Enemy: " + e.Id;
             }
-            var notes = StageSelectView.StageNotes(App.Data, stage);
+            var notes = CampaignView.StageNotes(App.Data, stage);
             if (notes.Count > 0) Ui.Label(content, string.Join("  ", notes), 24, Palette.Status, TextAnchor.MiddleCenter, new Vector2(0, 580), new Vector2(1000, 60));
 
             // Formation: rows are staggered, so a row of two stands in the gaps of the row of three.

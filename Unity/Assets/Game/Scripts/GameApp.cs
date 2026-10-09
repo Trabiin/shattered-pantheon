@@ -1,5 +1,5 @@
 // The game's entry point: loads the data, owns the canvas, and switches between screens
-// (stage select -> team and formation -> battle -> results). Every screen builds its own UI in code.
+// (campaign -> team and formation -> battle -> results). Every screen builds its own UI in code.
 namespace ShatteredPantheon.Game
 {
     using System.Collections.Generic;
@@ -33,7 +33,8 @@ namespace ShatteredPantheon.Game
         static GameData LoadData()
         {
             string T(string name) => Resources.Load<TextAsset>("BattleData/" + name).text;
-            return GameData.FromJson(T("rules"), T("heroes"), T("enemies"), T("stages"));
+            // The battles are the campaign's; stages.json holds the balance simulator's test stages.
+            return GameData.FromJson(T("rules"), T("heroes"), T("enemies"), T("campaign"));
         }
 
         void BuildCanvas()
@@ -52,7 +53,7 @@ namespace ShatteredPantheon.Game
             Ui.Stretch(Ui.Panel(canvas, "Background", Palette.Background).rectTransform);
         }
 
-        public void ShowStages() => Show(new StageSelectView(this));
+        public void ShowStages() => Show(new CampaignView(this));
         public void ShowTeam(StageDef stage) => Show(new TeamView(this, stage));
         public void ShowBattle(StageDef stage, List<TeamSlot> team, string formation) => Show(new BattleView(this, stage, team, formation));
         public void ShowResults(StageDef stage, List<TeamSlot> team, Battle battle) => Show(new ResultsView(this, stage, team, battle));
@@ -102,7 +103,7 @@ namespace ShatteredPantheon.Game
         }
     }
 
-    // What the player has done, saved on the device: stages cleared and the last team used on each stage.
+    // What the player has done, saved on the device: battles cleared and the last team used on each battle.
     public class PlayerProgress
     {
         readonly GameData data;

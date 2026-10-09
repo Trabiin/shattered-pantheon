@@ -25,6 +25,8 @@ namespace ShatteredPantheon.Game
             this.stage = stage;
             this.team = team;
             this.formation = formation;
+            // Heroes have no levels yet (E8), so they fight at the strength this battle was sim-checked for.
+            foreach (var t in team) t.HpScale = t.AtkScale = stage.HeroScale;
         }
 
         float SecondsPerAction => (float)(App.Data.Rules.SecondsPerActionAt1x / GameApp.Speeds[App.SpeedIndex]);
