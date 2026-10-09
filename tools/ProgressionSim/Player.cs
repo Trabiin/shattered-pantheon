@@ -148,7 +148,7 @@ class Player
             lossesHere.TryGetValue((Diff, Battle), out int tries);
             var team = tries < 2 || tries % 2 == 0 ? BestTeam(enemies) : Counter(stage, enemies, tries);
             var slots = Place(team);
-            var r = ShatteredPantheon.Battle.Battle.Run(data, slots, stage, seed * 1000003 + Diff * 10007 + Battle * 31 + attemptsToday, null);
+            var r = ShatteredPantheon.Battle.Battle.Run(data, slots, stage, seed * 1000003 + Diff * 10007 + Battle * 31 + today.Day * 7919 + attemptsToday, null);
             RealFights++; attemptsToday++; today.Fights++;
             minutes -= FightSeconds(r.Actions) / 60;
             if (r.Result == "win")
