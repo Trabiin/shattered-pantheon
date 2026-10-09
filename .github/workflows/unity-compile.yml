@@ -19,7 +19,8 @@ jobs:
         run: |
           TAG=$(curl -s "https://hub.docker.com/v2/repositories/unityci/editor/tags?page_size=100&name=ubuntu-6000.3" | jq -r '.results[].name' | grep -E '^ubuntu-6000\.3\.[0-9]+f[0-9]+-base-[0-9.]+$' | sort -V | tail -1)
           echo "Unity image: $TAG"
-          docker pull -q unityci/editor:$TAG
+          # Docker Hub sometimes times out; try the pull a few times before giving up.
+          for n in 1 2 3 4 5; do docker pull -q unityci/editor:$TAG && break; [ $n = 5 ] && exit 1; sleep $((n * 20)); done
           id=$(docker create unityci/editor:$TAG)
           mkdir -p unity-data
           docker cp $id:/opt/unity/Editor/Data/Managed unity-data/Managed
