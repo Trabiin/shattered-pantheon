@@ -7,9 +7,9 @@ The game reads its battle content from `Unity/Assets/Resources/BattleData/`:
 | `rules.json` | Numbers shared by every fight: turn gauge, mana, hit and crit, damage ranges, effect chance limits, type chart, faction wheel, doctrines (2/4 heroes of a faction) and type bonuses (2/3 heroes of a type), fight length targets per difficulty. |
 | `heroes.json` | The test roster: 20 heroes, two per faction. |
 | `enemies.json` | Enemy units, same shape as heroes. `boss` and `unyielding` mark bosses. |
-| `stages.json` | Stages: `difficulty`, `formation` (`2-3` or `3-2`), `hpScale`, `atkScale` and `enemies` as `[id, slot]`. |
+| `stages.json` | The balance simulator's 6 test stages (`tools/BattleSim`, its report and the fight viewer); the game doesn't show them. Each has `difficulty`, `formation` (`2-3` or `3-2`), `hpScale`, `atkScale` and `enemies` as `[id, slot]`. |
 | `progression.json` | The progression and economy rules the progression simulator plays by (campaign layout, rewards, summons, shop). Hand-edited. |
-| `campaign.json` | The campaign: 4 difficulties × 10 realms × 10 stages × 4 battles. Same shape as `stages.json`, plus `realm`, `realmNumber`, `stage`, `battle` and `boss` (`stage` or `realm`, absent on normal battles). Generated and sim-checked by `tools/ProgressionSim --build-campaign`; never edit by hand. |
+| `campaign.json` | The campaign: 4 difficulties × 10 realms × 10 stages × 4 battles. Same shape as `stages.json`, plus `realm`, `realmNumber`, `stage`, `battle`, `boss` (`stage` or `realm`, absent on normal battles) and `heroScale`: the strength the battle expects the player's heroes at (times their listed stats), which it is sim-checked against. The game plays these battles, with heroes at `heroScale` until they have levels. Generated and sim-checked by `tools/ProgressionSim --build-campaign`; never edit by hand. |
 
 These files are generated. Edit `gen_data.py` here and run, from the repo root:
 

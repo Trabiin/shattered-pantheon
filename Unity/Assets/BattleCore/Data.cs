@@ -89,6 +89,9 @@ namespace ShatteredPantheon.Battle
         public string Realm, Boss;
         public int RealmNumber, StageNumber, BattleNumber;
         public double HpScale = 1, AtkScale = 1;
+        // How strong the campaign expects the player's heroes to be here (times their listed stats);
+        // the battle is sim-checked against heroes at this strength. 1 for test stages.
+        public double HeroScale = 1;
         public List<StageEnemy> Enemies = new List<StageEnemy>();
     }
 
@@ -247,7 +250,7 @@ namespace ShatteredPantheon.Battle
                 Formation = Str(d, "formation", "2-3"), Notes = Str(d, "notes"),
                 Realm = Str(d, "realm"), Boss = Str(d, "boss"),
                 RealmNumber = (int)Num(d, "realmNumber"), StageNumber = (int)Num(d, "stage"), BattleNumber = (int)Num(d, "battle"),
-                HpScale = S("hpScale"), AtkScale = S("atkScale"),
+                HpScale = S("hpScale"), AtkScale = S("atkScale"), HeroScale = S("heroScale"),
             };
             var next = new Dictionary<string, int> { ["front"] = 0, ["back"] = 0 };
             foreach (var e in Arr(d["enemies"]))
