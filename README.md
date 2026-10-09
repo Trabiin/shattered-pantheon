@@ -64,7 +64,7 @@ dotnet run --project tools/ProgressionSim -c Release -- --build-campaign      # 
 ## Checks without Unity
 
 Every pull request runs these on GitHub (`.github/workflows/`):
-- **Unity compile:** the game and editor scripts are compiled against the real Unity 6.3 libraries, taken from an official Unity editor image. No Unity licence is needed.
+- **Unity compile:** the game and editor scripts are compiled against the real Unity 6.3 libraries, taken from an official Unity editor image (from Docker Hub, or Google's copy of it if Docker Hub fails) and kept in GitHub's cache until a newer image comes out. No Unity licence is needed.
 - **Screen smoke test:** `dotnet run --project tools/ScreenSmokeTest` plays the screens on a stand-in for Unity, like a player would (locked battles can't be started, then all 40 realm 1 battles in order, each win opening the next, retrying lost ones, then closing and reopening the game and resetting progress), and fails on errors or on fights that differ from the engine.
 - **Save tests:** `dotnet run --project tools/SaveTests` saves and reloads progress, and checks a new game, damaged saves, upgrading an older version and resetting.
 - **Campaign order tests:** `dotnet run --project tools/CampaignTests` checks the order battles open in across all 4 difficulties: a new game, each win, stage and realm bosses, the next difficulty, replays and a reloaded save.
