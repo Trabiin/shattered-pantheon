@@ -1,5 +1,5 @@
 // Reads progression.json (Unity/Assets/Resources/BattleData) into plain objects, and builds the
-// generated campaign: 4 difficulties x 40 stages x 10 battles, each scaled to a recommended level.
+// generated campaign: 4 difficulties x 10 realms x 10 stages x 4 battles, each scaled to a recommended level.
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -73,13 +73,15 @@ class Cfg
     public double RefillDevotion; public double[] RefillCosts;
     // Campaign
     public List<Difficulty> Difficulties = new List<Difficulty>();
-    public int Stages, BattlesPerStage;
+    public int Stages, BattlesPerStage, StagesPerRealm;
+    public List<string> Realms = new List<string>();
     public double EnemyFactor, BossFactor;
-    public double[] StarSteps, WinBand, BossWinBand, EarlyWinBand;
+    public double[] StarSteps, WinBand, BossWinBand, RealmBossWinBand, EarlyWinBand;
     public int EarlyBattles;
     public double RewardEase;
     // Rewards
     public Reward ShrinePerHour, FirstClear, StageClear, StarChest, Farm, Daily, Weekly;
+    public double[] StageChestStars; public List<Reward> StageChests;
     public List<Dictionary<int, double>> StageClearVessels;
     public List<Reward> FarmByDifficulty;
     public Mode BossHunts, Endless;
@@ -160,9 +162,10 @@ class Cfg
         var ca = r.GetProperty("campaign");
         foreach (var d in ca.GetProperty("difficulties").EnumerateArray())
             c.Difficulties.Add(new Difficulty { Name = d.GetProperty("name").GetString(), Levels = Arr(d, "levels"), Stars = Arr(d, "stars"), Gear = Arr(d, "gear"), Skill = Arr(d, "skill"), Curve = N(d, "curve", 1), RewardScale = N(d, "rewardScale", 1) });
-        c.Stages = (int)N(ca, "stages"); c.BattlesPerStage = (int)N(ca, "battlesPerStage");
+        c.Stages = (int)N(ca, "stages"); c.BattlesPerStage = (int)N(ca, "battlesPerStage"); c.StagesPerRealm = (int)N(ca, "stagesPerRealm");
+        foreach (var rn in ca.GetProperty("realms").EnumerateArray()) c.Realms.Add(rn.GetString());
         c.EnemyFactor = N(ca, "enemyFactor"); c.BossFactor = N(ca, "bossFactor"); c.StarSteps = Arr(ca, "starSteps");
-        c.WinBand = Arr(ca, "winBand"); c.BossWinBand = Arr(ca, "bossWinBand");
+        c.WinBand = Arr(ca, "winBand"); c.BossWinBand = Arr(ca, "bossWinBand"); c.RealmBossWinBand = Arr(ca, "realmBossWinBand");
         c.RewardEase = N(ca, "rewardEase", 1);
         c.EarlyBattles = (int)N(ca, "earlyBattles"); c.EarlyWinBand = Arr(ca, "earlyWinBand");
 
@@ -171,6 +174,7 @@ class Cfg
         c.FirstClear = Reward.From(re.GetProperty("firstClear")); c.StageClear = Reward.From(re.GetProperty("stageClear"));
         c.StarGodshards = N(re.GetProperty("star"), "godshards"); c.StarChestEvery = N(re, "starChestEvery");
         c.StarChest = Reward.From(re.GetProperty("starChest"));
+        var sc = re.GetProperty("stageChests"); c.StageChestStars = Arr(sc, "stars"); c.StageChests = Reward.List(sc.GetProperty("rewards"));
         c.StageClearVessels = re.GetProperty("stageClearVessels").EnumerateArray().Select(Vessels).ToList();
         c.FarmByDifficulty = Reward.List(re.GetProperty("farmByDifficulty"));
         Mode M(JsonElement e) => new Mode { UnlockBattles = (int)N(e, "unlockBattles"), FreePerDay = (int)N(e, "freePerDay"), DevotionCost = N(e, "devotionCost"), Minutes = N(e, "minutes"), ByDifficulty = Reward.List(e.GetProperty("byDifficulty")) };
@@ -254,7 +258,7 @@ class Cfg
                 var rng = new Random(d * 100003 + k * 7919 + 17);
                 bool boss = IsBoss(k);
                 double scale = RecScale(d, k) * EnemyFactor * (boss ? BossFactor : 1);
-                var st = new StageDef { Id = StageId(d, k), Name = $"{Difficulties[d].Name} {k / BattlesPerStage + 1}-{k % BattlesPerStage + 1}", Difficulty = Difficulties[d].Name.ToLowerInvariant(), HpScale = scale, AtkScale = scale };
+                var st = new StageDef { Id = StageId(d, k), Name = BattleName(k), Realm = Realms[RealmOf(k)], RealmNumber = RealmOf(k) + 1, StageNumber = StageInRealm(k) + 1, BattleNumber = k % BattlesPerStage + 1, Boss = IsRealmBoss(k) ? "realm" : boss ? "stage" : null, Difficulty = Difficulties[d].Name.ToLowerInvariant(), HpScale = scale, AtkScale = scale };
                 if (boss)
                 {
                     st.Formation = "2-3";
@@ -292,6 +296,12 @@ class Cfg
     }
 
     public bool IsBoss(int k) => k % BattlesPerStage == BattlesPerStage - 1;
+    public bool IsRealmBoss(int k) => IsBoss(k) && StageOf(k) % StagesPerRealm == StagesPerRealm - 1;
+    public int StageOf(int k) => k / BattlesPerStage;                           // 0-based stage in the difficulty
+    public int RealmOf(int k) => StageOf(k) / StagesPerRealm;                   // 0-based realm
+    public int StageInRealm(int k) => StageOf(k) % StagesPerRealm;              // 0-based
+    // "Hearth 3-4": realm, stage in the realm, battle in the stage.
+    public string BattleName(int k) => $"{Realms[RealmOf(k)]} {StageInRealm(k) + 1}-{k % BattlesPerStage + 1}";
 
     // The content pipeline's check (doc 06 section 11.1): random teams of Epic heroes at exactly the
     // recommended power should win each battle within its band. Battles outside it are scaled up or
@@ -303,7 +313,7 @@ class Cfg
             var st = stages[i];
             int d = i / BattlesPerDifficulty, k = i % BattlesPerDifficulty;
             // The first battles teach the game, so they should be won almost every time.
-            var band = d == 0 && k < EarlyBattles ? EarlyWinBand : IsBoss(k) ? BossWinBand : WinBand;
+            var band = d == 0 && k < EarlyBattles ? EarlyWinBand : IsRealmBoss(k) ? RealmBossWinBand : IsBoss(k) ? BossWinBand : WinBand;
             var one = new GameData { Rules = data.Rules, Heroes = data.Heroes, Enemies = data.Enemies, Stages = new List<StageDef> { st } };
             double rec = RecScale(d, k);
             for (int iter = 0; iter < 8; iter++)
@@ -332,7 +342,7 @@ class Cfg
         for (int i = 0; i < stages.Count; i++)
         {
             var s = stages[i];
-            sb.Append($" {{\"id\":\"{s.Id}\",\"name\":\"{s.Name}\",\"difficulty\":\"{s.Difficulty}\",\"formation\":\"{s.Formation}\",\"hpScale\":{s.HpScale.ToString("0.###", inv)},\"atkScale\":{s.AtkScale.ToString("0.###", inv)},\"enemies\":[");
+            sb.Append($" {{\"id\":\"{s.Id}\",\"name\":\"{s.Name}\",\"difficulty\":\"{s.Difficulty}\",\"formation\":\"{s.Formation}\",\"realm\":\"{s.Realm}\",\"realmNumber\":{s.RealmNumber},\"stage\":{s.StageNumber},\"battle\":{s.BattleNumber},{(s.Boss != null ? $"\"boss\":\"{s.Boss}\"," : "")}\"hpScale\":{s.HpScale.ToString("0.###", inv)},\"atkScale\":{s.AtkScale.ToString("0.###", inv)},\"enemies\":[");
             sb.Append(string.Join(",", s.Enemies.Select(e => $"[\"{e.Id}\",\"{e.Slot}\"]")));
             sb.Append(i < stages.Count - 1 ? "]},\n" : "]}\n");
         }
