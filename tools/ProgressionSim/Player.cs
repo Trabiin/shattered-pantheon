@@ -51,7 +51,7 @@ class Player
     readonly HashSet<string> codexDone = new HashSet<string>();
     public readonly List<DayLog> Days = new List<DayLog>();
     DayLog today;
-    public int RealFights;
+    public int RealFights, PracticeFights;
     public Dictionary<string, int> DoneDay = new Dictionary<string, int>();   // milestone -> day
     public int FirstLegendaryDay = -1;
 
@@ -108,9 +108,10 @@ class Player
             Summon();
             minutes = PushCampaign(minutes);
             Upgrade();
-            minutes = Challenges(minutes);
+            // Devotion first (hunts, farming), then replays for challenge stars with the time left.
             minutes = Hunts(minutes, 0, true);
             minutes = FarmFights(minutes);
+            minutes = Challenges(minutes);
             today.MinutesUnused += Math.Max(0, minutes);
             Upgrade();
             Summon();
@@ -145,9 +146,9 @@ class Player
             var enemies = data.Stages.First(s => s.Id == stage).Enemies.Select(e => data.Enemy(e.Id)).ToList();
             // After a loss, alternate between the best line-up and a different one, as a player would.
             lossesHere.TryGetValue((Diff, Battle), out int tries);
-            var team = tries < 2 ? BestTeam(enemies) : Counter(stage, enemies, tries);
+            var team = tries < 2 || tries % 2 == 0 ? BestTeam(enemies) : Counter(stage, enemies, tries);
             var slots = Place(team);
-            var r = ShatteredPantheon.Battle.Battle.Run(data, slots, stage, seed * 1000003 + Diff * 10007 + Battle * 31 + attemptsToday, null);
+            var r = ShatteredPantheon.Battle.Battle.Run(data, slots, stage, seed * 1000003 + Diff * 10007 + Battle * 31 + today.Day * 7919 + attemptsToday, null);
             RealFights++; attemptsToday++; today.Fights++;
             minutes -= FightSeconds(r.Actions) / 60;
             if (r.Result == "win")
@@ -158,6 +159,9 @@ class Player
             }
             losses++;
             lossesHere[(Diff, Battle)] = tries + 1;
+            // A player who has already lost a full session here tries once, then goes to grow the team
+            // (hunts, farming) instead of spending the whole session on the same battle.
+            if (tries >= C.AttemptsBeforeUpgrading * 2) { Upgrade(); Summon(); break; }
             if (losses >= C.AttemptsBeforeUpgrading)
             {
                 if (upgradedAfterLoss) break;   // stuck for this session
@@ -298,7 +302,7 @@ class Player
             if (ShatteredPantheon.Battle.Battle.Run(data, Place(VariantTeam(enemies, i)), stage, 98000 + i, null).Result == "win") winsVar++;
         }
         Console.Error.WriteLine($"[{Name} {seed}] day {today.Day} stuck 20+ days on {stage}: team {TeamScale(team) / C.RecScale(Diff, Battle):P0} of recommended, wins {wins}/{n}, variants {winsVar}/{n}. " +
-            string.Join(", ", team.Select(o => $"{o.Card.Kit}/{o.Card.Rarity[0]} L{o.Level} {o.Stars}* g{o.Gear} s{o.Skill}")) + $" | fodder {string.Join(" ", fodder.Select(kv => kv.Key + ":" + kv.Value))} xp {xp:0} gold {gold:0} mats {gearMats:0} tomes {tomes:0}");
+            string.Join(", ", team.Select(o => $"{o.Card.Kit}/{o.Card.Rarity[0]} L{o.Level} {o.Stars}* g{o.Gear} s{o.Skill}")) + $" | fodder {string.Join(" ", fodder.Select(kv => kv.Key + ":" + kv.Value))} xp {xp:0} gold {gold:0} mats {gearMats:0} tomes {tomes:0} farm {Days.Skip(Math.Max(0, Days.Count - 20)).Sum(x => x.FarmFights)} hunts {Days.Skip(Math.Max(0, Days.Count - 20)).Sum(x => x.Hunts)} unused {Days.Skip(Math.Max(0, Days.Count - 20)).Sum(x => x.MinutesUnused):0}m");
     }
 
     // ---------- Team ----------
@@ -342,11 +346,11 @@ class Player
 
     // A different line-up after a loss: any 5 kits whose best hero is close to the strongest ones,
     // keeping a tank and a healer when the pool has them. Players rearrange and try counters before grinding (doc 10).
-    List<Owned> VariantTeam(List<UnitDef> enemies, int variant)
+    List<Owned> VariantTeam(List<UnitDef> enemies, int variant, double barFactor = 0.85)
     {
         var best = BestTeam(enemies);
         var byKit = Roster.Values.OrderByDescending(HeroScale).GroupBy(o => o.Card.Kit).Select(g => g.First()).ToList();
-        double bar = byKit.Count >= 5 ? HeroScale(byKit[4]) * 0.85 : 0;
+        double bar = byKit.Count >= 5 ? HeroScale(byKit[4]) * barFactor : 0;
         var pool = byKit.Where(o => HeroScale(o) >= bar).ToList();
         if (pool.Count <= 5) return best;
         var r = new Random(variant * 7919 + Diff * 31 + Battle);
@@ -361,32 +365,36 @@ class Player
 
     // After a couple of losses the player studies the fight and tries counters (doc 10: rearrange
     // before grinding). Modelled as picking, from the best line-up and a spread of other line-ups,
-    // the one that does best in a few practice fights. Re-thought every few losses as the roster grows.
+    // the one that does best in a few practice fights. Re-thought now and then as the roster grows.
     readonly Dictionary<(int, int), (int at, List<Owned> team)> plans = new Dictionary<(int, int), (int, List<Owned>)>();
     List<Owned> Counter(string stage, List<UnitDef> enemies, int tries)
     {
-        if (plans.TryGetValue((Diff, Battle), out var plan) && tries - plan.at < 4) return plan.team;
-        var candidates = new List<List<Owned>> { BestTeam(enemies) };
-        for (int v = 0; v < 15; v++) candidates.Add(VariantTeam(enemies, tries * 100 + v));
+        if (plans.TryGetValue((Diff, Battle), out var plan) && tries < plan.at * 2 + 4) return plan.team;   // re-think less and less often
+        var main = BestTeam(enemies);
+        var candidates = new List<List<Owned>> { main };
+        for (int v = 0; v < 9; v++) candidates.Add(VariantTeam(enemies, tries * 100 + v));
         List<Owned> best = null; int bestWins = -1;
         foreach (var team in candidates)
         {
             int wins = 0;
-            for (int i = 0; i < 4; i++)
+            for (int i = 0; i < 3; i++)
+            {
+                PracticeFights++;
                 if (ShatteredPantheon.Battle.Battle.Run(data, Place(team), stage, seed * 7 + tries * 1009 + i * 13 + 5, null).Result == "win") wins++;
-            if (wins > bestWins) { best = team; bestWins = wins; }
+            }
+            if (wins > bestWins || (wins == bestWins && team == main)) { best = team; bestWins = wins; }
         }
         plans[(Diff, Battle)] = (tries, best);
         return best;
     }
 
-    List<TeamSlot> Place(List<Owned> team)
+    List<TeamSlot> Place(List<Owned> team, double scale = 0)
     {
         var placed = Formation.AutoPlace(data, team.Select(o => o.Card.Kit).ToList());
         foreach (var s in placed)
         {
             var o = team.First(t => t.Card.Kit == s.Id);
-            s.HpScale = s.AtkScale = HeroScale(o);
+            s.HpScale = s.AtkScale = scale > 0 ? scale : HeroScale(o);
         }
         return placed;
     }
@@ -396,15 +404,16 @@ class Player
     void Upgrade()
     {
         var team = BestTeam(null);
-        var core = Roster.Values.OrderByDescending(Power).Take(8).ToList();
+        // A bench of 10 is levelled together, so there are real line-ups to switch to when a battle needs a counter.
+        var core = Roster.Values.OrderByDescending(Power).GroupBy(o => o.Card.Kit).Select(g => g.First()).Take(10).ToList();
         // Gear first, up to what the current battle recommends, so gold isn't all spent on levels.
         var rec = C.Recommended(Math.Min(Diff, C.Difficulties.Count - 1), Math.Min(Battle, C.BattlesPerDifficulty - 1));
         UpgradeGear(team, (int)Math.Ceiling(rec.gear));
-        // Levels: the lowest-level team hero first; the bench only once the team is capped.
-        foreach (var group in new[] { team, core })
+        // Levels: the team up to the recommended level first, then the whole bench, lowest first.
+        foreach (var (group, upTo) in new[] { (team, (int)Math.Ceiling(rec.level)), (core, int.MaxValue) })
             while (true)
             {
-                var o = group.Where(h => h.Level < C.Cap(h.Stars)).OrderBy(h => h.Level).FirstOrDefault();
+                var o = group.Where(h => h.Level < Math.Min(upTo, C.Cap(h.Stars))).OrderBy(h => h.Level).FirstOrDefault();
                 if (o == null) break;
                 double cost = C.XpToNext(o.Level);
                 if (xp < cost || gold < cost * C.GoldPerXp) break;
@@ -555,11 +564,12 @@ class Player
         return from + (C.Difficulties[d].RewardScale - from) * t;
     }
 
-    // Gear materials and tomes follow the difficulty's rewardScale, except from Boss Hunts and Endless,
-    // whose tables already list the amount for each difficulty.
+    // XP, gold, gear materials and tomes follow the difficulty's rewardScale, except from Boss Hunts,
+    // Endless and per-difficulty farm drops, whose tables already list the amount for each difficulty.
     void Add(Reward r, double times, bool scaled = true)
     {
-        double lc = LevelCost(), rs = scaled ? RewardScale() : 1;
+        double lc = scaled ? LevelCost() : C.XpToNext(Math.Max(1, C.RecLevel(Math.Min(Diff, C.Difficulties.Count - 1), Math.Min(Battle, C.BattlesPerDifficulty - 1))));
+        double rs = scaled ? RewardScale() : 1;
         double bonus = spend.PilgrimsPath ? C.PassBonus : 0;
         xp += r.XpLevels * lc * times * (1 + bonus);
         gold += r.GoldLevels * lc * C.GoldPerXp * times * (1 + bonus);

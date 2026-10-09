@@ -99,6 +99,7 @@ class Cfg
     public double[] LightFaster;
     public SortedDictionary<int, double[]> CollectionShare = new SortedDictionary<int, double[]>();
     public double LegendaryShareMax, TimePays, LateWallDays;
+    public Dictionary<string, double> SpendGapLate = new Dictionary<string, double>();
     public double[] PullsMonth1, PullsLater;
 
     public int BattlesPerDifficulty => Stages * BattlesPerStage;
@@ -208,7 +209,7 @@ class Cfg
         var cl = ta.GetProperty("collection");
         foreach (var kv in cl.GetProperty("rosterShare").EnumerateObject()) c.CollectionShare[int.Parse(kv.Name)] = kv.Value.EnumerateArray().Select(x => x.GetDouble()).ToArray();
         c.LegendaryShareMax = N(cl, "legendaryShareMax");
-        c.TimePays = N(ta, "timePays"); c.LateWallDays = N(ta, "lateWallDays");
+        c.TimePays = N(ta, "timePays"); c.LateWallDays = N(ta, "lateWallDays"); foreach (var sg in ta.GetProperty("spendGapLate").EnumerateObject()) c.SpendGapLate[sg.Name] = sg.Value.GetDouble();
         c.PullsMonth1 = Arr(ta.GetProperty("pullsPerDayFree"), "month1"); c.PullsLater = Arr(ta.GetProperty("pullsPerDayFree"), "later");
         return c;
     }
@@ -268,8 +269,22 @@ class Cfg
                     var fronts = slots.Where(s => s.StartsWith("front")).ToList();
                     var backs = slots.Where(s => s.StartsWith("back")).ToList();
                     int nf = count == 5 ? fronts.Count : 2;
-                    for (int i = 0; i < nf; i++) st.Enemies.Add(new StageEnemy { Id = Fronts[rng.Next(Fronts.Length)], Slot = fronts[i] });
-                    for (int i = 0; i < count - nf && i < backs.Count; i++) st.Enemies.Add(new StageEnemy { Id = Backs[rng.Next(Backs.Length)], Slot = backs[i] });
+                    for (int i = 0; i < nf; i++)
+                    {
+                        string id;
+                        do id = Fronts[rng.Next(Fronts.Length)];
+                        while (st.Enemies.Count(e => e.Id == id) >= 2);
+                        st.Enemies.Add(new StageEnemy { Id = id, Slot = fronts[i] });
+                    }
+                    // At most one healer, and no more than two of any enemy: stacked healers stall most
+                    // line-ups at any power, which reads as a wall rather than a puzzle.
+                    for (int i = 0; i < count - nf && i < backs.Count; i++)
+                    {
+                        string id;
+                        do id = Backs[rng.Next(Backs.Length)];
+                        while (st.Enemies.Count(e => e.Id == id) >= (id == "priest" ? 1 : 2));
+                        st.Enemies.Add(new StageEnemy { Id = id, Slot = backs[i] });
+                    }
                 }
                 list.Add(st);
             }

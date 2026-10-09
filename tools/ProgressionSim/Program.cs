@@ -52,6 +52,7 @@ static class Program
 
         int days = int.Parse(Arg("days", "365")), seeds = int.Parse(Arg("seeds", "6"));
         var jobs = (from t in cfg.Times from s in cfg.Spends from k in Enumerable.Range(0, seeds) select (t, s, k)).ToList();
+        if (args.TryGetValue("only", out var only) && only != null) jobs = jobs.Where(j => only.Split(',').Contains($"{j.t.Name} {j.s.Name}")).ToList();
         var players = new Player[jobs.Count];
         Parallel.For(0, jobs.Count, i =>
         {
@@ -60,11 +61,18 @@ static class Program
             for (int d = 1; d <= days; d++) p.PlayDay(d);
             players[i] = p;
         });
+        if (args.ContainsKey("only"))
+        {
+            // Quick look while tuning: the day each player finished each difficulty.
+            foreach (var p in players)
+                Console.Error.WriteLine($"{p.Name} {string.Join(" ", Enumerable.Range(1, cfg.Difficulties.Count).Select(d => p.Days.FirstOrDefault(x => x.Difficulty >= d)?.Day.ToString() ?? "-"))}");
+            return 0;
+        }
         string report = Report(cfg, players, days, seeds, cards.Count(h => h.ReleaseDay == 0));
         string outPath = Arg("out", Path.Combine(root, "reports", "progression.md"));
         File.WriteAllText(outPath, report);
         Console.WriteLine(report);
-        Console.Error.WriteLine($"{players.Sum(p => p.RealFights)} campaign fights simulated");
+        Console.Error.WriteLine($"{players.Sum(p => p.RealFights)} campaign fights simulated, plus {players.Sum(p => p.PracticeFights)} practice fights");
         return 0;
     }
 
@@ -234,6 +242,17 @@ static class Program
                     if (double.IsNaN(fast)) continue;
                     double ratio = double.IsNaN(slow) ? days / fast : slow / fast;
                     if (ratio < c.TimePays) flags.Add($"**Time:** {c.Times[i].Name} free players reach {m} only {ratio:0.00}× as fast as {c.Times[i - 1].Name} ones; the target is at least {c.TimePays:0.0}×.");
+                }
+
+        // Late spender gap (Ojon, 2026-10-09): spending speeds up the late game, but not by more than this.
+        foreach (var t in c.Times)
+            foreach (var sp in c.Spends.Skip(1))
+                foreach (var m in new[] { "Nightmare 40", "Godless 40" })
+                {
+                    double free = reach[($"{t.Name} {c.Spends[0].Name}", m)], paid = reach[($"{t.Name} {sp.Name}", m)];
+                    if (double.IsNaN(paid)) continue;
+                    double ratio = double.IsNaN(free) ? days / paid : free / paid;
+                    if (c.SpendGapLate.TryGetValue(sp.Name, out var lim) && ratio > lim) flags.Add($"**Spending:** {t.Name} {sp.Name} players reach {m} {ratio:0.00}× as fast as free ones; the limit is {lim:0.0}×.");
                 }
 
         // Rhythm

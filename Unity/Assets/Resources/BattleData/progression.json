@@ -149,7 +149,7 @@
           5,
           7
         ],
-        "rewardScale": 0.3
+        "rewardScale": 0.2
       },
       {
         "name": "Nightmare",
@@ -345,20 +345,27 @@
       },
       {
         "vessels": {
-          "3": 0.15
+          "3": 0.15,
+          "4": 0.06,
+          "5": 0.01
         },
         "heroShards": 0.02,
         "gearMats": 0.3,
-        "skillTomes": 0.2
+        "skillTomes": 0.2,
+        "goldLevels": 0.03,
+        "xpLevels": 0.03
       },
       {
         "vessels": {
-          "3": 0.2,
-          "4": 0.03
+          "3": 0.1,
+          "4": 0.08,
+          "5": 0.02
         },
         "heroShards": 0.025,
         "gearMats": 0.25,
-        "skillTomes": 0.15
+        "skillTomes": 0.15,
+        "goldLevels": 0.03,
+        "xpLevels": 0.03
       }
     ],
     "bossHunts": {
@@ -543,6 +550,8 @@
     },
     "timePays": 1.3,
     "lateWallDays": 14,
+    "_spendGapLate": "Most times faster than a free player a spender may finish Nightmare or Godless. No cap on spending (Ojon, 2026-10-09), so these only catch regressions.",
+    "spendGapLate": { "Light": 2.0, "Medium": 3.0, "Heavy": 4.5 },
     "pullsPerDayFree": {
       "month1": [
         1.5,
