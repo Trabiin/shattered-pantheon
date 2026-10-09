@@ -1,11 +1,13 @@
 // The campaign: the realm's 10 stages, each a row of its 4 battles (battle 4 is the stage boss, and
-// stage 10's boss the realm boss). Tapping a battle opens the team screen for it.
+// stage 10's boss the realm boss). Tapping a battle opens the team screen for it. Cleared battles
+// come from the save; a testing-only button resets it.
 namespace ShatteredPantheon.Game
 {
     using System.Collections.Generic;
     using System.Linq;
     using ShatteredPantheon.Battle;
     using UnityEngine;
+    using UnityEngine.UI;
 
     public class CampaignView : View
     {
@@ -34,6 +36,21 @@ namespace ShatteredPantheon.Game
                 int n = 0;
                 foreach (var battle in stages[i]) BattleTile(row, battle, new Vector2(-185 + n++ * 192, 0), new Vector2(180, height - 24));
             }
+            ResetButton();
+        }
+
+        // TODO(E16-F5-S1-T1): for testing only; moves to the settings screen in testing builds and is gone from the closed test.
+        void ResetButton()
+        {
+            bool armed = false;
+            Text label = null;
+            label = Ui.MakeButton(Root, "Reset progress", new Vector2(310, -880), new Vector2(380, 90), () =>
+            {
+                if (!armed) { armed = true; label.text = "Tap again to reset"; return; }
+                App.Progress.Reset();
+                App.ShowStages();
+            });
+            label.fontSize = 28;
         }
 
         void BattleTile(RectTransform row, StageDef battle, Vector2 pos, Vector2 size)

@@ -70,7 +70,7 @@ namespace ShatteredPantheon.Game
             logLine.text = Battle.Result == "win" ? "Victory!" : Battle.Result == "lose" ? "Defeat..." : "Time's up";
             yield return new WaitForSeconds(1.2f);
             if (Closed) yield break;
-            if (Battle.Result == "win") App.Progress.MarkCleared(stage.Id);
+            App.Progress.RecordBattle(stage, Battle.Result);
             App.ShowResults(stage, team, Battle);
         }
 

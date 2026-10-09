@@ -1,7 +1,7 @@
 name: Unity compile
 
-# Compiles the game scripts against the real Unity 6.3 libraries and plays the battle screen
-# on a stand-in for Unity. No Unity licence is needed: nothing here runs the Unity editor.
+# Compiles the game scripts against the real Unity 6.3 libraries, plays the screens on a stand-in
+# for Unity, and tests the save file. No Unity licence is needed: nothing here runs the Unity editor.
 on:
   push:
     branches: [main]
@@ -33,3 +33,5 @@ jobs:
         run: dotnet build tools/UnityCompileCheck -p:UnityData=$PWD/unity-data -p:WithEditor=true -o out/editor
       - name: Play the battle screen on a stand-in for Unity
         run: dotnet run --project tools/ScreenSmokeTest
+      - name: Test the save file
+        run: dotnet run --project tools/SaveTests
