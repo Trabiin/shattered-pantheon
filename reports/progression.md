@@ -1,6 +1,6 @@
 # Progression Report
 
-*Generated 2026-10-09 15:11 UTC by `dotnet run --project tools/ProgressionSim -c Release`. 12 player types × 5 players each, 365 days. Every campaign battle is a real fight on the battle engine (111,775 fights); rewards, upgrades, summons and star challenges follow `progression.json`. Roster: the 20 test kits stand in for 60 launch heroes (8 Legendary, 12 Epic, 14 Rare, 14 Uncommon, 12 Common), plus 1 Rare, 2 Epic, 1 Legendary every 30 days. Numbers are medians across the players of each type.*
+*Generated 2026-10-09 15:22 UTC by `dotnet run --project tools/ProgressionSim -c Release`. 12 player types × 5 players each, 365 days. Every campaign battle is a real fight on the battle engine (111,775 fights); rewards, upgrades, summons and star challenges follow `progression.json`. Roster: the 20 test kits stand in for 60 launch heroes (8 Legendary, 12 Epic, 14 Rare, 14 Uncommon, 12 Common), plus 1 Rare, 2 Epic, 1 Legendary every 30 days. Numbers are medians across the players of each type.*
 
 ## When each player type gets there
 
@@ -175,14 +175,6 @@ Campaign fights never cost energy (doc 10 section 4). Energy runs out only when 
 - **Regular Free** finishes Hard on day 45, much sooner than the target of about day 75.
 - **Dedicated Free** finishes Hard on day 22, much sooner than the target of about day 50.
 - **Time:** Regular free players reach Nightmare 40 only 1.28× as fast as Casual ones; the target is at least 1.3×.
-- **Spending:** Regular Medium players reach Nightmare 40 2.47× as fast as free ones; the limit is 2.0×.
-- **Spending:** Regular Medium players reach Godless 40 2.27× as fast as free ones; the limit is 2.0×.
-- **Spending:** Regular Heavy players reach Nightmare 40 3.78× as fast as free ones; the limit is 2.0×.
-- **Spending:** Regular Heavy players reach Godless 40 3.52× as fast as free ones; the limit is 2.0×.
-- **Spending:** Dedicated Medium players reach Nightmare 40 2.17× as fast as free ones; the limit is 2.0×.
-- **Spending:** Dedicated Medium players reach Godless 40 2.39× as fast as free ones; the limit is 2.0×.
-- **Spending:** Dedicated Heavy players reach Nightmare 40 4.33× as fast as free ones; the limit is 2.0×.
-- **Spending:** Dedicated Heavy players reach Godless 40 3.67× as fast as free ones; the limit is 2.0×.
 - **Casual Free:** stuck on one Nightmare or Godless battle for up to 34 days; the limit is 14.
 - **Casual Light:** stuck on one Nightmare or Godless battle for up to 34 days; the limit is 14.
 - **Regular Free:** stuck on one Nightmare or Godless battle for up to 19 days; the limit is 14.
