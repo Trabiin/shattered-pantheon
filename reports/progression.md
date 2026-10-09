@@ -1,6 +1,6 @@
 # Progression Report
 
-*Generated 2026-10-09 15:41 UTC by `dotnet run --project tools/ProgressionSim -c Release`. 12 player types × 5 players each, 365 days. Every campaign battle is a real fight on the battle engine (111,237 fights); rewards, upgrades, summons and star challenges follow `progression.json`. Roster: the 20 test kits stand in for 60 launch heroes (8 Legendary, 12 Epic, 14 Rare, 14 Uncommon, 12 Common), plus 1 Rare, 2 Epic, 1 Legendary every 30 days. Numbers are medians across the players of each type.*
+*Generated 2026-10-09 18:03 UTC by `dotnet run --project tools/ProgressionSim -c Release`. 12 player types × 5 players each, 365 days. Every campaign battle is a real fight on the battle engine (111,237 fights); rewards, upgrades, summons and star challenges follow `progression.json`. Roster: the 20 test kits stand in for 60 launch heroes (8 Legendary, 12 Epic, 14 Rare, 14 Uncommon, 12 Common), plus 1 Rare, 2 Epic, 1 Legendary every 30 days. Numbers are medians across the players of each type.*
 
 ## When each player type gets there
 

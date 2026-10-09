@@ -1,6 +1,6 @@
 # Battle Balance Report
 
-*Generated 2026-10-08 12:16 UTC by `dotnet run --project tools/BattleSim`. Rules: battle system draft 3 (doc 04) with the 10 factions and 10 types of doc 09. 400 random 5-hero teams × 12 fights per stage, auto-placed (tanks and warriors in front). Fight length assumes 1s per action at 1x.*
+*Generated 2026-10-09 17:57 UTC by `dotnet run --project tools/BattleSim`. Rules: battle system draft 3 (doc 04) with the 10 factions and 10 types of doc 09. 400 random 5-hero teams × 12 fights per stage, auto-placed (tanks and warriors in front). Fight length assumes 1s per action at 1x.*
 
 ## The Ash Road (easy)
 
