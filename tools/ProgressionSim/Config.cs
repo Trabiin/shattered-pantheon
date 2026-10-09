@@ -98,7 +98,8 @@ class Cfg
     public double WallDays, NewHeroEveryDays, FirstLegendaryDay, MaxDaysWithoutBig;
     public double[] LightFaster;
     public SortedDictionary<int, double[]> CollectionShare = new SortedDictionary<int, double[]>();
-    public double LegendaryShareMax, TimePays, LateWallDays, SpendGapLate;
+    public double LegendaryShareMax, TimePays, LateWallDays;
+    public Dictionary<string, double> SpendGapLate = new Dictionary<string, double>();
     public double[] PullsMonth1, PullsLater;
 
     public int BattlesPerDifficulty => Stages * BattlesPerStage;
@@ -208,7 +209,7 @@ class Cfg
         var cl = ta.GetProperty("collection");
         foreach (var kv in cl.GetProperty("rosterShare").EnumerateObject()) c.CollectionShare[int.Parse(kv.Name)] = kv.Value.EnumerateArray().Select(x => x.GetDouble()).ToArray();
         c.LegendaryShareMax = N(cl, "legendaryShareMax");
-        c.TimePays = N(ta, "timePays"); c.LateWallDays = N(ta, "lateWallDays"); c.SpendGapLate = N(ta, "spendGapLate");
+        c.TimePays = N(ta, "timePays"); c.LateWallDays = N(ta, "lateWallDays"); foreach (var sg in ta.GetProperty("spendGapLate").EnumerateObject()) c.SpendGapLate[sg.Name] = sg.Value.GetDouble();
         c.PullsMonth1 = Arr(ta.GetProperty("pullsPerDayFree"), "month1"); c.PullsLater = Arr(ta.GetProperty("pullsPerDayFree"), "later");
         return c;
     }

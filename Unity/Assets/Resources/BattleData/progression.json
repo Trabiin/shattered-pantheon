@@ -550,7 +550,8 @@
     },
     "timePays": 1.3,
     "lateWallDays": 14,
-    "spendGapLate": 2.0,
+    "_spendGapLate": "Most times faster than a free player a spender may finish Nightmare or Godless. No cap on spending (Ojon, 2026-10-09), so these only catch regressions.",
+    "spendGapLate": { "Light": 2.0, "Medium": 3.0, "Heavy": 4.5 },
     "pullsPerDayFree": {
       "month1": [
         1.5,

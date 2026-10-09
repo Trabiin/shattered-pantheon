@@ -252,7 +252,7 @@ static class Program
                     double free = reach[($"{t.Name} {c.Spends[0].Name}", m)], paid = reach[($"{t.Name} {sp.Name}", m)];
                     if (double.IsNaN(paid)) continue;
                     double ratio = double.IsNaN(free) ? days / paid : free / paid;
-                    if (ratio > c.SpendGapLate) flags.Add($"**Spending:** {t.Name} {sp.Name} players reach {m} {ratio:0.00}× as fast as free ones; the limit is {c.SpendGapLate:0.0}×.");
+                    if (c.SpendGapLate.TryGetValue(sp.Name, out var lim) && ratio > lim) flags.Add($"**Spending:** {t.Name} {sp.Name} players reach {m} {ratio:0.00}× as fast as free ones; the limit is {lim:0.0}×.");
                 }
 
         // Rhythm
