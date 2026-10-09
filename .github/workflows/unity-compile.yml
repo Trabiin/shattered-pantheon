@@ -1,7 +1,7 @@
 name: Unity compile
 
 # Compiles the game scripts against the real Unity 6.3 libraries, plays the screens on a stand-in
-# for Unity, and tests the save file. No Unity licence is needed: nothing here runs the Unity editor.
+# for Unity, and tests the save file and the campaign order. No Unity licence is needed: nothing here runs the Unity editor.
 on:
   push:
     branches: [main]
@@ -35,3 +35,5 @@ jobs:
         run: dotnet run --project tools/ScreenSmokeTest
       - name: Test the save file
         run: dotnet run --project tools/SaveTests
+      - name: Test the order campaign battles open in
+        run: dotnet run --project tools/CampaignTests
