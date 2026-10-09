@@ -8,6 +8,8 @@ The game reads its battle content from `Unity/Assets/Resources/BattleData/`:
 | `heroes.json` | The test roster: 20 heroes, two per faction. |
 | `enemies.json` | Enemy units, same shape as heroes. `boss` and `unyielding` mark bosses. |
 | `stages.json` | Stages: `difficulty`, `formation` (`2-3` or `3-2`), `hpScale`, `atkScale` and `enemies` as `[id, slot]`. |
+| `progression.json` | The progression and economy rules the progression simulator plays by (campaign layout, rewards, summons, shop). Hand-edited. |
+| `campaign.json` | The campaign: 4 difficulties × 10 realms × 10 stages × 4 battles. Same shape as `stages.json`, plus `realm`, `realmNumber`, `stage`, `battle` and `boss` (`stage` or `realm`, absent on normal battles). Generated and sim-checked by `tools/ProgressionSim --build-campaign`; never edit by hand. |
 
 These files are generated. Edit `gen_data.py` here and run, from the repo root:
 
