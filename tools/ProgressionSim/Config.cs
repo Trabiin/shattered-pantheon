@@ -258,7 +258,7 @@ class Cfg
                 var rng = new Random(d * 100003 + k * 7919 + 17);
                 bool boss = IsBoss(k);
                 double scale = RecScale(d, k) * EnemyFactor * (boss ? BossFactor : 1);
-                var st = new StageDef { Id = StageId(d, k), Name = BattleName(k), Realm = Realms[RealmOf(k)], RealmNumber = RealmOf(k) + 1, StageNumber = StageInRealm(k) + 1, BattleNumber = k % BattlesPerStage + 1, Boss = IsRealmBoss(k) ? "realm" : boss ? "stage" : null, Difficulty = Difficulties[d].Name.ToLowerInvariant(), HpScale = scale, AtkScale = scale };
+                var st = new StageDef { Id = StageId(d, k), Name = BattleName(k), Realm = Realms[RealmOf(k)], RealmNumber = RealmOf(k) + 1, StageNumber = StageInRealm(k) + 1, BattleNumber = k % BattlesPerStage + 1, Boss = IsRealmBoss(k) ? "realm" : boss ? "stage" : null, Difficulty = Difficulties[d].Name.ToLowerInvariant(), HpScale = scale, AtkScale = scale, HeroScale = RecScale(d, k) };
                 if (boss)
                 {
                     st.Formation = "2-3";
@@ -315,7 +315,6 @@ class Cfg
             // The first battles teach the game, so they should be won almost every time.
             var band = d == 0 && k < EarlyBattles ? EarlyWinBand : IsRealmBoss(k) ? RealmBossWinBand : IsBoss(k) ? BossWinBand : WinBand;
             var one = new GameData { Rules = data.Rules, Heroes = data.Heroes, Enemies = data.Enemies, Stages = new List<StageDef> { st } };
-            double rec = RecScale(d, k);
             for (int iter = 0; iter < 8; iter++)
             {
                 var rng = new Random(i * 31 + 7);
@@ -324,7 +323,7 @@ class Cfg
                 {
                     var ids = data.Heroes.OrderBy(_ => rng.Next()).Take(5).Select(h => h.Id).ToList();
                     var team = Formation.AutoPlace(data, ids);
-                    foreach (var t in team) t.HpScale = t.AtkScale = rec;
+                    foreach (var t in team) t.HpScale = t.AtkScale = st.HeroScale;
                     if (Battle.Run(one, team, st.Id, i * 1000 + f + 1).Result == "win") wins++;
                 }
                 double wr = (double)wins / fights;
@@ -342,7 +341,7 @@ class Cfg
         for (int i = 0; i < stages.Count; i++)
         {
             var s = stages[i];
-            sb.Append($" {{\"id\":\"{s.Id}\",\"name\":\"{s.Name}\",\"difficulty\":\"{s.Difficulty}\",\"formation\":\"{s.Formation}\",\"realm\":\"{s.Realm}\",\"realmNumber\":{s.RealmNumber},\"stage\":{s.StageNumber},\"battle\":{s.BattleNumber},{(s.Boss != null ? $"\"boss\":\"{s.Boss}\"," : "")}\"hpScale\":{s.HpScale.ToString("0.###", inv)},\"atkScale\":{s.AtkScale.ToString("0.###", inv)},\"enemies\":[");
+            sb.Append($" {{\"id\":\"{s.Id}\",\"name\":\"{s.Name}\",\"difficulty\":\"{s.Difficulty}\",\"formation\":\"{s.Formation}\",\"realm\":\"{s.Realm}\",\"realmNumber\":{s.RealmNumber},\"stage\":{s.StageNumber},\"battle\":{s.BattleNumber},{(s.Boss != null ? $"\"boss\":\"{s.Boss}\"," : "")}\"hpScale\":{s.HpScale.ToString("0.###", inv)},\"atkScale\":{s.AtkScale.ToString("0.###", inv)},\"heroScale\":{s.HeroScale.ToString("0.###", inv)},\"enemies\":[");
             sb.Append(string.Join(",", s.Enemies.Select(e => $"[\"{e.Id}\",\"{e.Slot}\"]")));
             sb.Append(i < stages.Count - 1 ? "]},\n" : "]}\n");
         }
