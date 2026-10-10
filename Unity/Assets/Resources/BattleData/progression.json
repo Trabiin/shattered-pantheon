@@ -52,7 +52,7 @@
     }
   },
   "roster": {
-    "_about": "The simulator's roster. Each test kit stands in for several heroes of different rarities: the launch roster, then new heroes every releaseEveryDays. Rarities are listed rarest first.",
+    "_about": "The simulator's roster: the launch roster, then new heroes every releaseEveryDays. Each card uses a test kit of its own rarity (heroes.json), so each kit stands in for several heroes of that rarity. Starters are the 3 heroes a new player gets, at their own rarity. Rarities are listed rarest first.",
     "rarities": [
       "Legendary",
       "Epic",
@@ -76,10 +76,9 @@
     "releaseEveryDays": 30,
     "starters": [
       "hilde",
-      "varkhul",
-      "maren"
-    ],
-    "starterRarity": "Rare"
+      "grub",
+      "korvald"
+    ]
   },
   "summon": {
     "cost": 300,

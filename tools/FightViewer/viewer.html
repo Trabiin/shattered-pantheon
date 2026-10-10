@@ -361,7 +361,7 @@ function castLabel(e) {
   if (d === "basic") return `${nameOf(e[1])}: basic attack`;
   if (d === "stunned") return `${nameOf(e[1])} is Godstruck`;
   const [kind, name] = d.split(":");
-  return `${nameOf(e[1])}: ${name}${kind === "ult" ? " (ultimate)" : kind === "passive" ? " (passive)" : kind === "echo" ? " (echo)" : ""}`;
+  return `${nameOf(e[1])}: ${name}${kind === "ult" ? " (ultimate)" : kind === "passive" ? " (passive)" : kind === "recitation" ? " (recitation)" : ""}`;
 }
 // One small stack of numbers per target: total damage, healing and shield, then what landed or failed.
 function floats(events) {

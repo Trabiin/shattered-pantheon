@@ -62,7 +62,7 @@ class Cfg
     public List<string> Rarities;                        // rarest first
     public Dictionary<string, int> Launch;
     public List<string> Release; public int ReleaseEvery;
-    public List<string> Starters; public string StarterRarity;
+    public List<string> Starters;
     public double SummonCost; public Dictionary<string, double> Rates; public bool FirstTenEpic;
     public List<(string rarity, int every)> Guarantees = new List<(string, int)>();
     public Dictionary<string, double> ShardUnlock;
@@ -144,7 +144,7 @@ class Cfg
         c.Rarities = Strs(ro, "rarities");
         c.Launch = Map(ro.GetProperty("launch")).ToDictionary(kv => kv.Key, kv => (int)kv.Value);
         c.Release = Strs(ro, "release"); c.ReleaseEvery = (int)N(ro, "releaseEveryDays");
-        c.Starters = Strs(ro, "starters"); c.StarterRarity = ro.GetProperty("starterRarity").GetString();
+        c.Starters = Strs(ro, "starters");
 
         var su = r.GetProperty("summon");
         c.SummonCost = N(su, "cost"); c.Rates = Map(su.GetProperty("rates"));

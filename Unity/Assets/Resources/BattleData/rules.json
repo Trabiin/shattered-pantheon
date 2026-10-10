@@ -175,8 +175,8 @@
         "haste": 0.2
       },
       "4": {
-        "echoEvery": 3,
-        "echoPower": 0.5
+        "recitationEvery": 3,
+        "recitationPower": 0.5
       }
     },
     "Trickster": {
