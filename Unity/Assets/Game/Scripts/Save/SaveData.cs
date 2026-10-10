@@ -20,11 +20,27 @@ namespace ShatteredPantheon.Game
 
     public class SaveData
     {
-        public const int CurrentVersion = 1;
+        public const int CurrentVersion = 2;
 
-        // Upgrades[i] turns a version i + 1 save into version i + 2. Empty while version 1 is the only format.
+        // Upgrades[i] turns a version i + 1 save into version i + 2.
         public static readonly List<Func<Dictionary<string, object>, Dictionary<string, object>>> Upgrades =
-            new List<Func<Dictionary<string, object>, Dictionary<string, object>>>();
+            new List<Func<Dictionary<string, object>, Dictionary<string, object>>> { RenameHeroesInTeams };
+
+        // Version 2 (E4-F1-S1): two test heroes were renamed so no hero shares a god's name. Saved teams
+        // keep them under their new ids.
+        static readonly Dictionary<string, string> RenamedInVersion2 = new Dictionary<string, string> { ["pell"] = "jink", ["varkhul"] = "korvald" };
+
+        static Dictionary<string, object> RenameHeroesInTeams(Dictionary<string, object> root)
+        {
+            if (!(root.TryGetValue("teams", out var t) && t is Dictionary<string, object> teams)) return root;
+            var saved = new List<object> { teams.TryGetValue("last", out var last) ? last : null };
+            if (teams.TryGetValue("battles", out var b) && b is Dictionary<string, object> battles) saved.AddRange(battles.Values);
+            foreach (var team in saved.OfType<Dictionary<string, object>>())
+                if (team.TryGetValue("heroes", out var h) && h is List<object> heroes)
+                    foreach (var slot in heroes.OfType<Dictionary<string, object>>())
+                        if (slot.TryGetValue("hero", out var id) && id is string old && RenamedInVersion2.TryGetValue(old, out var renamed)) slot["hero"] = renamed;
+            return root;
+        }
 
         public int Version = CurrentVersion;
         // Battle id -> the star numbers earned on it (1 = the win; 2 to 5 = challenges, from E7-F5).
