@@ -321,7 +321,7 @@ class Player
 
     // ---------- Team ----------
 
-    double HeroScale(Owned o) => C.Scale(o.Card.Rarity, o.Level, o.Stars, o.Gear, o.Skill);
+    double HeroScale(Owned o) => C.Growth.StatScale(o.Card.Rarity, o.Level, o.Stars, o.Gear, o.Skill);
     // Kit strength counts for a lot: an average kit needs about 15% more growth to match a strong one.
     double Power(Owned o) => HeroScale(o) * Math.Pow(o.Card.KitPower, 2);
     double TeamScale(List<Owned> team) => team.Count == 0 ? 0 : team.Average(HeroScale) * Math.Min(1, team.Count / 5.0);
@@ -427,25 +427,25 @@ class Player
         foreach (var (group, upTo) in new[] { (team, (int)Math.Ceiling(rec.level)), (core, int.MaxValue) })
             while (true)
             {
-                var o = group.Where(h => h.Level < Math.Min(upTo, C.Cap(h.Stars))).OrderBy(h => h.Level).FirstOrDefault();
+                var o = group.Where(h => h.Level < Math.Min(upTo, C.Growth.LevelCap(h.Stars))).OrderBy(h => h.Level).FirstOrDefault();
                 if (o == null) break;
-                double cost = C.XpToNext(o.Level);
-                if (xp < cost || gold < cost * C.GoldPerXp) break;
-                xp -= cost; gold -= cost * C.GoldPerXp; o.Level++;
+                double cost = C.Growth.XpToNext(o.Level), goldCost = C.Growth.GoldToNext(o.Level);
+                if (xp < cost || gold < goldCost) break;
+                xp -= cost; gold -= goldCost; o.Level++;
             }
         // Then gear beyond the recommendation, and skills.
-        UpgradeGear(team, C.MaxGear);
+        UpgradeGear(team, C.Growth.MaxGear);
         while (true)
         {
-            var o = team.Where(h => h.Skill < C.MaxSkill).OrderBy(h => h.Skill).FirstOrDefault();
+            var o = team.Where(h => h.Skill < C.Growth.MaxSkill).OrderBy(h => h.Skill).FirstOrDefault();
             if (o == null) break;
-            double need = C.TomesPerLevel * o.Skill;
+            double need = C.Growth.TomesToNext(o.Skill);
             if (tomes < need) break;
             tomes -= need; o.Skill++;
         }
         // Ascension: a capped team hero takes fodder of its own star rank.
-        foreach (var o in team.Where(h => h.Level >= C.Cap(h.Stars) && h.Stars < 6).OrderByDescending(Power))
-            if (TakeFodder(o.Stars, C.AscendFodder[o.Stars]))
+        foreach (var o in team.Where(h => h.Level >= C.Growth.LevelCap(h.Stars) && h.Stars < C.Growth.MaxStars).OrderByDescending(Power))
+            if (TakeFodder(o.Stars, C.Growth.FodderToAscend(o.Stars)))
             {
                 o.Stars++;
                 today.BigMoment = true;
@@ -457,9 +457,9 @@ class Player
     {
         while (true)
         {
-            var o = team.Where(h => h.Gear < Math.Min(upTo, C.MaxGear)).OrderBy(h => h.Gear).FirstOrDefault();
+            var o = team.Where(h => h.Gear < Math.Min(upTo, C.Growth.MaxGear)).OrderBy(h => h.Gear).FirstOrDefault();
             if (o == null) break;
-            double mats = C.GearMatsPerTier * (o.Gear + 1), g = C.GearGoldLevels * C.XpToNext(Math.Max(1, o.Level)) * C.GoldPerXp;
+            double mats = C.Growth.GearMatsToNext(o.Gear), g = C.Growth.GearGoldToNext(o.Level);
             if (gearMats < mats || gold < g) break;
             gearMats -= mats; gold -= g; o.Gear++;
         }
@@ -479,7 +479,7 @@ class Player
         while (fodder[rank] < count)
         {
             if (rank <= 1) return false;
-            int need = 1 + C.AscendFodder[rank - 1];
+            int need = 1 + C.Growth.FodderToAscend(rank - 1);
             if (!Ensure(rank - 1, need)) return false;
             fodder[rank - 1] -= need;
             fodder[rank]++;
@@ -494,10 +494,10 @@ class Player
         HeroesFrom[how + (Roster.ContainsKey(card.Id) ? " (duplicate)" : "")] = (HeroesFrom.TryGetValue(how + (Roster.ContainsKey(card.Id) ? " (duplicate)" : ""), out var n) ? n : 0) + 1;
         if (Roster.ContainsKey(card.Id))
         {
-            fodder[(int)C.RarityStars[card.Rarity]]++;
+            fodder[C.Growth.StartStars(card.Rarity)]++;
             return;
         }
-        Roster[card.Id] = new Owned { Card = card, Stars = (int)C.RarityStars[card.Rarity] };
+        Roster[card.Id] = new Owned { Card = card, Stars = C.Growth.StartStars(card.Rarity) };
         if (today != null) { today.NewHero = true; if (Rank(card.Rarity) <= 1) today.BigMoment = true; }
         if (card.Rarity == C.Rarities[0] && FirstLegendaryDay < 0) FirstLegendaryDay = today?.Day ?? 0;
         if (fromPull || today != null)
@@ -566,7 +566,7 @@ class Player
     double LevelCost()
     {
         int d = Math.Min(Diff, C.Difficulties.Count - 1), k = Math.Min(Battle, C.BattlesPerDifficulty - 1);
-        return C.XpToNext(Math.Max(1, C.RecLevel(d, k))) * RewardScale();
+        return C.Growth.XpToNext(Math.Max(1, C.RecLevel(d, k))) * RewardScale();
     }
 
     double RewardScale()
@@ -582,11 +582,11 @@ class Player
     // Endless and per-difficulty farm drops, whose tables already list the amount for each difficulty.
     void Add(Reward r, double times, bool scaled = true)
     {
-        double lc = scaled ? LevelCost() : C.XpToNext(Math.Max(1, C.RecLevel(Math.Min(Diff, C.Difficulties.Count - 1), Math.Min(Battle, C.BattlesPerDifficulty - 1))));
+        double lc = scaled ? LevelCost() : C.Growth.XpToNext(Math.Max(1, C.RecLevel(Math.Min(Diff, C.Difficulties.Count - 1), Math.Min(Battle, C.BattlesPerDifficulty - 1))));
         double rs = scaled ? RewardScale() : 1;
         double bonus = spend.PilgrimsPath ? C.PassBonus : 0;
         xp += r.XpLevels * lc * times * (1 + bonus);
-        gold += r.GoldLevels * lc * C.GoldPerXp * times * (1 + bonus);
+        gold += r.GoldLevels * lc * C.Growth.GoldPerXp * times * (1 + bonus);
         Earn(r.Godshards * times);
         devotion += r.Devotion * times;
         gearMats += r.GearMats * times * rs;
