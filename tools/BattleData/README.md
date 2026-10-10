@@ -8,7 +8,7 @@ The game reads its battle content from `Unity/Assets/Resources/BattleData/`:
 | `heroes.json` | The test roster: 20 heroes, two per faction, across the five rarities (4 Common, 5 Uncommon, 5 Rare, 4 Epic, 2 Legendary). |
 | `enemies.json` | Enemy units, same shape as heroes. `boss` and `unyielding` mark bosses. |
 | `stages.json` | The balance simulator's 6 test stages (`tools/BattleSim`, its report and the fight viewer); the game doesn't show them. Each has `difficulty`, `formation` (`2-3` or `3-2`), `hpScale`, `atkScale` and `enemies` as `[id, slot]`. |
-| `progression.json` | The progression and economy rules the progression simulator plays by (campaign layout, rewards, summons, shop, the stat multiplier for each rarity, the 3 starting heroes). Hand-edited. |
+| `progression.json` | The progression and economy rules the progression simulator plays by (campaign layout, rewards, summons, shop, the 3 starting heroes). Its `heroGrowth` (stat multipliers for rarity, level, stars, gear and skills; level caps; starting star rank) and `costs` (XP, gold, fodder, skill tomes, gear materials) sections are read by `Unity/Assets/BattleCore/Growth.cs`, the growth rules the game and the simulator share. Hand-edited. |
 | `campaign.json` | The campaign: 4 difficulties × 10 realms × 10 stages × 4 battles. Same shape as `stages.json`, plus `realm`, `realmNumber`, `stage`, `battle`, `boss` (`stage` or `realm`, absent on normal battles) and `heroScale`: the strength the battle expects the player's heroes at (times their listed stats), which it is sim-checked against. The game plays these battles, with heroes at `heroScale` until they have levels. Generated and sim-checked by `tools/ProgressionSim --build-campaign`; never edit by hand. |
 
 These files are generated. Edit `gen_data.py` here and run, from the repo root:
@@ -41,7 +41,7 @@ Heroes also have `rarity` (Common, Uncommon, Rare, Epic, Legendary) and `fantasy
 | Rare, Epic | 3 | 1 |
 | Legendary | 3 | 2 |
 
-Common and Uncommon heroes use the default basic attack. Listed stats are the same for every rarity; the progression rules multiply them by rarity (`progression.json`, `rarityBase`).
+Common and Uncommon heroes use the default basic attack. Listed stats are the same for every rarity; the growth rules multiply them by rarity (`progression.json`, `heroGrowth.rarityBase`, applied by `Unity/Assets/BattleCore/Growth.cs`).
 
 ## Actions
 
