@@ -50,14 +50,8 @@ class Cfg
     public static Dictionary<int, double> Vessels(JsonElement e) => Map(e).ToDictionary(kv => int.Parse(kv.Key), kv => kv.Value);
     static bool B(JsonElement e, string k) => e.TryGetProperty(k, out var v) && v.ValueKind == JsonValueKind.True;
 
-    // Hero growth
-    public double LevelGain, StarGain, GearGain, SkillGain;
-    public Dictionary<string, double> RarityBase, RarityStars;
-    public Dictionary<int, int> LevelCap = new Dictionary<int, int>();
-    public int MaxGear, MaxSkill;
-    // Costs
-    public double XpA, XpExp, GoldPerXp, GearMatsPerTier, GearGoldLevels, TomesPerLevel;
-    public Dictionary<int, int> AscendFodder = new Dictionary<int, int>();
+    // Hero growth and its costs: the rules the game uses too (Unity/Assets/BattleCore/Growth.cs).
+    public Growth Growth;
     // Roster and summons
     public List<string> Rarities;                        // rarest first
     public Dictionary<string, int> Launch;
@@ -125,19 +119,9 @@ class Cfg
 
     public static Cfg Load(string path)
     {
-        var r = JsonDocument.Parse(File.ReadAllText(path)).RootElement;
-        var c = new Cfg();
-        var g = r.GetProperty("heroGrowth");
-        c.LevelGain = N(g, "levelGain"); c.StarGain = N(g, "starGain"); c.GearGain = N(g, "gearGain"); c.SkillGain = N(g, "skillGain");
-        c.RarityBase = Map(g.GetProperty("rarityBase")); c.RarityStars = Map(g.GetProperty("rarityStars"));
-        foreach (var kv in Map(g.GetProperty("levelCapByStars"))) c.LevelCap[int.Parse(kv.Key)] = (int)kv.Value;
-        c.MaxGear = (int)N(g, "maxGear"); c.MaxSkill = (int)N(g, "maxSkill");
-
-        var co = r.GetProperty("costs");
-        c.XpA = N(co.GetProperty("xpToNext"), "a"); c.XpExp = N(co.GetProperty("xpToNext"), "exp");
-        c.GoldPerXp = N(co, "goldPerXp"); c.GearMatsPerTier = N(co.GetProperty("gearMats"), "perTier");
-        c.GearGoldLevels = N(co, "gearGoldLevels"); c.TomesPerLevel = N(co.GetProperty("skillTomes"), "perLevel");
-        foreach (var kv in Map(co.GetProperty("ascendFodder"))) c.AscendFodder[int.Parse(kv.Key)] = (int)kv.Value;
+        string text = File.ReadAllText(path);
+        var r = JsonDocument.Parse(text).RootElement;
+        var c = new Cfg { Growth = Growth.FromJson(text) };
 
         var ro = r.GetProperty("roster");
         List<string> Strs(JsonElement e, string k) => e.GetProperty(k).EnumerateArray().Select(x => x.GetString()).ToList();
@@ -218,14 +202,7 @@ class Cfg
         return c;
     }
 
-    // ---------- Growth and costs ----------
-
-    public double XpToNext(int level) => Math.Round(XpA * Math.Pow(level, XpExp));
-
-    public double Scale(string rarity, double level, double stars, double gear, double skill) =>
-        RarityBase[rarity] * (1 + LevelGain * (level - 1)) * (1 + StarGain * (stars - 3)) * (1 + GearGain * gear) * (1 + SkillGain * (skill - 1));
-
-    public int Cap(int stars) => LevelCap.TryGetValue(stars, out var c) ? c : LevelCap.Values.Max();
+    // ---------- Recommended power ----------
 
     static double Lerp(double[] a, double t) => a[0] + (a[1] - a[0]) * t;
 
@@ -237,7 +214,7 @@ class Cfg
         return (Lerp(d.Levels, Math.Pow(t, d.Curve)), Lerp(d.Stars, t), Lerp(d.Gear, t), Lerp(d.Skill, t));
     }
 
-    public double RecScale(int diff, int k) { var r = Recommended(diff, k); return Scale("Epic", r.level, r.stars, r.gear, r.skill); }
+    public double RecScale(int diff, int k) { var r = Recommended(diff, k); return Growth.StatScale("Epic", r.level, r.stars, r.gear, r.skill); }
     public int RecLevel(int diff, int k) => (int)Math.Round(Recommended(diff, k).level);
 
     // ---------- The generated campaign ----------
