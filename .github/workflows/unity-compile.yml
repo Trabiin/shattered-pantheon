@@ -1,7 +1,7 @@
 name: Unity compile
 
 # Compiles the game scripts against the real Unity 6.3 libraries, plays the screens on a stand-in
-# for Unity, and tests the save file. No Unity licence is needed: nothing here runs the Unity editor.
+# for Unity, and tests the save file and the campaign order. No Unity licence is needed: nothing here runs the Unity editor.
 on:
   push:
     branches: [main]
@@ -15,17 +15,32 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
-      - name: Get the Unity 6.3 libraries from the newest editor image
+      - name: Find the newest Unity 6.3 editor image
+        id: unity
         run: |
           TAG=$(curl -s "https://hub.docker.com/v2/repositories/unityci/editor/tags?page_size=100&name=ubuntu-6000.3" | jq -r '.results[].name' | grep -E '^ubuntu-6000\.3\.[0-9]+f[0-9]+-base-[0-9.]+$' | sort -V | tail -1)
           echo "Unity image: $TAG"
-          docker pull -q unityci/editor:$TAG
-          id=$(docker create unityci/editor:$TAG)
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+      - name: Reuse the Unity libraries from an earlier run of the same image
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: unity-data
+          key: unity-data-${{ steps.unity.outputs.tag }}
+      - name: Get the Unity 6.3 libraries from the editor image
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          TAG=${{ steps.unity.outputs.tag }}
+          # Docker Hub sometimes times out or limits pulls: try it a few times, then Google's copy of it.
+          IMG=""
+          for n in 1 2 3; do docker pull -q unityci/editor:$TAG && IMG=unityci/editor:$TAG && break; sleep $((n * 20)); done
+          [ -n "$IMG" ] || { docker pull -q mirror.gcr.io/unityci/editor:$TAG && IMG=mirror.gcr.io/unityci/editor:$TAG; }
+          id=$(docker create $IMG)
           mkdir -p unity-data
           docker cp $id:/opt/unity/Editor/Data/Managed unity-data/Managed
-          ui=$(docker run --rm unityci/editor:$TAG bash -c 'ls /opt/unity/Editor/Data/Resources/PackageManager/ProjectTemplates/libcache/*/ScriptAssemblies/UnityEngine.UI.dll | head -1')
+          ui=$(docker run --rm $IMG bash -c 'ls /opt/unity/Editor/Data/Resources/PackageManager/ProjectTemplates/libcache/*/ScriptAssemblies/UnityEngine.UI.dll | head -1')
           docker cp "$id:$ui" unity-data/UnityEngine.UI.dll
-          docker run --rm unityci/editor:$TAG cat /opt/unity/Editor/Data/Resources/PackageManager/BuiltInPackages/com.unity.ugui/package.json | jq -r '"Built-in ugui version: " + .version'
+          docker run --rm $IMG cat /opt/unity/Editor/Data/Resources/PackageManager/BuiltInPackages/com.unity.ugui/package.json | jq -r '"Built-in ugui version: " + .version'
           docker rm $id
       - name: Compile game scripts (player build, no editor code)
         run: dotnet build tools/UnityCompileCheck -p:UnityData=$PWD/unity-data -p:WithEditor=false -o out/player
@@ -35,3 +50,5 @@ jobs:
         run: dotnet run --project tools/ScreenSmokeTest
       - name: Test the save file
         run: dotnet run --project tools/SaveTests
+      - name: Test the order campaign battles open in
+        run: dotnet run --project tools/CampaignTests

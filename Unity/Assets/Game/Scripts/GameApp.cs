@@ -58,7 +58,8 @@ namespace ShatteredPantheon.Game
 
         public void ShowStages() => Show(new CampaignView(this));
         public void ShowTeam(StageDef stage) => Show(new TeamView(this, stage));
-        public void ShowBattle(StageDef stage, List<TeamSlot> team, string formation) => Show(new BattleView(this, stage, team, formation));
+        // A locked battle can't be started, whichever screen asks.
+        public void ShowBattle(StageDef stage, List<TeamSlot> team, string formation) { if (Progress.IsOpen(stage)) Show(new BattleView(this, stage, team, formation)); }
         public void ShowResults(StageDef stage, List<TeamSlot> team, Battle battle) => Show(new ResultsView(this, stage, team, battle));
 
         void Show(View next)

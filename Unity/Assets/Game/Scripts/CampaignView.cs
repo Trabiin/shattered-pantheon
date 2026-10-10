@@ -1,6 +1,7 @@
 // The campaign: the realm's 10 stages, each a row of its 4 battles (battle 4 is the stage boss, and
-// stage 10's boss the realm boss). Tapping a battle opens the team screen for it. Cleared battles
-// come from the save; a testing-only button resets it.
+// stage 10's boss the realm boss). Tapping an open battle opens the team screen for it; locked ones
+// open in order as the battle before them is won (CampaignOrder). Cleared battles come from the save;
+// a testing-only button resets it.
 namespace ShatteredPantheon.Game
 {
     using System.Collections.Generic;
@@ -55,11 +56,12 @@ namespace ShatteredPantheon.Game
 
         void BattleTile(RectTransform row, StageDef battle, Vector2 pos, Vector2 size)
         {
-            var fill = battle.Boss != null ? Palette.Faction(battle.Realm) : Palette.ButtonFill;
-            var tile = Ui.MakeTapArea(row, "Battle: " + battle.Id, fill, pos, size, () => App.ShowTeam(battle)).rectTransform;
+            bool open = App.Progress.IsOpen(battle);
+            var fill = !open ? Palette.PanelFill : battle.Boss != null ? Palette.Faction(battle.Realm) : Palette.ButtonFill;
+            var tile = Ui.MakeTapArea(row, "Battle: " + battle.Id, fill, pos, size, () => { if (open) App.ShowTeam(battle); }).rectTransform;
             string title = battle.Boss == "realm" ? "Realm boss" : battle.Boss == "stage" ? "Boss" : $"Battle {battle.BattleNumber}";
-            Ui.Label(tile, title, 28, Color.white, TextAnchor.MiddleCenter, new Vector2(0, 18), new Vector2(size.x - 10, 50)).Bold().FitText(18);
-            string state = App.Progress.IsCleared(battle.Id) ? "<color=#73d980>Cleared</color>" : $"{battle.StageNumber}-{battle.BattleNumber}";
+            Ui.Label(tile, title, 28, open ? Color.white : Palette.Muted, TextAnchor.MiddleCenter, new Vector2(0, 18), new Vector2(size.x - 10, 50)).Bold().FitText(18);
+            string state = App.Progress.IsCleared(battle.Id) ? "<color=#73d980>Cleared</color>" : open ? $"{battle.StageNumber}-{battle.BattleNumber}" : "Locked";
             Ui.Label(tile, state, 22, Palette.Muted, TextAnchor.MiddleCenter, new Vector2(0, -28), new Vector2(size.x - 10, 36));
         }
 

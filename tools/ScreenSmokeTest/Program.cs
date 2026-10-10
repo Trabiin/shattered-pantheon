@@ -1,6 +1,7 @@
 // Plays the game's screens on fake Unity (FakeUnity.cs) the way a player would: the campaign screen,
-// team and formation editing, every realm 1 battle in order, retreating mid-fight, results, retry,
-// closing and reopening the game with its save, and resetting progress.
+// locked battles, team and formation editing, every realm 1 battle in order (each win opening the
+// next), retreating mid-fight, results, retry, closing and reopening the game with its save, and
+// resetting progress.
 // Fails on any exception a screen throws, on a fight that differs from the engine run directly,
 // on screens or animations left behind, or on a team that isn't what the player picked.
 //   dotnet run --project tools/ScreenSmokeTest
@@ -41,6 +42,13 @@ static class Program
         Expect(Named("Battle: ").Count() == realm.Count, $"only realm 1 battles are listed ({Named("Battle: ").Count()})");
         var testStages = GameData.LoadDirectory(dir).Stages;
         Expect(testStages.All(s => Named(": " + s.Id).Count() == 0 && Named(s.Name).Count() == 0), "the balance simulator's test stages are not shown");
+
+        // A new game opens only the first battle; locked battles can't be started.
+        Expect(!IsShownLocked(realm[0]) && realm.Skip(1).All(IsShownLocked), "a new game shows only the first battle open, the rest locked");
+        Click("Battle: " + realm[1].Id);
+        Expect(Current is CampaignView, "tapping a locked battle doesn't open it");
+        app.ShowBattle(realm[1], Formation.AutoPlace(data, Starter), "2-3");
+        Expect(Current is CampaignView, "a locked battle can't be started even if a screen asks");
 
         // Team editing on the first battle.
         var first = realm[0];
@@ -87,14 +95,20 @@ static class Program
         Click("Speed Button"); Click("Speed Button");
         Expect(Label(Find("Speed Button")) == "3x", "speed button cycles to 3x");
         CheckFight(data, first, picked);
+        for (int tries = 1; !app.Progress.IsCleared(first.Id) && tries < MaxTries; tries++) { Click("Retry Button"); CheckFight(data, first, picked); }
+        Expect(app.Progress.IsCleared(first.Id), $"{first.Name}: won (retrying up to {MaxTries} times) before going on");
 
         // Realm 1 from start to finish with the starter team: every battle in order from the campaign
         // screen, retrying a lost battle like a player would.
         Click("Stages Button");
         Expect(Current is CampaignView, "Stages returns to the campaign");
+        Expect(!IsShownLocked(realm[1]) && realm.Skip(2).All(IsShownLocked), "winning the first battle opens the second, and only that");
         var last = picked;
         foreach (var stage in realm.Skip(1))
         {
+            var next = realm.ElementAtOrDefault(realm.IndexOf(stage) + 1);
+            string opens = stage.Boss == "stage" ? "the next stage's first battle" : "the next battle";
+            Expect(!IsShownLocked(stage) && (next == null || IsShownLocked(next)), $"{stage.Name}: open, and {opens} locked until it's won");
             Click("Battle: " + stage.Id);
             Expect(TeamSet(Team()) == TeamSet(last), $"{stage.Name}: opens with the last team used");
             Click("Clear Button");
@@ -107,8 +121,10 @@ static class Program
             while (!CheckFight(data, stage, team) && tries < MaxTries) { Click("Retry Button"); tries++; }
             Expect(app.Progress.IsCleared(stage.Id), $"{stage.Name}: won within {MaxTries} tries ({tries})");
             Click("Stages Button");
+            if (next != null) Expect(!IsShownLocked(next), $"{stage.Name}: the win opens {opens}");
         }
         Expect(realm.All(b => IsShownCleared(b)), "every won battle shows as cleared");
+        Expect(realm.All(b => !IsShownLocked(b)), "every won battle stays open to replay");
 
         // A fight in the 3-2 formation, on the realm boss.
         var wide = realm.Last();
@@ -137,6 +153,7 @@ static class Program
         Call(app, "Start");
         Expect(Current is CampaignView, "the reopened game starts on the campaign");
         Expect(realm.All(b => IsShownCleared(b)), "after reopening, every won battle still shows as cleared");
+        Expect(realm.All(b => !IsShownLocked(b)), "after reopening, every won battle is still open");
         Expect(realm.All(b => app.Progress.Stars(b.Id).SequenceEqual(new[] { 1 })), "after reopening, every won battle has its 1 star");
         Expect(app.Progress.Furthest("normal") == realm.Last().Id, "after reopening, the furthest battle reached is the realm boss");
         Click("Battle: " + first.Id);
@@ -151,6 +168,7 @@ static class Program
         Click("Reset progress Button");
         Expect(Current is CampaignView && realm.All(b => !IsShownCleared(b)) && !File.Exists(saveFile), "the second tap clears all progress and the save");
         Expect(app.Progress.Furthest("normal") == null, "after a reset nothing has been reached");
+        Expect(!IsShownLocked(realm[0]) && realm.Skip(1).All(IsShownLocked), "after a reset only the first battle is open");
         Directory.Delete(Application.persistentDataPath, true);
 
         foreach (var e in Scheduler.Errors.Distinct().Take(5)) Console.WriteLine("ERROR " + e);
@@ -190,7 +208,9 @@ static class Program
     static bool Has(string id, string slot) => Team().Any(t => t.Id == id && t.Slot == slot);
     static string TeamSet(List<TeamSlot> team) => string.Join(",", team.Select(t => t.Id + "@" + t.Row + "/" + t.Slot).OrderBy(x => x));
 
-    static bool IsShownCleared(StageDef b) => Find("Battle: " + b.Id).transform.Cast<Transform>().Any(t => t.GetComponent<Text>()?.text.Contains("Cleared") == true);
+    static bool IsShownCleared(StageDef b) => TileSays(b, "Cleared");
+    static bool IsShownLocked(StageDef b) => TileSays(b, "Locked");
+    static bool TileSays(StageDef b, string text) => Find("Battle: " + b.Id).transform.Cast<Transform>().Any(t => t.GetComponent<Text>()?.text.Contains(text) == true);
 
     static void RunFor(float seconds) { for (float t = 0; t < seconds; t += 1 / 60f) Scheduler.Frame(1 / 60f); }
     static float RunUntil(Func<bool> done, float limit) { float t = 0; while (!done() && t < limit) { Scheduler.Frame(1 / 60f); t += 1 / 60f; } return t; }

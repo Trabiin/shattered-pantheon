@@ -1,5 +1,6 @@
 // What the player has done, kept in the save file on the device (SaveStore): stars earned on each
 // battle, the furthest battle cleared on each difficulty, and the team last used on each battle.
+// Which battles are open isn't saved: CampaignOrder works it out from the cleared battles.
 // Every change is written straight away; GameApp also writes when the app is paused or closed.
 // Plain C# with no Unity code, so the save tests run without Unity (tools/SaveTests).
 namespace ShatteredPantheon.Game
@@ -17,6 +18,7 @@ namespace ShatteredPantheon.Game
         readonly GameData data;
         readonly SaveStore store;
         readonly Action<string> warn;
+        readonly CampaignOrder campaign;
 
         public SaveData Save { get; private set; }
 
@@ -25,12 +27,14 @@ namespace ShatteredPantheon.Game
             this.data = data;
             this.store = store;
             this.warn = warn;
+            campaign = new CampaignOrder(data.Stages);
             Save = store.Load(out string problem);
             if (problem != null) warn(problem);
         }
 
         public IReadOnlyList<int> Stars(string battleId) => Save.Stars.TryGetValue(battleId, out var s) ? s : (IReadOnlyList<int>)Array.Empty<int>();
         public bool IsCleared(string battleId) => Stars(battleId).Contains(1);
+        public bool IsOpen(StageDef battle) => campaign.IsOpen(battle, IsCleared);
         public string Furthest(string difficulty) => Save.Furthest.TryGetValue(difficulty, out var id) ? id : null;
 
         // Called when a fight ends, whatever the result, and saved.
@@ -43,12 +47,10 @@ namespace ShatteredPantheon.Game
                 if (!stars.Contains(1)) { stars.Add(1); stars.Sort(); }
                 string furthest = Furthest(battle.Difficulty);
                 var before = furthest == null ? null : data.Stages.Find(b => b.Id == furthest);
-                if (before == null || Order(battle).CompareTo(Order(before)) > 0) Save.Furthest[battle.Difficulty] = battle.Id;
+                if (before == null || campaign.IndexOf(battle) > campaign.IndexOf(before)) Save.Furthest[battle.Difficulty] = battle.Id;
             }
             Write();
         }
-
-        static (int, int, int) Order(StageDef b) => (b.RealmNumber, b.StageNumber, b.BattleNumber);
 
         public void SaveTeam(string battleId, List<TeamSlot> team, string formation)
         {
