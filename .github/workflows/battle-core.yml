@@ -13,6 +13,11 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
+      - name: The battle data matches its generator, whose checks pass (kits by rarity, no god's names)
+        run: |
+          mkdir generated
+          python3 -I tools/BattleData/gen_data.py generated 0.5
+          for f in rules heroes enemies stages; do diff generated/$f.json Unity/Assets/Resources/BattleData/$f.json; done
       - name: Build the battle core and simulator
         run: dotnet build tools/BattleSim -c Release
       - name: The same seed always gives the same fight

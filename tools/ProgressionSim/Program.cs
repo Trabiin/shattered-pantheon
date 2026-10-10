@@ -84,15 +84,18 @@ static class Program
     }
 
     // The simulator's roster: the launch heroes, then new ones every month for a year. Each card uses
-    // one of the test kits; kits are dealt out in turn so each kit appears at several rarities.
+    // one of the test kits of its own rarity; a rarity's kits are dealt out in turn, so each kit stands
+    // in for several heroes of that rarity.
     static List<HeroCard> Cards(Cfg c, GameData data)
     {
         var lift = KitLift(c, data);
         var list = new List<HeroCard>();
-        int next = 0;
+        var next = c.Rarities.ToDictionary(r => r, _ => 0);
         void Make(string rarity, int day)
         {
-            var h = data.Heroes[next++ % data.Heroes.Count];
+            var kits = data.Heroes.Where(h => h.Rarity == rarity).ToList();
+            if (kits.Count == 0) throw new InvalidDataException($"No test hero has the rarity {rarity}.");
+            var h = kits[next[rarity]++ % kits.Count];
             list.Add(new HeroCard
             {
                 Id = $"{h.Id}-{rarity.ToLowerInvariant()}-{list.Count}", Kit = h.Id, Rarity = rarity, ReleaseDay = day,
@@ -100,7 +103,7 @@ static class Program
                 KitPower = lift[h.Id],
             });
         }
-        foreach (var r in new[] { c.StarterRarity }.Concat(c.Rarities.Where(x => x != c.StarterRarity)))
+        foreach (var r in c.Rarities)
             for (int i = 0; i < c.Launch[r]; i++) Make(r, 0);
         for (int day = c.ReleaseEvery; day <= 400; day += c.ReleaseEvery)
             foreach (var r in c.Release) Make(r, day);
@@ -185,7 +188,7 @@ static class Program
         var sb = new StringBuilder();
         sb.AppendLine("# Progression Report");
         sb.AppendLine();
-        sb.AppendLine($"*Generated {DateTime.UtcNow:yyyy-MM-dd HH:mm} UTC by `dotnet run --project tools/ProgressionSim -c Release`. {players.Length / seeds} player types × {seeds} players each, {days} days. Every campaign battle is a real fight on the battle engine ({players.Sum(p => p.RealFights):N0} fights); rewards, upgrades, summons and star challenges follow `progression.json`. Roster: the 20 test kits stand in for {rosterSize} launch heroes ({string.Join(", ", c.Rarities.Select(r => $"{c.Launch[r]} {r}"))}), plus {string.Join(", ", c.Release.GroupBy(x => x).Select(g => $"{g.Count()} {g.Key}"))} every {c.ReleaseEvery} days. Numbers are medians across the players of each type.*");
+        sb.AppendLine($"*Generated {DateTime.UtcNow:yyyy-MM-dd HH:mm} UTC by `dotnet run --project tools/ProgressionSim -c Release`. {players.Length / seeds} player types × {seeds} players each, {days} days. Every campaign battle is a real fight on the battle engine ({players.Sum(p => p.RealFights):N0} fights); rewards, upgrades, summons and star challenges follow `progression.json`. Roster: the 20 test kits, each at its own rarity, stand in for {rosterSize} launch heroes ({string.Join(", ", c.Rarities.Select(r => $"{c.Launch[r]} {r}"))}), plus {string.Join(", ", c.Release.GroupBy(x => x).Select(g => $"{g.Count()} {g.Key}"))} every {c.ReleaseEvery} days. Numbers are medians across the players of each type.*");
         sb.AppendLine();
 
         var groups = players.GroupBy(p => p.Name).ToList();

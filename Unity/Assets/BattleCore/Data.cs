@@ -75,6 +75,7 @@ namespace ShatteredPantheon.Battle
         public List<SkillDef> Skills = new List<SkillDef>();
         public List<PassiveDef> Passives = new List<PassiveDef>();
         public string Description;
+        public string Fantasy;   // the one-line idea of who a hero is
     }
 
     public class StageEnemy
@@ -224,6 +225,7 @@ namespace ShatteredPantheon.Battle
                 Id = Str(d, "id"), Name = Str(d, "name"), Faction = Str(d, "faction"), Type = Str(d, "type"),
                 Role = Str(d, "role"), Rarity = Str(d, "rarity"), Kind = Str(d, "kind", "phys"),
                 Description = Str(d, "description"),
+                Fantasy = Str(d, "fantasy"),
                 Boss = Bool(d, "boss"), Unyielding = Bool(d, "unyielding") || Bool(d, "boss"),
                 Immune = Strs(d, "immune"),
                 Basic = ReadSkill(d.TryGetValue("basic", out var b) ? b : null),

@@ -841,11 +841,11 @@ namespace ShatteredPantheon.Battle
                     RunActions(u, s, s.Actions, 1, true, null);
                     u.Cd[i] = s.Cd;
                     u.SkillsUsed++;
-                    double every = u.Mods.Get("echoEvery");
+                    double every = u.Mods.Get("recitationEvery");
                     if (every > 0 && u.SkillsUsed % (int)every == 0 && u.Alive)
                     {
-                        Emit(EventKind.Turn, u, null, 0, "echo:" + s.Name);
-                        RunActions(u, s, s.Actions, u.Mods.Get("echoPower"), true, null);
+                        Emit(EventKind.Turn, u, null, 0, "recitation:" + s.Name);
+                        RunActions(u, s, s.Actions, u.Mods.Get("recitationPower"), true, null);
                     }
                     return;
                 }

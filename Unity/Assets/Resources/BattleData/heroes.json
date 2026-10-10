@@ -5,8 +5,9 @@
   "faction": "Sun",
   "type": "Radiant",
   "role": "Warrior",
-  "rarity": "epic",
+  "rarity": "Legendary",
   "kind": "phys",
+  "fantasy": "A sun-crowned executioner who passes judgement at high noon, when no shadow is left to hide in.",
   "hp": 700,
   "atk": 130,
   "armour": 50,
@@ -75,6 +76,19 @@
       "casterMaxHp": 0.2
      }
     ]
+   },
+   {
+    "name": "High Noon",
+    "trigger": "afterUlt",
+    "actions": [
+     {
+      "target": "allAllies",
+      "effect": "status",
+      "status": "grace",
+      "mult": 0.15,
+      "turns": 2
+     }
+    ]
    }
   ]
  },
@@ -84,8 +98,9 @@
   "faction": "Sun",
   "type": "Radiant",
   "role": "Support",
-  "rarity": "epic",
+  "rarity": "Epic",
   "kind": "magic",
+  "fantasy": "A lantern-bearer who kept the last of the sun burning through the Long Night, and spends it to heal.",
   "hp": 600,
   "atk": 100,
   "armour": 40,
@@ -99,7 +114,7 @@
      {
       "target": "lowestAlly",
       "effect": "heal",
-      "mult": 1.6
+      "mult": 1.5
      }
     ]
    },
@@ -165,8 +180,9 @@
   "faction": "Grave",
   "type": "Umbral",
   "role": "Controller",
-  "rarity": "epic",
+  "rarity": "Legendary",
   "kind": "magic",
+  "fantasy": "The boatman of the dead, who still collects his toll and sometimes rows a fallen friend back.",
   "hp": 580,
   "atk": 110,
   "armour": 40,
@@ -203,7 +219,7 @@
       "target": "fastest",
       "effect": "status",
       "status": "hush",
-      "chance": 0.7,
+      "chance": 0.8,
       "turns": 1
      }
     ]
@@ -249,6 +265,17 @@
       "mult": 1.2
      }
     ]
+   },
+   {
+    "name": "Coin for the Crossing",
+    "trigger": "onKill",
+    "actions": [
+     {
+      "target": "lowestManaAlly",
+      "effect": "mana",
+      "value": 20
+     }
+    ]
    }
   ]
  },
@@ -258,8 +285,9 @@
   "faction": "Grave",
   "type": "Venom",
   "role": "Warrior",
-  "rarity": "epic",
+  "rarity": "Uncommon",
   "kind": "phys",
+  "fantasy": "A gravedigger whose scythe leaves rot-flowers growing in everything it cuts.",
   "hp": 700,
   "atk": 125,
   "armour": 50,
@@ -293,19 +321,6 @@
       "target": "splash",
       "effect": "damage",
       "mult": 1.1
-     }
-    ]
-   },
-   {
-    "name": "Feast of the Fallen",
-    "cd": 5,
-    "startCd": 2,
-    "actions": [
-     {
-      "target": "opposite",
-      "effect": "damage",
-      "mult": 1.6,
-      "lifesteal": 0.4
      }
     ]
    }
@@ -345,13 +360,14 @@
   ]
  },
  {
-  "id": "varkhul",
-  "name": "Varkhul the Ashen",
+  "id": "korvald",
+  "name": "Korvald the Ashen",
   "faction": "War",
   "type": "Flame",
   "role": "Warrior",
-  "rarity": "epic",
+  "rarity": "Rare",
   "kind": "phys",
+  "fantasy": "A veteran of a hundred burned fields, grey with the ash of every battle he walked out of.",
   "hp": 720,
   "atk": 125,
   "armour": 50,
@@ -441,8 +457,9 @@
   "faction": "War",
   "type": "Metal",
   "role": "Tank",
-  "rarity": "epic",
+  "rarity": "Common",
   "kind": "phys",
+  "fantasy": "A brawler with a hide like boiled leather, who shouts louder than the whole war band.",
   "hp": 1000,
   "atk": 82,
   "armour": 90,
@@ -484,17 +501,6 @@
       "chance": 0.35
      }
     ]
-   },
-   {
-    "name": "Iron Hide",
-    "cd": 5,
-    "actions": [
-     {
-      "target": "self",
-      "effect": "shield",
-      "casterMaxHp": 0.15
-     }
-    ]
    }
   ],
   "ult": {
@@ -531,8 +537,9 @@
   "faction": "Hearth",
   "type": "Stone",
   "role": "Tank",
-  "rarity": "epic",
+  "rarity": "Rare",
   "kind": "phys",
+  "fantasy": "A stout grandmother with an anvil for a shield, who has never once let anyone hurt her family.",
   "hp": 950,
   "atk": 78,
   "armour": 90,
@@ -547,12 +554,12 @@
      {
       "target": "self",
       "effect": "shield",
-      "casterMaxHp": 0.1
+      "casterMaxHp": 0.09
      },
      {
       "target": "behind",
       "effect": "shield",
-      "casterMaxHp": 0.1
+      "casterMaxHp": 0.09
      }
     ]
    },
@@ -577,7 +584,7 @@
       "target": "self",
       "effect": "status",
       "status": "bulwark",
-      "pct": 0.3,
+      "pct": 0.25,
       "turns": 2
      },
      {
@@ -628,8 +635,9 @@
   "faction": "Hearth",
   "type": "Verdant",
   "role": "Support",
-  "rarity": "epic",
+  "rarity": "Rare",
   "kind": "magic",
+  "fantasy": "A heavyset camp cook whose stew mends wounds and whose ladle settles arguments.",
   "hp": 600,
   "atk": 100,
   "armour": 40,
@@ -714,8 +722,9 @@
   "faction": "Wild",
   "type": "Storm",
   "role": "Ranger",
-  "rarity": "epic",
+  "rarity": "Common",
   "kind": "phys",
+  "fantasy": "A storm-quick huntress who marks her prey and lets the pack finish it.",
   "hp": 520,
   "atk": 140,
   "armour": 30,
@@ -745,20 +754,9 @@
      {
       "target": "chain",
       "effect": "damage",
-      "mult": 0.9,
+      "mult": 1.0,
       "n": 4,
       "kind": "magic"
-     }
-    ]
-   },
-   {
-    "name": "Pounce",
-    "cd": 5,
-    "actions": [
-     {
-      "target": "back",
-      "effect": "damage",
-      "mult": 1.5
      }
     ]
    }
@@ -769,7 +767,7 @@
     {
      "target": "random",
      "effect": "damage",
-     "mult": 0.7,
+     "mult": 0.8,
      "n": 6
     }
    ]
@@ -779,7 +777,7 @@
     "name": "Pack Instinct",
     "trigger": "always",
     "mods": {
-     "dmgVsmark": 0.25
+     "dmgVsmark": 0.35
     }
    }
   ]
@@ -790,24 +788,14 @@
   "faction": "Wild",
   "type": "Verdant",
   "role": "Warrior",
-  "rarity": "epic",
+  "rarity": "Common",
   "kind": "phys",
+  "fantasy": "A horned beast-man grown over with thorns, who charges first and thinks later.",
   "hp": 780,
   "atk": 118,
   "armour": 50,
   "spirit": 35,
   "spd": 102,
-  "description": "Basic attacks chase the target his team has marked.",
-  "basic": {
-   "name": "Hunt",
-   "actions": [
-    {
-     "target": "marked",
-     "effect": "damage",
-     "mult": 1.0
-    }
-   ]
-  },
   "skills": [
    {
     "name": "Gore",
@@ -824,24 +812,6 @@
       "status": "sunder",
       "chance": 0.6,
       "pct": 0.15
-     }
-    ]
-   },
-   {
-    "name": "Thornhide",
-    "cd": 4,
-    "actions": [
-     {
-      "target": "self",
-      "effect": "shield",
-      "casterMaxHp": 0.1
-     },
-     {
-      "target": "self",
-      "effect": "status",
-      "status": "grace",
-      "targetMaxHp": 0.04,
-      "turns": 2
      }
     ]
    },
@@ -888,8 +858,9 @@
   "faction": "Forge",
   "type": "Metal",
   "role": "Controller",
-  "rarity": "epic",
+  "rarity": "Uncommon",
   "kind": "phys",
+  "fantasy": "A toy golem a smith's child built from spare parts, who jams enemy armour with rivets.",
   "hp": 580,
   "atk": 110,
   "armour": 40,
@@ -912,24 +883,6 @@
       "status": "sunder",
       "chance": 0.7,
       "pct": 0.2
-     }
-    ]
-   },
-   {
-    "name": "Overclock",
-    "cd": 4,
-    "actions": [
-     {
-      "target": "manaAlly",
-      "effect": "mana",
-      "value": 25
-     },
-     {
-      "target": "same",
-      "effect": "status",
-      "status": "tailwind",
-      "pct": 0.2,
-      "turns": 2
      }
     ]
    },
@@ -989,8 +942,9 @@
   "faction": "Forge",
   "type": "Stone",
   "role": "Tank",
-  "rarity": "epic",
+  "rarity": "Epic",
   "kind": "phys",
+  "fantasy": "A smith-knight sworn on her own anvil to stand wherever the fire is hottest.",
   "hp": 950,
   "atk": 82,
   "armour": 90,
@@ -1088,8 +1042,9 @@
   "faction": "Sea",
   "type": "Tide",
   "role": "Support",
-  "rarity": "epic",
+  "rarity": "Uncommon",
   "kind": "magic",
+  "fantasy": "A fisher-singer whose shanties pull the wounded back from drowning.",
   "hp": 600,
   "atk": 100,
   "armour": 40,
@@ -1104,23 +1059,6 @@
       "target": "lowestAlly",
       "effect": "heal",
       "mult": 1.6
-     }
-    ]
-   },
-   {
-    "name": "Undertow",
-    "cd": 4,
-    "actions": [
-     {
-      "target": "strongest",
-      "effect": "status",
-      "status": "hush",
-      "chance": 0.6
-     },
-     {
-      "target": "same",
-      "effect": "gauge",
-      "value": 0.25
      }
     ]
    },
@@ -1173,8 +1111,9 @@
   "faction": "Sea",
   "type": "Frost",
   "role": "Controller",
-  "rarity": "epic",
+  "rarity": "Rare",
   "kind": "magic",
+  "fantasy": "A pale diver from the drowned depths, who brings the cold of the sea floor up with her.",
   "hp": 580,
   "atk": 110,
   "armour": 40,
@@ -1218,7 +1157,7 @@
       "target": "opposite",
       "effect": "status",
       "status": "godstruck",
-      "chance": 0.5
+      "chance": 0.4
      },
      {
       "target": "same",
@@ -1235,7 +1174,7 @@
      "target": "fastest",
      "effect": "status",
      "status": "godstruck",
-     "chance": 0.8,
+     "chance": 0.5,
      "n": 2
     },
     {
@@ -1261,14 +1200,14 @@
   "faction": "Arcana",
   "type": "Flame",
   "role": "Caster",
-  "rarity": "epic",
+  "rarity": "Epic",
   "kind": "magic",
+  "fantasy": "An elderly, frail-looking archmage who hits harder than anyone.",
   "hp": 500,
   "atk": 142,
   "armour": 25,
   "spirit": 50,
   "spd": 100,
-  "description": "An elderly, frail-looking archmage who hits harder than anyone.",
   "skills": [
    {
     "name": "Firebolt",
@@ -1356,8 +1295,9 @@
   "faction": "Arcana",
   "type": "Storm",
   "role": "Caster",
-  "rarity": "epic",
+  "rarity": "Uncommon",
   "kind": "magic",
+  "fantasy": "A scribe whose written spells crackle off the page as lightning.",
   "hp": 500,
   "atk": 142,
   "armour": 25,
@@ -1392,23 +1332,6 @@
       "chance": 0.6
      }
     ]
-   },
-   {
-    "name": "Static Field",
-    "cd": 5,
-    "actions": [
-     {
-      "target": "backRow",
-      "effect": "damage",
-      "mult": 0.8
-     },
-     {
-      "target": "same",
-      "effect": "status",
-      "status": "godstruck",
-      "chance": 0.25
-     }
-    ]
    }
   ],
   "ult": {
@@ -1434,13 +1357,14 @@
   ]
  },
  {
-  "id": "pell",
-  "name": "Pell the Gambler",
+  "id": "jink",
+  "name": "Jink the Gambler",
   "faction": "Trickster",
   "type": "Venom",
   "role": "Ranger",
-  "rarity": "epic",
+  "rarity": "Uncommon",
   "kind": "phys",
+  "fantasy": "A card sharp who throws loaded dice and lets luck pick the target.",
   "hp": 520,
   "atk": 140,
   "armour": 30,
@@ -1454,7 +1378,7 @@
      {
       "target": "random",
       "effect": "damage",
-      "mult": 0.55,
+      "mult": 0.6,
       "n": 4
      },
      {
@@ -1488,18 +1412,7 @@
      {
       "target": "lowest",
       "effect": "damage",
-      "mult": 1.4
-     }
-    ]
-   },
-   {
-    "name": "Sleight",
-    "cd": 5,
-    "actions": [
-     {
-      "target": "mostBuffs",
-      "effect": "steal",
-      "n": 1
+      "mult": 1.6
      }
     ]
    }
@@ -1521,7 +1434,7 @@
     "name": "Lucky Coin",
     "trigger": "onDodge",
     "stats": {
-     "dodge": 0.08
+     "dodge": 0.1
     },
     "actions": [
      {
@@ -1539,14 +1452,15 @@
   "faction": "Trickster",
   "type": "Umbral",
   "role": "Warrior",
-  "rarity": "epic",
+  "rarity": "Epic",
   "kind": "phys",
+  "fantasy": "An assassin with two faces and two names, and neither of them is real.",
   "hp": 620,
   "atk": 132,
   "armour": 50,
   "spirit": 35,
   "spd": 110,
-  "description": "An assassin who dives the back row.",
+  "description": "Dives the back row.",
   "skills": [
    {
     "name": "Backstab",
@@ -1634,8 +1548,9 @@
   "faction": "Night",
   "type": "Frost",
   "role": "Ranger",
-  "rarity": "epic",
+  "rarity": "Rare",
   "kind": "phys",
+  "fantasy": "A moonlit archer whose silver arrows blind whatever they touch.",
   "hp": 520,
   "atk": 140,
   "armour": 30,
@@ -1712,8 +1627,9 @@
   "faction": "Night",
   "type": "Tide",
   "role": "Support",
-  "rarity": "epic",
+  "rarity": "Common",
   "kind": "magic",
+  "fantasy": "A keeper of dreams who soothes allies back to health and lulls enemies to sleep.",
   "hp": 600,
   "atk": 100,
   "armour": 40,
@@ -1727,14 +1643,7 @@
      {
       "target": "lowestAlly",
       "effect": "heal",
-      "mult": 1.4
-     },
-     {
-      "target": "same",
-      "effect": "status",
-      "status": "grace",
-      "mult": 0.2,
-      "turns": 2
+      "mult": 1.6
      }
     ]
    },
@@ -1746,20 +1655,7 @@
       "target": "strongest",
       "effect": "status",
       "status": "godstruck",
-      "chance": 0.45
-     }
-    ]
-   },
-   {
-    "name": "Dream Veil",
-    "cd": 5,
-    "startCd": 2,
-    "actions": [
-     {
-      "target": "allAllies",
-      "effect": "status",
-      "status": "ward",
-      "turns": 2
+      "chance": 0.6
      }
     ]
    }
@@ -1770,13 +1666,7 @@
     {
      "target": "allAllies",
      "effect": "heal",
-     "mult": 0.9
-    },
-    {
-     "target": "all",
-     "effect": "status",
-     "status": "hush",
-     "chance": 0.35
+     "mult": 1.0
     }
    ]
   },

@@ -37,7 +37,7 @@ rules = {
   "Wild": {"2":{"spd":10}, "4":{"packHunt":0.1}},
   "Forge": {"2":{"armourPct":0.15}, "4":{"shieldBonus":0.3, "thorns":0.1}},
   "Sea": {"2":{"manaRegen":10}, "4":{"tideEvery":8}},
-  "Arcana": {"2":{"haste":0.2}, "4":{"echoEvery":3, "echoPower":0.5}},
+  "Arcana": {"2":{"haste":0.2}, "4":{"recitationEvery":3, "recitationPower":0.5}},
   "Trickster": {"2":{"luckyRolls":1}, "4":{"misdirection":1}},
   "Night": {"2":{"crit":0.1, "dodge":0.1}, "4":{"moonless":1}}},
  "typeBonuses": {
@@ -55,8 +55,14 @@ rules = {
  "reliableWinShareMax": {"easy":1.0, "normal":0.9, "hard":0.5, "nightmare":0.2},
 }
 
-def hero(id, name, faction, type, role, stats, skills, ult, passives, kind="phys", basic=None, desc=None):
-    d={"id":id,"name":name,"faction":faction,"type":type,"role":role,"rarity":"epic","kind":kind}
+# Rarity sets how complex a kit is, not how useful it is (doc 06 section 9): every rarity has heroes
+# that are the best answer to some fight. The stat multiplier for each rarity is in progression.json.
+#   Common: 2 skills and a passive that only changes stats.
+#   Uncommon: 2 skills and one passive of any kind.
+#   Rare and Epic: 3 skills and one passive.
+#   Legendary: 3 skills and two passives.
+def hero(id, name, faction, type, role, rarity, fantasy, stats, skills, ult, passives, kind="phys", basic=None, desc=None):
+    d={"id":id,"name":name,"faction":faction,"type":type,"role":role,"rarity":rarity,"kind":kind,"fantasy":fantasy}
     d.update(stats)
     if desc: d["description"]=desc
     if basic: d["basic"]=basic
@@ -73,134 +79,147 @@ def s(base, **kw): d=dict(base); d.update(kw); return d
 
 heroes = [
  # Sun
- hero("solenne","Solenne of the Noon","Sun","Radiant","Warrior", s(WAR, atk=130),
+ hero("solenne","Solenne of the Noon","Sun","Radiant","Warrior","Legendary",
+  "A sun-crowned executioner who passes judgement at high noon, when no shadow is left to hide in.", s(WAR, atk=130),
   [S("Dawnstrike",3, dmg("opposite",1.4)),
    S("Searing Verdict",4, dmg("lowest",1.3, execute=0.12)),
    S("Noon's Blessing",5, st("allAllies","grace",mult=0.25,turns=2), startCd=1)],
   U("Executioner's Verdict", dmg("lowest",2.2, repeatOnKill=2)),
-  [P("Unbowed","hpBelow",[A("self","shield",casterMaxHp=0.2)], hpBelow=0.4, once=True)]),
- hero("oriel","Oriel of the Last Light","Sun","Radiant","Support", SUP,
-  [S("Kindle",3, A("lowestAlly","heal",mult=1.6)),
+  [P("Unbowed","hpBelow",[A("self","shield",casterMaxHp=0.2)], hpBelow=0.4, once=True),
+   P("High Noon","afterUlt",[st("allAllies","grace",mult=0.15,turns=2)])]),
+ hero("oriel","Oriel of the Last Light","Sun","Radiant","Support","Epic",
+  "A lantern-bearer who kept the last of the sun burning through the Long Night, and spends it to heal.", SUP,
+  [S("Kindle",3, A("lowestAlly","heal",mult=1.5)),
    S("Halo",4, A("lowestAlly","shield",mult=1.8), st("same","bulwark",pct=0.2,turns=2)),
    S("Dawn Chorus",5, A("allAllies","heal",mult=0.7), startCd=2)],
   U("Sunrise", A("allAllies","heal",mult=1.0), A("allAllies","cleanse",n=1)),
   [P("Lantern", stats={"healPower":0.1})], kind="magic"),
  # Grave
- hero("mordecai","Mordecai the Ferryman","Grave","Umbral","Controller", CON,
+ hero("mordecai","Mordecai the Ferryman","Grave","Umbral","Controller","Legendary",
+  "The boatman of the dead, who still collects his toll and sometimes rows a fallen friend back.", CON,
   [S("Grave Toll",3, dmg("mostMana",1.1), A("same","mana",value=-30), A("lowestManaAlly","mana",value=30)),
-   S("Hush of the Tomb",4, st("fastest","hush",chance=0.7,turns=1)),
+   S("Hush of the Tomb",4, st("fastest","hush",chance=0.8,turns=1)),
    S("Bone Chill",5, st("all","blight",chance=0.5,mult=0.15,turns=2))],
   U("Last Rites", dmg("all",1.0), A("fallenAlly","revive",pct=0.25)),
-  [P("Ferryman's Due","allyFalls",[dmg("contextAttacker",1.2)])], kind="magic"),
- hero("vesna","Vesna Gravebloom","Grave","Venom","Warrior", WAR,
+  [P("Ferryman's Due","allyFalls",[dmg("contextAttacker",1.2)]),
+   P("Coin for the Crossing","onKill",[A("lowestManaAlly","mana",value=20)])], kind="magic"),
+ hero("vesna","Vesna Gravebloom","Grave","Venom","Warrior","Uncommon",
+  "A gravedigger whose scythe leaves rot-flowers growing in everything it cuts.", WAR,
   [S("Rotbloom",3, st("highest","blight",chance=0.8,mult=0.3,turns=2), dmg("same",0.8)),
-   S("Reaper's Arc",4, dmg("splash",1.1)),
-   S("Feast of the Fallen",5, dmg("opposite",1.6, lifesteal=0.4), startCd=2)],
+   S("Reaper's Arc",4, dmg("splash",1.1))],
   U("Plaguewind", st("all","blight",chance=0.7,mult=0.25,turns=3), dmg("all",0.7)),
   [P("Deathless","hpBelow",[A("self","heal",targetMaxHp=0.25)], hpBelow=0.25, once=True)]),
  # War
- hero("varkhul","Varkhul the Ashen","War","Flame","Warrior", s(WAR, hp=1450),
+ hero("korvald","Korvald the Ashen","War","Flame","Warrior","Rare",
+  "A veteran of a hundred burned fields, grey with the ash of every battle he walked out of.", s(WAR, hp=1450),
   [S("Cleave",3, dmg("splash",1.0), st("same","pyre",chance=0.6,mult=0.15)),
    S("Spearwall",4, dmg("pierce",1.3, bonusVsExposed=1.0)),
    S("Battle Cry",5, st("self","bloodrite",pct=0.1,turns=3))],
   U("Red Harvest", dmg("frontRow",1.6), st("same","pyre",chance=0.8,mult=0.2)),
   [P("Bloodlust","onKill",[st("self","bloodrite",pct=0.1,turns=3)])]),
- hero("brannoc","Brannoc Thickhide","War","Metal","Tank", s(TANK, hp=2000, atk=82),
+ hero("brannoc","Brannoc Thickhide","War","Metal","Tank","Common",
+  "A brawler with a hide like boiled leather, who shouts louder than the whole war band.", s(TANK, hp=2000, atk=82),
   [S("Challenge",4, st("self","challenge",turns=2), st("self","bulwark",pct=0.25,turns=2)),
-   S("Shield Bash",3, dmg("opposite",0.9), st("same","godstruck",chance=0.35)),
-   S("Iron Hide",5, A("self","shield",casterMaxHp=0.15))],
+   S("Shield Bash",3, dmg("opposite",0.9), st("same","godstruck",chance=0.35))],
   U("Warlord's Roar", st("self","challenge",turns=2), st("allAllies","bloodrite",pct=0.1,turns=3)),
   [P("Thick Hide", stats={"armourPct":0.1})]),
  # Hearth
- hero("hilde","Grandmother Hilde Ashanvil","Hearth","Stone","Tank", TANK,
-  [S("Anvil Guard",3, A("self","shield",casterMaxHp=0.1), A("behind","shield",casterMaxHp=0.1)),
+ hero("hilde","Grandmother Hilde Ashanvil","Hearth","Stone","Tank","Rare",
+  "A stout grandmother with an anvil for a shield, who has never once let anyone hurt her family.", TANK,
+  [S("Anvil Guard",3, A("self","shield",casterMaxHp=0.09), A("behind","shield",casterMaxHp=0.09)),
    S("Stoke the Hearth",4, st("behind","grace",targetMaxHp=0.05,turns=2)),
-   S("Old Iron",5, st("self","bulwark",pct=0.3,turns=2), st("self","challenge",turns=1))],
+   S("Old Iron",5, st("self","bulwark",pct=0.25,turns=2), st("self","challenge",turns=1))],
   U("Hold the Line", st("self","challenge",turns=2), st("self","bulwark",pct=0.5,turns=2), A("allAllies","shield",casterMaxHp=0.06)),
   [P("Hearthwarden", mods={"intercept":1})], desc="Takes dives aimed at the heroes behind her."),
- hero("grub","Big Grub Marrow","Hearth","Verdant","Support", SUP,
+ hero("grub","Big Grub Marrow","Hearth","Verdant","Support","Rare",
+  "A heavyset camp cook whose stew mends wounds and whose ladle settles arguments.", SUP,
   [S("Hearty Stew",3, A("lowestAlly","heal",mult=1.5)),
    S("Second Helping",4, st("allAllies","grace",mult=0.2,turns=2)),
    S("Kitchen Brawl",5, dmg("opposite",1.2), st("same","godstruck",chance=0.3), startCd=2)],
   U("Harvest Feast", A("allAllies","heal",mult=1.0), A("allAllies","cleanse",n=1)),
   [P("Well Fed","battleStart",[A("allAllies","shield",targetMaxHp=0.05)])], kind="magic"),
  # Wild
- hero("kesh","Kesh Swiftclaw","Wild","Storm","Ranger", RNG,
+ hero("kesh","Kesh Swiftclaw","Wild","Storm","Ranger","Common",
+  "A storm-quick huntress who marks her prey and lets the pack finish it.", RNG,
   [S("Hunter's Mark",4, A("fastest","mark",turns=3), dmg("same",1.0)),
-   S("Chain of Storms",3, dmg("chain",0.9, n=4, kind="magic")),
-   S("Pounce",5, dmg("back",1.5))],
-  U("Stampede", dmg("random",0.7, n=6)),
-  [P("Pack Instinct", mods={"dmgVsmark":0.25})]),
- hero("gorran","Gorran Bramblehorn","Wild","Verdant","Warrior", s(WAR, hp=1550, atk=118),
+   S("Chain of Storms",3, dmg("chain",1.0, n=4, kind="magic"))],
+  U("Stampede", dmg("random",0.8, n=6)),
+  [P("Pack Instinct", mods={"dmgVsmark":0.35})]),
+ hero("gorran","Gorran Bramblehorn","Wild","Verdant","Warrior","Common",
+  "A horned beast-man grown over with thorns, who charges first and thinks later.", s(WAR, hp=1550, atk=118),
   [S("Gore",3, dmg("opposite",1.3), st("same","sunder",chance=0.6,pct=0.15)),
-   S("Thornhide",4, A("self","shield",casterMaxHp=0.1), st("self","grace",targetMaxHp=0.04,turns=2)),
    S("Trample",5, dmg("frontRow",0.9))],
   U("Wild Charge", dmg("pierce",2.0), A("same","gauge",value=0.3)),
-  [P("Bramble", mods={"thorns":0.08})], basic=U("Hunt", dmg("marked",1.0)), desc="Basic attacks chase the target his team has marked."),
+  [P("Bramble", mods={"thorns":0.08})]),
  # Forge
- hero("pip","Pip the Tinker Golem","Forge","Metal","Controller", CON,
+ hero("pip","Pip the Tinker Golem","Forge","Metal","Controller","Uncommon",
+  "A toy golem a smith's child built from spare parts, who jams enemy armour with rivets.", CON,
   [S("Rivet Shot",3, dmg("strongest",1.0), st("same","sunder",chance=0.7,pct=0.2)),
-   S("Overclock",4, A("manaAlly","mana",value=25), st("same","tailwind",pct=0.2,turns=2)),
    S("Spanner in the Works",5, st("fastest","godstruck",chance=0.5), dmg("same",0.8))],
   U("Grand Contraption", dmg("all",0.8), st("all","sunder",chance=0.6,pct=0.2)),
   [P("Self-Repair","turnStart",[A("self","shield",casterMaxHp=0.06)], every=3)]),
- hero("dagna","Dagna Ironvow","Forge","Stone","Tank", s(TANK, atk=82),
+ hero("dagna","Dagna Ironvow","Forge","Stone","Tank","Epic",
+  "A smith-knight sworn on her own anvil to stand wherever the fire is hottest.", s(TANK, atk=82),
   [S("Molten Aegis",3, A("self","shield",casterMaxHp=0.12), st("self","bulwark",pct=0.2,turns=2)),
    S("Hammerfall",4, dmg("opposite",1.0), st("same","godstruck",chance=0.35)),
    S("Rockslide",5, dmg("splash",0.8), st("same","sunder",chance=0.5,pct=0.15))],
   U("Mountain's Oath", st("self","challenge",turns=2), A("allAllies","shield",casterMaxHp=0.07), dmg("frontRow",0.8)),
   [P("Anvil-Born", stats={"armourPct":0.1})]),
  # Sea
- hero("maren","Maren Saltsong","Sea","Tide","Support", SUP,
+ hero("maren","Maren Saltsong","Sea","Tide","Support","Uncommon",
+  "A fisher-singer whose shanties pull the wounded back from drowning.", SUP,
   [S("Brine Mending",3, A("lowestAlly","heal",mult=1.6)),
-   S("Undertow",4, st("strongest","hush",chance=0.6), A("same","gauge",value=0.25)),
    S("Tidal Ward",5, A("allAllies","cleanse",n=1))],
   U("High Tide", A("allAllies","heal",mult=0.8), st("allAllies","ward",turns=2)),
   [P("Revenge of the Drowned","allyFalls",[dmg("contextAttacker",1.5)], once=True)], kind="magic"),
- hero("seraphine","Seraphine of the Deep","Sea","Frost","Controller", CON,
+ hero("seraphine","Seraphine of the Deep","Sea","Frost","Controller","Rare",
+  "A pale diver from the drowned depths, who brings the cold of the sea floor up with her.", CON,
   [S("Glacial Spear",3, dmg("pierce",1.1)),
    S("Riptide",4, A("fastest","gauge",value=0.4), dmg("same",0.7)),
-   S("Deep Freeze",5, st("opposite","godstruck",chance=0.5), dmg("same",1.0), startCd=1)],
-  U("Glacier Prison", st("fastest","godstruck",chance=0.8,n=2), dmg("same",1.2)),
+   S("Deep Freeze",5, st("opposite","godstruck",chance=0.4), dmg("same",1.0), startCd=1)],
+  U("Glacier Prison", st("fastest","godstruck",chance=0.5,n=2), dmg("same",1.2)),
   [P("Cold Current", mods={"dmgVsgodstruck":0.2})], kind="magic"),
  # Arcana
- hero("thessaly","Old Thessaly","Arcana","Flame","Caster", CAS,
+ hero("thessaly","Old Thessaly","Arcana","Flame","Caster","Epic",
+  "An elderly, frail-looking archmage who hits harder than anyone.", CAS,
   [S("Firebolt",2, dmg("front",1.3), st("same","pyre",chance=0.7,mult=0.15)),
    S("Flame Wreath",4, dmg("splash",1.0), st("same","pyre",chance=0.5,mult=0.15)),
    S("Borrowed Time",5, A("manaAlly","mana",value=30), A("same","resetCd",n=1))],
   U("Meteor", dmg("all",1.3), st("all","pyre",chance=0.5,mult=0.15)),
-  [P("Study of Ruin", mods={"dmgVspyre":0.2})], kind="magic", desc="An elderly, frail-looking archmage who hits harder than anyone."),
- hero("quill","Quill the Inkwright","Arcana","Storm","Caster", CAS,
+  [P("Study of Ruin", mods={"dmgVspyre":0.2})], kind="magic"),
+ hero("quill","Quill the Inkwright","Arcana","Storm","Caster","Uncommon",
+  "A scribe whose written spells crackle off the page as lightning.", CAS,
   [S("Lightning Script",3, dmg("chain",1.0, n=3)),
-   S("Runic Seal",4, A("mostBuffs","strip",n=1), st("same","hush",chance=0.6)),
-   S("Static Field",5, dmg("backRow",0.8), st("same","godstruck",chance=0.25))],
+   S("Runic Seal",4, A("mostBuffs","strip",n=1), st("same","hush",chance=0.6))],
   U("Thunder Codex", dmg("chain",1.4, n=5, falloff=0.15)),
   [P("Annotated", stats={"haste":0.1})], kind="magic"),
  # Trickster
- hero("pell","Pell the Gambler","Trickster","Venom","Ranger", RNG,
-  [S("Ninefold Lots",3, dmg("random",0.55, n=4), st("same","pyre",chance=0.35,mult=0.1), st("same","eclipse",chance=0.35,pct=0.15), st("same","sunder",chance=0.35,pct=0.15)),
-   S("Loaded Dice",4, dmg("lowest",1.4), range="wild"),
-   S("Sleight",5, A("mostBuffs","steal",n=1))],
+ hero("jink","Jink the Gambler","Trickster","Venom","Ranger","Uncommon",
+  "A card sharp who throws loaded dice and lets luck pick the target.", RNG,
+  [S("Ninefold Lots",3, dmg("random",0.6, n=4), st("same","pyre",chance=0.35,mult=0.1), st("same","eclipse",chance=0.35,pct=0.15), st("same","sunder",chance=0.35,pct=0.15)),
+   S("Loaded Dice",4, dmg("lowest",1.6), range="wild")],
   U("Jackpot", dmg("random",0.6, n=7), range="wild"),
-  [P("Lucky Coin","onDodge",[A("self","mana",value=15)], stats={"dodge":0.08})]),
- hero("wren","Wren Twofaces","Trickster","Umbral","Warrior", s(WAR, hp=1250, atk=132, spd=110),
+  [P("Lucky Coin","onDodge",[A("self","mana",value=15)], stats={"dodge":0.1})]),
+ hero("wren","Wren Twofaces","Trickster","Umbral","Warrior","Epic",
+  "An assassin with two faces and two names, and neither of them is real.", s(WAR, hp=1250, atk=132, spd=110),
   [S("Backstab",3, dmg("back",1.5, bonusVsExposed=0.5)),
    S("Smoke and Mirrors",4, st("self","ward",turns=2), st("self","tailwind",pct=0.25,turns=2)),
    S("Cutpurse",5, dmg("mostMana",1.0), A("same","mana",value=-25), A("self","mana",value=25))],
   U("Vanishing Act", dmg("back",2.5), st("self","ward",turns=2)),
-  [P("Two Faces", stats={"dodge":0.1, "crit":0.1})], desc="An assassin who dives the back row."),
+  [P("Two Faces", stats={"dodge":0.1, "crit":0.1})], desc="Dives the back row."),
  # Night
- hero("ysolde","Ysolde Nightglass","Night","Frost","Ranger", RNG,
+ hero("ysolde","Ysolde Nightglass","Night","Frost","Ranger","Rare",
+  "A moonlit archer whose silver arrows blind whatever they touch.", RNG,
   [S("Moonshot",3, dmg("back",1.3), st("same","eclipse",chance=0.6,pct=0.2)),
    S("Silver Volley",4, dmg("random",0.8, n=3, distinct=True)),
    S("Dream Thief",5, A("mostBuffs","steal",n=1))],
   U("Eclipse Arrow", dmg("lowest",2.4)),
   [P("Night Sight", stats={"crit":0.1, "acc":0.1})]),
- hero("somna","Somna the Dreamwarden","Night","Tide","Support", SUP,
-  [S("Moonwell",3, A("lowestAlly","heal",mult=1.4), st("same","grace",mult=0.2,turns=2)),
-   S("Lull",4, st("strongest","godstruck",chance=0.45)),
-   S("Dream Veil",5, st("allAllies","ward",turns=2), startCd=2)],
-  U("Sweet Dreams", A("allAllies","heal",mult=0.9), st("all","hush",chance=0.35)),
+ hero("somna","Somna the Dreamwarden","Night","Tide","Support","Common",
+  "A keeper of dreams who soothes allies back to health and lulls enemies to sleep.", SUP,
+  [S("Moonwell",3, A("lowestAlly","heal",mult=1.6)),
+   S("Lull",4, st("strongest","godstruck",chance=0.6))],
+  U("Sweet Dreams", A("allAllies","heal",mult=1.0)),
   [P("Moonlit", stats={"dodge":0.05, "healPower":0.1})], kind="magic"),
 ]
 
@@ -263,4 +282,27 @@ for n,o in [("heroes",heroes),("enemies",enemies)]:
 dump("stages", stages, per_line=True)
 print(len(heroes), len(enemies), len(stages))
 from collections import Counter
-print(Counter(h["type"] for h in heroes)); print(Counter(h["faction"] for h in heroes)); print(Counter(h["role"] for h in heroes))
+print(Counter(h["type"] for h in heroes)); print(Counter(h["faction"] for h in heroes)); print(Counter(h["role"] for h in heroes)); print(Counter(h["rarity"] for h in heroes))
+
+# Kit complexity by rarity (top of the hero list): skills, passives, and whether passives may only change stats.
+KIT = {"Common":(2,1,True), "Uncommon":(2,1,False), "Rare":(3,1,False), "Epic":(3,1,False), "Legendary":(3,2,False)}
+for h in heroes:
+    skills, passives, stats_only = KIT[h["rarity"]]
+    assert len(h["skills"]) == skills and len(h["passives"]) == passives, f"{h['name']}: a {h['rarity']} kit has {skills} skills and {passives} passive(s)"
+    assert not stats_only or all(p["trigger"] == "always" and "actions" not in p for p in h["passives"]), f"{h['name']}: a Common passive only changes stats"
+    assert "basic" not in h or h["rarity"] not in ("Common", "Uncommon"), f"{h['name']}: Common and Uncommon heroes use the default basic attack"
+
+# No hero shares or nearly shares a dead god's name (doc 12 sections 8 and 12): no name word within
+# one letter of a god's name, or starting with the same four letters.
+GODS = ["Maelin", "Varkas", "Sethis", "Auren", "Selvane", "Pell", "Ithren", "Thalvos", "Kethra", "Rhoan"]
+def distance(a, b):
+    row = list(range(len(b) + 1))
+    for i, x in enumerate(a, 1):
+        prev, row[0] = row[0], i
+        for j, y in enumerate(b, 1): prev, row[j] = row[j], min(row[j] + 1, row[j - 1] + 1, prev + (x != y))
+    return row[-1]
+for u in heroes + enemies:
+    for word in u["name"].replace("'", " ").split():
+        for god in GODS:
+            w, g = word.lower(), god.lower()
+            assert distance(w, g) > 1 and w[:4] != g[:4], f"{u['name']}: too close to the god {god}"

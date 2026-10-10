@@ -28,6 +28,7 @@ static class Program
         Test("Teams are saved per battle", Teams);
         Test("A damaged save starts a new game and is kept aside", Damaged);
         Test("An older save is upgraded", OlderVersion);
+        Test("A version 1 save keeps renamed heroes in its teams", RenamedHeroes);
         Test("Sections a later system adds are kept, and missing ones get defaults", Sections);
         Test("Saving replaces the file in one step", Writing);
         Test("Reset progress", Reset);
@@ -156,32 +157,49 @@ static class Program
 
     static void OlderVersion(string folder)
     {
-        // Version 1 is the only format so far, so the test pretends the game is at version 2, whose one
-        // upgrade step gives every older save a "heroes" section with the starter hero.
-        var v1 = new SaveData();
-        v1.Stars["c0-0"] = new List<int> { 1 };
-        v1.Stars["c0-1"] = new List<int> { 1 };
-        v1.Furthest["normal"] = "c0-1";
-        v1.LastTeam = new SavedTeam("2-3", new[] { new TeamSlot("hilde", "front0") });
-        string v1Json = v1.ToJson();
-        var upgrades = new List<Func<Dictionary<string, object>, Dictionary<string, object>>>
+        // The test pretends the game is one version newer than it is, with an extra upgrade step that
+        // gives every older save a "heroes" section with the starter hero.
+        int next = SaveData.CurrentVersion + 1;
+        var old = new SaveData();
+        old.Stars["c0-0"] = new List<int> { 1 };
+        old.Stars["c0-1"] = new List<int> { 1 };
+        old.Furthest["normal"] = "c0-1";
+        old.LastTeam = new SavedTeam("2-3", new[] { new TeamSlot("hilde", "front0") });
+        string oldJson = old.ToJson();
+        var upgrades = new List<Func<Dictionary<string, object>, Dictionary<string, object>>>(SaveData.Upgrades)
         {
             root => { root["heroes"] = new Dictionary<string, object> { ["hilde"] = new Dictionary<string, object> { ["level"] = 1.0 } }; return root; },
         };
-        SaveData ReadV2(string text) => SaveData.FromJson(text, 2, upgrades);
+        SaveData ReadNext(string text) => SaveData.FromJson(text, next, upgrades);
 
-        var upgraded = ReadV2(v1Json);
-        Expect(upgraded.Version == 2, "the upgraded save is at the new version");
+        var upgraded = ReadNext(oldJson);
+        Expect(upgraded.Version == next, "the upgraded save is at the new version");
         Expect(upgraded.Stars.Keys.OrderBy(k => k).SequenceEqual(new[] { "c0-0", "c0-1" }) && upgraded.Furthest["normal"] == "c0-1" && upgraded.LastTeam.Heroes[0].Id == "hilde", "everything in the old save survives the upgrade");
-        Expect(upgraded.ToJson().Contains("\"version\": 2") && upgraded.ToJson().Contains("\"heroes\""), "it is written back as the new version, with the new section");
+        Expect(upgraded.ToJson().Contains($"\"version\": {next}") && upgraded.ToJson().Contains("\"heroes\""), "it is written back as the new version, with the new section");
 
         var store = new SaveStore(folder);
-        File.WriteAllText(store.FilePath, v1Json);
-        var loaded = store.Load(out string problem, ReadV2);
-        Expect(problem == null && loaded.Version == 2 && loaded.Stars.Count == 2, "an older save on the device loads through the upgrade, not as damaged");
+        File.WriteAllText(store.FilePath, oldJson);
+        var loaded = store.Load(out string problem, ReadNext);
+        Expect(problem == null && loaded.Version == next && loaded.Stars.Count == 2, "an older save on the device loads through the upgrade, not as damaged");
         Expect(Directory.GetFiles(folder, "save.damaged-*.json").Length == 0, "nothing is set aside");
 
-        Expect(SaveData.FromJson(v1Json).Version == SaveData.CurrentVersion, "a current-version save needs no upgrade");
+        Expect(SaveData.FromJson(oldJson).Version == SaveData.CurrentVersion, "a current-version save needs no upgrade");
+    }
+
+    static void RenamedHeroes(string folder)
+    {
+        // Version 2 renamed Pell the Gambler to Jink and Varkhul the Ashen to Korvald (E4-F1-S1).
+        string v1 = "{\"version\": 1, \"campaign\": {\"stars\": {\"c0-0\": [1]}, \"furthest\": {\"normal\": \"c0-0\"}}, \"teams\": {" +
+            "\"last\": {\"formation\": \"2-3\", \"heroes\": [{\"hero\": \"varkhul\", \"slot\": \"front0\"}, {\"hero\": \"hilde\", \"slot\": \"front1\"}, {\"hero\": \"pell\", \"slot\": \"back0\"}, {\"hero\": \"grub\", \"slot\": \"back1\"}, {\"hero\": \"maren\", \"slot\": \"back2\"}]}, " +
+            "\"battles\": {\"c0-0\": {\"formation\": \"2-3\", \"heroes\": [{\"hero\": \"pell\", \"slot\": \"back0\"}]}}}}";
+        var store = new SaveStore(folder);
+        File.WriteAllText(store.FilePath, v1);
+        var progress = Progress(folder, out var warnings);
+        Expect(warnings.Count == 0 && progress.Save.Version == SaveData.CurrentVersion && progress.IsCleared("c0-0"), "it loads at the current version with its progress");
+        Expect(Slots(progress.Save.LastTeam.Heroes) == "grub@back1,hilde@front1,jink@back0,korvald@front0,maren@back2" && progress.Save.Teams["c0-0"].Heroes[0].Id == "jink", "both renamed heroes keep their slots, in every saved team");
+        Expect(Slots(progress.LoadTeam(realm[1].Id)) == Slots(progress.Save.LastTeam.Heroes), "the game puts the saved team back on the team screen");
+        progress.Write();
+        Expect(!File.ReadAllText(store.FilePath).Contains("pell") && !File.ReadAllText(store.FilePath).Contains("varkhul"), "the old ids are gone from the save written back");
     }
 
     static void Sections(string folder)

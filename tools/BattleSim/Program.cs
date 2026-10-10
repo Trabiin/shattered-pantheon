@@ -73,6 +73,7 @@ static partial class Program
     }
 
     const string DataPath = "Unity/Assets/Resources/BattleData";
+    static readonly string[] Rarities = { "Common", "Uncommon", "Rare", "Epic", "Legendary" };
 
     // "id" entries are auto-placed; "id@slot" entries are placed where given.
     static List<TeamSlot> Place(IList<string> ids) => ids.All(i => i.Contains('@'))
@@ -153,6 +154,7 @@ static partial class Program
         o.Append($"{teamCount} random 5-hero teams × {runs} fights per stage, auto-placed (tanks and warriors in front). Fight length assumes {R.SecondsPerActionAt1x.ToString(CultureInfo.InvariantCulture)}s per action at 1x.*\n\n");
         var flags = new List<string>();
         var overallLift = data.Heroes.ToDictionary(h => h.Id, h => 0.0);
+        var stageRanks = new List<(string Stage, List<string> Ranked)>();   // heroes by win-rate difference, best first, on stages where one helps
 
         foreach (var st in data.Stages)
         {
@@ -212,18 +214,34 @@ static partial class Program
                 return (h.Id, h.Name, Avg: avg, Lift: avg - overall);
             }).OrderByDescending(l => l.Lift).ToList();
             foreach (var l in lift) overallLift[l.Id] += l.Lift / data.Stages.Count;
+            if (lift[0].Lift > 0.005) stageRanks.Add((st.Name, lift.Select(l => l.Id).ToList()));
             o.Append($"<details><summary>Win rate of teams that include each hero (average {Pct(overall)})</summary>\n\n| Hero | Win rate with hero | Difference |\n|---|---|---|\n");
             foreach (var l in lift) o.Append($"| {l.Name} | {Pct(l.Avg)} | {Pts(l.Lift)} |\n");
             o.Append("\n</details>\n\n");
             if (lift[0].Lift > 0.25) flags.Add($"**{st.Name}:** {lift[0].Name} looks like a must-have ({Pts(lift[0].Lift)}). Check that other answers exist.");
         }
 
-        o.Append("## Heroes across all stages\n\nAverage difference in win rate when a hero is in the team. Big positive numbers suggest a hero is too strong, big negative ones too weak.\n\n| Hero | Faction | Type | Role | Difference |\n|---|---|---|---|---|\n");
+        o.Append("## Heroes across all stages\n\nAverage difference in win rate when a hero is in the team. Big positive numbers suggest a hero is too strong, big negative ones too weak. Heroes fight at their listed stats here, whatever their rarity: rarity's stat multiplier is a progression rule (`progression.json`), so this compares kits.\n\n| Hero | Rarity | Faction | Type | Role | Difference |\n|---|---|---|---|---|---|\n");
         foreach (var kv in overallLift.OrderByDescending(k => k.Value))
         {
             var h = data.Hero(kv.Key);
-            o.Append($"| {h.Name} | {h.Faction} | {h.Type} | {h.Role} | {Pts(kv.Value)} |\n");
+            o.Append($"| {h.Name} | {h.Rarity} | {h.Faction} | {h.Type} | {h.Role} | {Pts(kv.Value)} |\n");
             if (Math.Abs(kv.Value) > 0.12) flags.Add($"**{h.Name}:** {Pts(kv.Value)} on average across stages.");
+        }
+        o.Append('\n');
+
+        // No rarity is useless (doc 06 section 9): each one has a hero that does the most for its team on some stage.
+        o.Append("## Rarities\n\nFor each rarity, the stages where one of its heroes lifts a team's win rate more than any other hero does (stages that every team wins don't count).\n\n| Rarity | Heroes | Best answer on |\n|---|---|---|\n");
+        foreach (var rarity in data.Heroes.Select(h => h.Rarity).Distinct().OrderBy(r => Array.IndexOf(Rarities, r)))
+        {
+            var ids = data.Heroes.Where(h => h.Rarity == rarity).Select(h => h.Id).ToList();
+            var best = stageRanks.Where(r => ids.Contains(r.Ranked[0])).Select(r => $"{r.Stage} ({data.Hero(r.Ranked[0]).Name})").ToList();
+            o.Append($"| {rarity} | {ids.Count} | {(best.Count > 0 ? string.Join(", ", best) : "none")} |\n");
+            if (best.Count == 0)
+            {
+                int top = stageRanks.Min(r => r.Ranked.FindIndex(ids.Contains)) + 1;
+                flags.Add($"**{rarity}:** no {rarity} hero is the best answer to any stage (its best is number {top} of {data.Heroes.Count}).");
+            }
         }
         o.Append('\n');
         o.Append("## Flags\n\n" + (flags.Count > 0 ? string.Join("\n", flags.Select(f => "- " + f)) : "- None.") + "\n");

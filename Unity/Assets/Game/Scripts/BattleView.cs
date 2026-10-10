@@ -85,7 +85,7 @@ namespace ShatteredPantheon.Game
                     if (e.Detail == "stunned") { Popup(actor, "Godstruck", Palette.Status, 30); logLine.text = $"{actor.Name} is Godstruck"; }
                     else if (e.Detail.StartsWith("ult:")) { Popup(actor, e.Detail.Substring(4), Palette.Ult, 34); logLine.text = $"{actor.Name} unleashes <b>{e.Detail.Substring(4)}</b>"; }
                     else if (e.Detail.StartsWith("skill:")) logLine.text = $"{actor.Name} uses <b>{e.Detail.Substring(6)}</b>";
-                    else if (e.Detail.StartsWith("echo:")) logLine.text = $"{actor.Name}'s <b>{e.Detail.Substring(5)}</b> echoes";
+                    else if (e.Detail.StartsWith("recitation:")) logLine.text = $"{actor.Name} recites <b>{e.Detail.Substring(11)}</b> again";
                     else if (e.Detail.StartsWith("passive:")) Popup(actor, e.Detail.Substring(8), Palette.Ritual, 26);
                     else logLine.text = $"{actor.Name} attacks";
                     break;

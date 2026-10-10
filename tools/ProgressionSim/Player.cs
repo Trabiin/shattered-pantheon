@@ -62,7 +62,7 @@ class Player
         rng = new Random((int)(seed * 7919 % int.MaxValue));
         stars = new int[c.Difficulties.Count, c.BattlesPerDifficulty];
         stageChests = new int[c.Difficulties.Count, c.Stages];
-        foreach (var kit in c.Starters) Gain(cards.First(h => h.Kit == kit && h.Rarity == c.StarterRarity), false, "Starters");
+        foreach (var kit in c.Starters) Gain(cards.First(h => h.Kit == kit && h.ReleaseDay == 0), false, "Starters");
         foreach (var g in c.Guarantees) sinceRarity[g.rarity] = 0;
         shards = c.StartingGodshards;   // the first 10-pull, a few minutes in
     }

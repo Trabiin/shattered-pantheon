@@ -26,7 +26,7 @@ A mobile auto-battle gacha game, built in Unity. Design docs live in the project
 3. The game's scene is created automatically (`Assets/Scenes/Main.unity`). Open it and press **Play**. If it's missing, use the menu **Shattered Pantheon > Rebuild Main Scene**.
 4. In the Game view, pick a portrait phone resolution (for example 1080x1920) to see it as on a phone.
 
-The game opens on the campaign: realm 1 (Hearth) on Normal, its 10 stages with 4 battles each (battle 4 is the stage boss; stage 10's is the realm boss). Battles open in order: a new game opens only the first battle, each win opens the next, and beating a stage boss opens the next stage (locked battles are greyed out and say **Locked**). Cleared battles can always be replayed. Tap an open battle, set your team and formation (tap a slot, then a hero; the formation button switches between 2 in front and 3 in front), and press **Fight!**. The fight plays itself (tap the speed button for 1x/2x/3x, **Retreat** to go back), then the results show what each hero did, and won battles show as **Cleared**. Heroes have no levels yet, so in each battle they fight at the strength the campaign was balanced for there.
+The game opens on the campaign: realm 1 (Hearth) on Normal, its 10 stages with 4 battles each (battle 4 is the stage boss; stage 10's is the realm boss). Battles open in order: a new game opens only the first battle, each win opens the next, and beating a stage boss opens the next stage (locked battles are greyed out and say **Locked**). Cleared battles can always be replayed. Tap an open battle, set your team and formation (tap a slot, then a hero; the formation button switches between 2 in front and 3 in front), and press **Fight!**. The fight plays itself (tap the speed button for 1x/2x/3x, **Retreat** to go back), then the results show what each hero did, and won battles show as **Cleared**. Heroes have no levels yet and their rarity doesn't change their strength yet, so in each battle they fight at the strength the campaign was balanced for there.
 
 ## Your save
 
@@ -42,7 +42,7 @@ Until the build settings name the app, Unity uses `DefaultCompany` and `Unity` f
 
 **To start again:** tap **Reset progress** at the bottom of the campaign screen, then **Tap again to reset**. Or close the game and delete `save.json`. The button is for testing and goes before the closed test.
 
-**A damaged save** (one that can't be read) never stops the game: it's renamed to `save.damaged-<date>-<time>.json` in the same folder for checking, and the game starts new. The file is JSON with a `version` number; later systems (heroes, currencies, items) add their own sections, and a format change adds an upgrade step in `SaveData.cs` so older saves keep working.
+**A damaged save** (one that can't be read) never stops the game: it's renamed to `save.damaged-<date>-<time>.json` in the same folder for checking, and the game starts new. The file is JSON with a `version` number; later systems (heroes, currencies, items) add their own sections, and a change that older saves need (a new format, or a renamed hero in a saved team) bumps the version and adds an upgrade step in `SaveData.cs`, so older saves keep working.
 
 ## Run the simulator
 
@@ -66,7 +66,8 @@ dotnet run --project tools/ProgressionSim -c Release -- --build-campaign      # 
 Every pull request runs these on GitHub (`.github/workflows/`):
 - **Unity compile:** the game and editor scripts are compiled against the real Unity 6.3 libraries, taken from an official Unity editor image (from Docker Hub, or Google's copy of it if Docker Hub fails) and kept in GitHub's cache until a newer image comes out. No Unity licence is needed.
 - **Screen smoke test:** `dotnet run --project tools/ScreenSmokeTest` plays the screens on a stand-in for Unity, like a player would (locked battles can't be started, then all 40 realm 1 battles in order, each win opening the next, retrying lost ones, then closing and reopening the game and resetting progress), and fails on errors or on fights that differ from the engine.
-- **Save tests:** `dotnet run --project tools/SaveTests` saves and reloads progress, and checks a new game, damaged saves, upgrading an older version and resetting.
+- **Save tests:** `dotnet run --project tools/SaveTests` saves and reloads progress, and checks a new game, damaged saves, upgrading an older version (version 1 saves keep the renamed heroes Jink and Korvald in their teams) and resetting.
 - **Campaign order tests:** `dotnet run --project tools/CampaignTests` checks the order battles open in across all 4 difficulties: a new game, each win, stage and realm bosses, the next difficulty, replays and a reloaded save.
+- **Battle data:** the files `tools/BattleData/gen_data.py` writes match the ones in the repository, and its checks pass (kits fit their rarity, no names close to a god's).
 - **Replays:** the same seed always gives the same fight, so replays and server checks work.
 - **Simulators run:** the balance report and a short progression run complete without errors.
