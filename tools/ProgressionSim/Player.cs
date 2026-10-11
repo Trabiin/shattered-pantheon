@@ -563,20 +563,8 @@ class Player
     // ---------- Rewards ----------
 
     // XP and gold rewards are counted in level-ups at the current battle's recommended level.
-    double LevelCost()
-    {
-        int d = Math.Min(Diff, C.Difficulties.Count - 1), k = Math.Min(Battle, C.BattlesPerDifficulty - 1);
-        return C.Growth.XpToNext(Math.Max(1, C.RecLevel(d, k))) * RewardScale();
-    }
-
-    double RewardScale()
-    {
-        int d = Math.Min(Diff, C.Difficulties.Count - 1), k = Math.Min(Battle, C.BattlesPerDifficulty - 1);
-        // Eases from the previous difficulty's value to this one's over its first battles, so there's no sudden drop.
-        double from = d == 0 ? C.Difficulties[0].RewardScale : C.Difficulties[d - 1].RewardScale;
-        double t = Math.Min(1, k / (C.RewardEase * C.BattlesPerDifficulty));
-        return from + (C.Difficulties[d].RewardScale - from) * t;
-    }
+    double LevelCost() => C.Curve.LevelCost(Math.Min(Diff, C.Difficulties.Count - 1), Math.Min(Battle, C.BattlesPerDifficulty - 1));
+    double RewardScale() => C.Curve.RewardScale(Math.Min(Diff, C.Difficulties.Count - 1), Math.Min(Battle, C.BattlesPerDifficulty - 1));
 
     // XP, gold, gear materials and tomes follow the difficulty's rewardScale, except from Boss Hunts,
     // Endless and per-difficulty farm drops, whose tables already list the amount for each difficulty.

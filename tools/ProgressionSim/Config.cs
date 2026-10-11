@@ -27,13 +27,6 @@ class Reward
 
 class Mode { public int UnlockBattles, FreePerDay; public double DevotionCost, Minutes; public List<Reward> ByDifficulty; }
 
-class Difficulty
-{
-    public string Name;
-    public double[] Levels, Stars, Gear, Skill;
-    public double Curve, RewardScale = 1;
-}
-
 class TimeProfile { public string Name; public double Minutes; public int Sessions; }
 class SpendProfile
 {
@@ -50,8 +43,10 @@ class Cfg
     public static Dictionary<int, double> Vessels(JsonElement e) => Map(e).ToDictionary(kv => int.Parse(kv.Key), kv => kv.Value);
     static bool B(JsonElement e, string k) => e.TryGetProperty(k, out var v) && v.ValueKind == JsonValueKind.True;
 
-    // Hero growth and its costs: the rules the game uses too (Unity/Assets/BattleCore/Growth.cs).
+    // Hero growth and its costs, and what the campaign expects at each battle: the rules the game uses
+    // too (Unity/Assets/BattleCore/Growth.cs and CampaignCurve.cs).
     public Growth Growth;
+    public CampaignCurve Curve;
     // Roster and summons
     public List<string> Rarities;                        // rarest first
     public Dictionary<string, int> Launch;
@@ -66,13 +61,12 @@ class Cfg
     public double BlessingPrice, BlessingDays, BlessingNow, BlessingPerDay, BlessingDevotion;
     public double RefillDevotion; public double[] RefillCosts;
     // Campaign
-    public List<Difficulty> Difficulties = new List<Difficulty>();
+    public List<CampaignCurve.Difficulty> Difficulties;
     public int Stages, BattlesPerStage, StagesPerRealm;
     public List<string> Realms = new List<string>();
     public double EnemyFactor, BossFactor;
     public double[] StarSteps, WinBand, BossWinBand, RealmBossWinBand, EarlyWinBand;
     public int EarlyBattles;
-    public double RewardEase;
     // Rewards
     public Reward ShrinePerHour, FirstClear, StageClear, StarChest, Farm, Daily, Weekly;
     public double[] StageChestStars; public List<Reward> StageChests;
@@ -98,7 +92,7 @@ class Cfg
     public Dictionary<string, double> SpendGapLate = new Dictionary<string, double>();
     public double[] PullsMonth1, PullsLater;
 
-    public int BattlesPerDifficulty => Stages * BattlesPerStage;
+    public int BattlesPerDifficulty => Curve.BattlesPerDifficulty;
 
     // Godshards for a month's spend on packs: the biggest packs that fit, then smaller ones.
     public double PackGodshards(double dollars)
@@ -121,7 +115,8 @@ class Cfg
     {
         string text = File.ReadAllText(path);
         var r = JsonDocument.Parse(text).RootElement;
-        var c = new Cfg { Growth = Growth.FromJson(text) };
+        var curve = CampaignCurve.FromJson(text);
+        var c = new Cfg { Growth = curve.Growth, Curve = curve };
 
         var ro = r.GetProperty("roster");
         List<string> Strs(JsonElement e, string k) => e.GetProperty(k).EnumerateArray().Select(x => x.GetString()).ToList();
@@ -144,13 +139,11 @@ class Cfg
         var rf = sh.GetProperty("devotionRefill"); c.RefillDevotion = N(rf, "devotion"); c.RefillCosts = Arr(rf, "godshards");
 
         var ca = r.GetProperty("campaign");
-        foreach (var d in ca.GetProperty("difficulties").EnumerateArray())
-            c.Difficulties.Add(new Difficulty { Name = d.GetProperty("name").GetString(), Levels = Arr(d, "levels"), Stars = Arr(d, "stars"), Gear = Arr(d, "gear"), Skill = Arr(d, "skill"), Curve = N(d, "curve", 1), RewardScale = N(d, "rewardScale", 1) });
-        c.Stages = (int)N(ca, "stages"); c.BattlesPerStage = (int)N(ca, "battlesPerStage"); c.StagesPerRealm = (int)N(ca, "stagesPerRealm");
+        c.Difficulties = curve.Difficulties;
+        c.Stages = curve.Stages; c.BattlesPerStage = curve.BattlesPerStage; c.StagesPerRealm = curve.StagesPerRealm;
         foreach (var rn in ca.GetProperty("realms").EnumerateArray()) c.Realms.Add(rn.GetString());
         c.EnemyFactor = N(ca, "enemyFactor"); c.BossFactor = N(ca, "bossFactor"); c.StarSteps = Arr(ca, "starSteps");
         c.WinBand = Arr(ca, "winBand"); c.BossWinBand = Arr(ca, "bossWinBand"); c.RealmBossWinBand = Arr(ca, "realmBossWinBand");
-        c.RewardEase = N(ca, "rewardEase", 1);
         c.EarlyBattles = (int)N(ca, "earlyBattles"); c.EarlyWinBand = Arr(ca, "earlyWinBand");
 
         var re = r.GetProperty("rewards");
@@ -204,18 +197,10 @@ class Cfg
 
     // ---------- Recommended power ----------
 
-    static double Lerp(double[] a, double t) => a[0] + (a[1] - a[0]) * t;
-
-    // What an Epic hero should have reached to take on battle k of a difficulty.
-    public (double level, double stars, double gear, double skill) Recommended(int diff, int k)
-    {
-        var d = Difficulties[diff];
-        double t = (double)k / (BattlesPerDifficulty - 1);
-        return (Lerp(d.Levels, Math.Pow(t, d.Curve)), Lerp(d.Stars, t), Lerp(d.Gear, t), Lerp(d.Skill, t));
-    }
-
-    public double RecScale(int diff, int k) { var r = Recommended(diff, k); return Growth.StatScale("Epic", r.level, r.stars, r.gear, r.skill); }
-    public int RecLevel(int diff, int k) => (int)Math.Round(Recommended(diff, k).level);
+    // What an Epic hero should have reached to take on battle k of a difficulty (CampaignCurve).
+    public (double level, double stars, double gear, double skill) Recommended(int diff, int k) => Curve.Recommended(diff, k);
+    public double RecScale(int diff, int k) => Curve.RecScale(diff, k);
+    public int RecLevel(int diff, int k) => Curve.RecLevel(diff, k);
 
     // ---------- The generated campaign ----------
 
