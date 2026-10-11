@@ -13,6 +13,8 @@ static class Program
 {
     static int failures;
     static GameData data;
+    static CampaignCurve curve;
+    static readonly string[] Team = { "hilde", "grub", "korvald" };
     static CampaignOrder order;
 
     static int Main()
@@ -20,6 +22,7 @@ static class Program
         string dir = Path.Combine(FindRoot(), "Unity", "Assets", "Resources", "BattleData");
         string R(string f) => File.ReadAllText(Path.Combine(dir, f + ".json"));
         data = GameData.FromJson(R("rules"), R("heroes"), R("enemies"), R("campaign"));
+        curve = CampaignCurve.FromJson(R("progression"));
         order = new CampaignOrder(data.Stages);
 
         Test("The order covers the whole campaign", WholeOrder);
@@ -152,24 +155,24 @@ static class Program
 
     static void Losses(string folder)
     {
-        var progress = new PlayerProgress(data, new SaveStore(folder), _ => { });
+        var progress = new PlayerProgress(data, curve, new SaveStore(folder), _ => { });
         var b1 = Find("normal", 1, 1, 1); var b2 = Find("normal", 1, 1, 2);
-        progress.RecordBattle(b1, "lose");
-        progress.RecordBattle(b1, "timeout");
+        progress.RecordBattle(b1, "lose", Team);
+        progress.RecordBattle(b1, "timeout", Team);
         Expect(progress.IsOpen(b1) && !progress.IsOpen(b2), "battle 2 stays locked after a loss and a timeout on battle 1");
-        progress.RecordBattle(b1, "win");
+        progress.RecordBattle(b1, "win", Team);
         Expect(progress.IsOpen(b2), "and opens with the win");
     }
 
     static void ReloadedSave(string folder)
     {
-        var progress = new PlayerProgress(data, new SaveStore(folder), _ => { });
+        var progress = new PlayerProgress(data, curve, new SaveStore(folder), _ => { });
         var played = order.Battles.Where(b => b.Difficulty == "normal" && (b.RealmNumber == 1 || (b.RealmNumber == 2 && b.StageNumber == 1 && b.BattleNumber <= 2))).ToList();
-        foreach (var b in played) progress.RecordBattle(b, "win");
+        foreach (var b in played) progress.RecordBattle(b, "win", Team);
         var openBefore = order.Battles.Where(progress.IsOpen).Select(b => b.Id).ToList();
 
         var warnings = new List<string>();
-        var reopened = new PlayerProgress(data, new SaveStore(folder), warnings.Add);
+        var reopened = new PlayerProgress(data, curve, new SaveStore(folder), warnings.Add);
         var openAfter = order.Battles.Where(reopened.IsOpen).Select(b => b.Id).ToList();
         Expect(warnings.Count == 0, "the save loads without warnings");
         Expect(openAfter.SequenceEqual(openBefore), $"the same {openAfter.Count} battles are open after reopening");
@@ -179,7 +182,7 @@ static class Program
         string json = File.ReadAllText(Path.Combine(folder, SaveStore.FileName));
         var root = (Dictionary<string, object>)Json.Parse(json);
         var campaign = (Dictionary<string, object>)root["campaign"];
-        Expect(root.Keys.OrderBy(k => k).SequenceEqual(new[] { "campaign", "teams", "version" }) && campaign.Keys.OrderBy(k => k).SequenceEqual(new[] { "furthest", "stars" }), "the save holds cleared battles only; what's open isn't stored");
+        Expect(root.Keys.OrderBy(k => k).SequenceEqual(new[] { "campaign", "heroes", "inventory", "teams", "version" }) && campaign.Keys.OrderBy(k => k).SequenceEqual(new[] { "furthest", "stars" }), "the save holds cleared battles only; what's open isn't stored");
     }
 
     static StageDef Find(string difficulty, int realm, int stage, int battle) =>
