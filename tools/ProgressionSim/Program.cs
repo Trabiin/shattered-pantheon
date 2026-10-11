@@ -47,7 +47,12 @@ static class Program
         var cards = Cards(cfg, data);
 
         if (args.ContainsKey("check")) { Check(cfg, data, cards); return 0; }
-        if (args.ContainsKey("lift")) { foreach (var kv in KitLift(cfg, data).OrderByDescending(x => x.Value)) Console.WriteLine($"{kv.Key,-10} {kv.Value:0.00}"); return 0; }
+        if (args.ContainsKey("lift"))
+        {
+            var copy = CopyLift(cfg, data);
+            foreach (var kv in KitLift(cfg, data).OrderByDescending(x => x.Value)) Console.WriteLine($"{kv.Key,-10} {kv.Value:0.00}  second copy {copy[kv.Key]:0.00}");
+            return 0;
+        }
         if (args.ContainsKey("probe")) { Probe(cfg, data, args["probe"], args.TryGetValue("team", out var tm) && tm != null ? tm.Split(',').ToList() : null); return 0; }
 
         int days = int.Parse(Arg("days", "365")), seeds = int.Parse(Arg("seeds", "6"));
@@ -89,6 +94,7 @@ static class Program
     static List<HeroCard> Cards(Cfg c, GameData data)
     {
         var lift = KitLift(c, data);
+        var copyLift = CopyLift(c, data);
         var list = new List<HeroCard>();
         var next = c.Rarities.ToDictionary(r => r, _ => 0);
         void Make(string rarity, int day)
@@ -100,7 +106,7 @@ static class Program
             {
                 Id = $"{h.Id}-{rarity.ToLowerInvariant()}-{list.Count}", Kit = h.Id, Rarity = rarity, ReleaseDay = day,
                 Name = $"{h.Name} ({rarity})", Faction = h.Faction, Role = h.Role,
-                KitPower = lift[h.Id],
+                KitPower = lift[h.Id], CopyPower = copyLift[h.Id],
             });
         }
         foreach (var r in c.Rarities)
@@ -131,6 +137,30 @@ static class Program
         }
         double overall = (double)wins / n;
         return data.Heroes.ToDictionary(h => h.Id, h => with[h.Id] / Math.Max(1, seen[h.Id]) / overall);
+    }
+
+    // How much a second copy of a kit lifts a team's win rate, against another hero in its place: the
+    // same random teams and battles at the recommended power, one with the kit twice and one with the
+    // kit once plus a random other hero. Simulated players weigh a second copy by this when they pick
+    // a team, the way a real player sees whether two of a hero work.
+    static Dictionary<string, double> CopyLift(Cfg c, GameData data)
+    {
+        var rng = new Random(29);
+        var twice = data.Heroes.ToDictionary(h => h.Id, _ => 0.0);
+        var once = data.Heroes.ToDictionary(h => h.Id, _ => 0.0);
+        for (int i = 0; i < 4000; i++)
+        {
+            int d = rng.Next(c.Difficulties.Count), k = rng.Next(c.BattlesPerDifficulty);
+            var kit = data.Heroes[rng.Next(data.Heroes.Count)].Id;
+            var others = data.Heroes.Where(h => h.Id != kit).OrderBy(_ => rng.Next()).Take(4).Select(h => h.Id).ToList();
+            foreach (var (ids, wins) in new[] { (new List<string> { kit, kit }.Concat(others.Take(3)).ToList(), twice), (new List<string> { kit }.Concat(others).ToList(), once) })
+            {
+                var team = Formation.AutoPlace(data, ids);
+                foreach (var s in team) s.HpScale = s.AtkScale = c.RecScale(d, k);
+                if (Battle.Run(data, team, Cfg.StageId(d, k), i + 1).Result == "win") wins[kit]++;
+            }
+        }
+        return data.Heroes.ToDictionary(h => h.Id, h => (twice[h.Id] + 1) / (once[h.Id] + 1));
     }
 
     // Win rate of random teams on one battle at 90 to 120% of its recommended power, e.g. --probe c3-167.
@@ -347,6 +377,22 @@ static class Program
             });
             var how = g.SelectMany(p => p.HeroesFrom.Keys).Distinct().OrderBy(x => x).Select(x => $"{x} {F(Median(g.Select(p => (double)(p.HeroesFrom.TryGetValue(x, out var v) ? v : 0))))}");
             sb.AppendLine($"| {g.Key} | {string.Join(" | ", cells)} | {string.Join(", ", how)} |");
+        }
+        sb.AppendLine();
+
+        // Copies (decided 2026-10-11): fielded when they're the best team; spare ones levelled and ascended into fodder.
+        sb.AppendLine("## Copies");
+        sb.AppendLine();
+        sb.AppendLine("A team may field several copies of one hero, and a spare copy is levelled to its rank's cap and ascended before it feeds a higher rank (doc 07 section 1). Each test kit stands in for several heroes, which are never fielded together (they'd fight as copies they aren't); copies of one hero are.");
+        sb.AppendLine();
+        sb.AppendLine("| Player | Days fielding a second copy of a hero | Copies in the team on those days | Fodder heroes made by levelling (whole run) |");
+        sb.AppendLine("|---|---|---|---|");
+        foreach (var g in groups)
+        {
+            double copyDays = Median(g.Select(p => p.Days.Count(d => d.TeamCopies > 0) / (double)p.Days.Count));
+            double copies = Median(g.Select(p => p.Days.Where(d => d.TeamCopies > 0).Select(d => (double)d.TeamCopies).DefaultIfEmpty(0).Average()));
+            double madeN = Median(g.Select(p => (double)p.FodderMade));
+            sb.AppendLine($"| {g.Key} | {F(copyDays * 100)}% | {copies:0.0} | {F(madeN)} |");
         }
         sb.AppendLine();
 

@@ -521,7 +521,8 @@
     ],
     "secondsPerFightOverhead": 15,
     "replaySpeed": 3,
-    "attemptsBeforeUpgrading": 3
+    "attemptsBeforeUpgrading": 3,
+    "minutesToMakeFodder": 1
   },
   "targets": {
     "normalDays": {
