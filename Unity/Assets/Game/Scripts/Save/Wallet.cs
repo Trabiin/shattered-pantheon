@@ -54,30 +54,37 @@ namespace ShatteredPantheon.Game
             }
         }
 
-        public OwnedHero Hero(string id) => Save.Heroes.TryGetValue(id, out var h) ? h : null;
-        public bool Owns(string id) => Save.Heroes.ContainsKey(id);
+        // Hero cards by card id (every copy of a hero is its own card; see OwnedHero).
+        public OwnedHero Hero(string card) => Save.Heroes.TryGetValue(card, out var h) ? h : null;
+        public bool Owns(string card) => Save.Heroes.ContainsKey(card);
 
-        // A new game's heroes, each at level 1 and their rarity's starting star rank. They aren't saved until
-        // something happens: until then a reopened new game gets them again.
-        public void StartingHeroes(IEnumerable<string> ids)
+        // A new card for this hero at level 1 and its rarity's starting star rank: the first copy's card id
+        // is the hero's id, later copies "#2", "#3" and so on. Saved with whatever change adds it.
+        public OwnedHero NewCard(string heroId)
+        {
+            var def = data.Hero(heroId) ?? throw new ArgumentException("Unknown hero " + heroId);
+            string card = heroId;
+            for (int n = 2; Owns(card); n++) card = heroId + "#" + n;
+            return Save.Heroes[card] = new OwnedHero { Id = card, Hero = heroId, Stars = growth.StartStars(def.Rarity) };
+        }
+
+        // A new game's heroes, one card each. They aren't saved until something happens: until then a
+        // reopened new game gets them again.
+        public void StartingHeroes(IEnumerable<string> heroIds)
         {
             if (Save.Heroes.Count > 0) throw new InvalidOperationException("Starting heroes go to a new game only");
-            foreach (string id in ids)
-            {
-                var def = data.Hero(id) ?? throw new ArgumentException("Unknown hero " + id);
-                Save.Heroes[id] = new OwnedHero { Id = id, Stars = growth.StartStars(def.Rarity) };
-            }
+            foreach (string id in heroIds) NewCard(id);
         }
 
         public int LevelCap(OwnedHero hero) => growth.LevelCap(hero.Stars);
 
-        // Battle XP after a win (doc 10 section 5): shared evenly by the heroes who fought and can still
+        // Battle XP after a win (doc 10 section 5): shared evenly by the hero cards that fought and can still
         // level. Every time a hero's XP reaches the next level they level up, without gold; a hero who
         // reaches their star rank's cap keeps no XP beyond it.
-        public void ShareBattleXp(IEnumerable<string> fighters, long xp)
+        public void ShareBattleXp(IEnumerable<string> cards, long xp)
         {
             if (xp < 0) throw new ArgumentException("Negative battle XP");
-            var growing = fighters.Distinct().Select(Hero).Where(h => h != null && h.Level < LevelCap(h)).ToList();
+            var growing = cards.Distinct().Select(Hero).Where(h => h != null && h.Level < LevelCap(h)).ToList();
             if (growing.Count == 0) return;
             foreach (var hero in growing) GiveXp(hero, xp / growing.Count);
             write();

@@ -197,6 +197,19 @@ static class Program
         Expect(data.Heroes.All(h => app.Progress.Wallet.Hero(h.Id).Level == 1), "after a reset the heroes are back at level 1");
         Expect(app.Progress.Furthest("normal") == null, "after a reset nothing has been reached");
         Expect(!IsShownLocked(realm[0]) && realm.Skip(1).All(IsShownLocked), "after a reset only the first battle is open");
+
+        // Every copy of a hero is its own card, and copies can fight side by side.
+        app.Progress.Wallet.NewCard("hilde");
+        Click("Battle: " + first.Id);
+        Expect(Find("Hero: hilde") != null && Find("Hero: hilde#2") != null && Named("Hero: ").Count() == data.Heroes.Count + 1, "a second copy of Hilde gets its own hero card");
+        Click("Clear Button");
+        Click("Hero: hilde"); Click("Hero: hilde#2");
+        Expect(Team().Select(t => t.Id).OrderBy(x => x).SequenceEqual(new[] { "hilde", "hilde#2" }), "both copies can be placed in one team");
+        Click("Fight! Button");
+        Expect(Current is BattleView && ((BattleView)Current).Battle.Units.Count(u => u.Side == "A" && u.Id == "hilde") == 2, "both copies fight");
+        Click("Retreat Button");
+        Expect(Team().Select(t => t.Id).OrderBy(x => x).SequenceEqual(new[] { "hilde", "hilde#2" }), "the team with both copies is kept");
+        Click("Back Button");
         Directory.Delete(Application.persistentDataPath, true);
 
         foreach (var e in Scheduler.Errors.Distinct().Take(5)) Console.WriteLine("ERROR " + e);
@@ -209,21 +222,22 @@ static class Program
     static bool CheckFight(GameData data, StageDef stage, List<TeamSlot> team)
     {
         var view = (BattleView)Current;
-        // Each hero fights at their own strength, from their level, star rank and skill level before the fight.
+        // Each hero card fights at its own strength, from its level, star rank and skill level before the fight.
         var scale = team.ToDictionary(s => s.Id, s => app.Progress.HeroScale(s.Id));
+        var fighting = app.Progress.FightingTeam(team);
         var xpBefore = team.ToDictionary(s => s.Id, s => TotalXp(s.Id));
         bool firstWin = !app.Progress.IsCleared(stage.Id);
         float t = RunUntil(() => Current is ResultsView, 3600);
-        var strong = team.Select(s => new TeamSlot(s.Id, s.Row, s.Slot) { HpScale = scale[s.Id], AtkScale = scale[s.Id] }).ToList();
+        var strong = team.Select(s => new TeamSlot(app.Progress.HeroOf(s.Id).Id, s.Row, s.Slot) { HpScale = scale[s.Id], AtkScale = scale[s.Id] }).ToList();
         var direct = Battle.Run(data, strong, stage.Id, view.Seed, new BattleOptions { Formation = view.Battle.HeroFormation });
         var shown = view.Battle;
         var results = Current as ResultsView;
         Console.WriteLine($"{stage.Name}: {results?.Title ?? "no results"} after {shown.Actions} actions ({t:0}s at {GameApp.Speeds[app.SpeedIndex]}x)");
         Expect(results != null, $"{stage.Name}: results screen opens when the fight ends");
         Expect(shown.Result == direct.Result && shown.Actions == direct.Actions, $"{stage.Name}: fight on screen matches the engine run directly ({direct.Result}, {direct.Actions} actions)");
-        Expect(TeamSet(shown.Units.Where(u => u.Side == "A").Select(u => new TeamSlot(u.Id, u.Row, u.Slot)).ToList()) == TeamSet(team), $"{stage.Name}: the fight used the picked team and formation");
+        Expect(TeamSet(shown.Units.Where(u => u.Side == "A").Select(u => new TeamSlot(u.Id, u.Row, u.Slot)).ToList()) == TeamSet(strong), $"{stage.Name}: the fight used the picked team and formation");
         Expect(results != null && results.Title == (direct.Result == "win" ? "Victory" : direct.Result == "lose" ? "Defeat" : "Time's up"), $"{stage.Name}: result title is right");
-        Expect(((List<TeamSlot>)Field(view, "team")).All(s => s.HpScale == scale[s.Id] && s.AtkScale == scale[s.Id]), $"{stage.Name}: heroes fight at their own strength ({string.Join(", ", scale.Values.Select(v => v.ToString("0.00")))}x; the battle expects {stage.HeroScale:0.00}x)");
+        Expect(fighting.Zip(strong, (a, b) => a.Id == b.Id && a.Slot == b.Slot && a.HpScale == b.HpScale && a.AtkScale == b.AtkScale).All(x => x), $"{stage.Name}: heroes fight at their own strength ({string.Join(", ", scale.Values.Select(v => v.ToString("0.00")))}x; the battle expects {stage.HeroScale:0.00}x)");
         long share = firstWin && direct.Result == "win" ? curve.FirstClearXp(stage) / team.Count : 0;
         Expect(team.All(s => TotalXp(s.Id) - xpBefore[s.Id] == share), $"{stage.Name}: {(share > 0 ? $"a first win gives each hero who fought {share} XP" : "no battle XP for a loss or a replay")}");
         Expect(direct.Result != "win" || app.Progress.IsCleared(stage.Id), $"{stage.Name}: a win marks the battle cleared");

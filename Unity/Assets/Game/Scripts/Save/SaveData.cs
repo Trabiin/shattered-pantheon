@@ -51,7 +51,7 @@ namespace ShatteredPantheon.Game
         // Battle id -> the team last sent into it; LastTeam is the last team sent anywhere.
         public Dictionary<string, SavedTeam> Teams = new Dictionary<string, SavedTeam>();
         public SavedTeam LastTeam;
-        // Hero id -> that hero's progress. Empty until the game gives a new player their heroes (PlayerProgress).
+        // Card id -> that hero card's progress (OwnedHero). Empty until the game gives a new player their heroes (PlayerProgress).
         public Dictionary<string, OwnedHero> Heroes = new Dictionary<string, OwnedHero>();
         // Item id (Item) -> how many the player holds. Items a newer game added are kept as they are.
         public Dictionary<string, long> Items = Item.All.ToDictionary(i => i, i => 0L);
@@ -183,7 +183,7 @@ namespace ShatteredPantheon.Game
         }
     }
 
-    // A team as saved: its formation and which hero stands in which slot.
+    // A team as saved: its formation and which hero card stands in which slot.
     public class SavedTeam
     {
         public string Formation;
@@ -206,25 +206,27 @@ namespace ShatteredPantheon.Game
             ((List<object>)o["heroes"]).Cast<Dictionary<string, object>>().Select(h => new TeamSlot((string)h["hero"], (string)h["slot"])));
     }
 
-    // One hero the player owns: level, XP towards the next level, star rank, skill level and how many
-    // copies they've had (duplicates arrive in E9-F4).
+    // One hero card the player owns: which hero it is, its level, XP towards the next level, star rank
+    // and skill level. Every copy of a hero is its own card (decided 2026-10-11). The first copy's card id
+    // is the hero's id; later copies add "#2", "#3"... (Wallet.NewCard).
     public class OwnedHero
     {
-        public string Id;
-        public int Level = 1, Stars = 1, Skill = 1, Copies = 1;
+        public string Id, Hero;
+        public int Level = 1, Stars = 1, Skill = 1;
         public long Xp;
 
         public Dictionary<string, object> ToJson() => new Dictionary<string, object>
         {
-            ["level"] = Level, ["xp"] = Xp, ["stars"] = Stars, ["skill"] = Skill, ["copies"] = Copies,
+            ["hero"] = Hero, ["level"] = Level, ["xp"] = Xp, ["stars"] = Stars, ["skill"] = Skill,
         };
 
         public static OwnedHero FromJson(string id, Dictionary<string, object> o)
         {
             int Whole(string k, int def) => o.TryGetValue(k, out var v) ? (int)SaveData.Count(v, 1, int.MaxValue, $"Bad {k} for hero {id}.") : def;
+            if (o.TryGetValue("hero", out var hero) && !(hero is string)) throw new FormatException($"Bad hero for card {id}.");
             return new OwnedHero
             {
-                Id = id, Level = Whole("level", 1), Stars = Whole("stars", 1), Skill = Whole("skill", 1), Copies = Whole("copies", 1),
+                Id = id, Hero = (string)hero ?? id, Level = Whole("level", 1), Stars = Whole("stars", 1), Skill = Whole("skill", 1),
                 Xp = o.TryGetValue("xp", out var xp) ? SaveData.Count(xp, 0, long.MaxValue, $"Bad xp for hero {id}.") : 0,
             };
         }

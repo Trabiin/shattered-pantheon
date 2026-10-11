@@ -1,6 +1,6 @@
 // Tests for the game's save file: a new game, saving and loading, closing and reopening, damaged and
-// unreadable saves, upgrading an older version, keeping sections a later system adds, the heroes and
-// items the player owns, the wallet every change to them goes through, and battle XP.
+// unreadable saves, upgrading an older version, keeping sections a later system adds, the hero cards
+// and items the player owns, the wallet every change to them goes through, battle XP, and copies.
 // Each test works in its own temporary folder, standing in for the phone's save folder.
 //   dotnet run --project tools/SaveTests
 using System;
@@ -43,6 +43,7 @@ static class Program
         Test("Battle XP stops at the level cap", LevelCaps);
         Test("Heroes fight at their own strength", Strength);
         Test("Heroes and items survive closing and reopening", HeroesReload);
+        Test("Every copy of a hero is its own card, and copies fight side by side", Copies);
 
         Console.WriteLine(failures == 0 ? "All save checks passed." : $"{failures} save check(s) failed.");
         return failures == 0 ? 0 : 1;
@@ -142,6 +143,7 @@ static class Program
             ("a hero at level 0", "{\"version\": 2, \"heroes\": {\"hilde\": {\"level\": 0}}}"),
             ("a hero with negative XP", "{\"version\": 2, \"heroes\": {\"hilde\": {\"level\": 3, \"xp\": -1}}}"),
             ("a hero that isn't an object", "{\"version\": 2, \"heroes\": {\"hilde\": 3}}"),
+            ("a card whose hero isn't a name", "{\"version\": 2, \"heroes\": {\"hilde#2\": {\"hero\": 7}}}"),
             ("a negative amount of gold", "{\"version\": 2, \"inventory\": {\"gold\": -5}}"),
             ("part of a skill tome", "{\"version\": 2, \"inventory\": {\"skillTomes\": 1.5}}"),
         };
@@ -237,7 +239,7 @@ static class Program
         var bare = SaveData.FromJson("{\"version\": 1}");
         Expect(bare.Stars.Count == 0 && bare.Furthest.Count == 0 && bare.Teams.Count == 0 && bare.LastTeam == null && bare.Heroes.Count == 0 && Item.All.All(i => bare.Items[i] == 0), "a save with only a version loads with empty sections");
         var hero = SaveData.FromJson("{\"version\": 2, \"heroes\": {\"pip\": {\"level\": 4}}}").Heroes["pip"];
-        Expect(hero.Level == 4 && hero.Xp == 0 && hero.Stars == 1 && hero.Skill == 1 && hero.Copies == 1, "a hero missing a field loads with that field's default");
+        Expect(hero.Hero == "pip" && hero.Level == 4 && hero.Xp == 0 && hero.Stars == 1 && hero.Skill == 1, "a hero missing a field loads with that field's default (a card without its hero is the hero its id names)");
         var partial = SaveData.FromJson("{\"version\": 1, \"campaign\": {\"stars\": {\"c0-3\": [1]}}}");
         Expect(partial.IsCleared("c0-3") && partial.Furthest.Count == 0, "a section missing a field loads with that field empty");
     }
@@ -275,8 +277,8 @@ static class Program
         var growth = curve.Growth;
         // TODO(E9-F2-S1-T5): a new game owns only the 3 starters once summons exist.
         Expect(data.Heroes.All(h => progress.Wallet.Owns(h.Id)) && progress.Save.Heroes.Count == data.Heroes.Count, "every test hero is owned (until summons exist)");
-        Expect(data.Heroes.All(h => progress.Wallet.Hero(h.Id) is var o && o.Level == 1 && o.Xp == 0 && o.Skill == 1 && o.Copies == 1 && o.Stars == growth.StartStars(h.Rarity)),
-            "each at level 1 with no XP, skill level 1, one copy and their rarity's starting stars (Common 1★ to Legendary 5★)");
+        Expect(data.Heroes.All(h => progress.Wallet.Hero(h.Id) is var o && o.Hero == h.Id && o.Level == 1 && o.Xp == 0 && o.Skill == 1 && o.Stars == growth.StartStars(h.Rarity)),
+            "one card each, under the hero's own id, at level 1 with no XP, skill level 1 and their rarity's starting stars (Common 1★ to Legendary 5★)");
         Expect(Item.All.All(i => progress.Wallet.Count(i) == 0), "the inventory is empty");
         Expect(warnings.Count == 0 && !File.Exists(Path.Combine(folder, SaveStore.FileName)), "nothing is written until something happens");
         var team = progress.StrongestTeam();
@@ -389,10 +391,54 @@ static class Program
         string written = File.ReadAllText(Path.Combine(folder, SaveStore.FileName));
         var reopened = Progress(folder, out var warnings);
         Expect(warnings.Count == 0, "no warnings");
-        Expect(Five.All(id => reopened.Wallet.Hero(id).Level > 1) && data.Heroes.All(h => Same(reopened.Wallet.Hero(h.Id), progress.Wallet.Hero(h.Id))), "every hero's level, XP, stars, skill and copies come back");
+        Expect(Five.All(id => reopened.Wallet.Hero(id).Level > 1) && data.Heroes.All(h => Same(reopened.Wallet.Hero(h.Id), progress.Wallet.Hero(h.Id))), "every card's hero, level, XP, stars and skill come back");
         Expect(Item.All.All(i => reopened.Wallet.Count(i) == progress.Wallet.Count(i)) && reopened.Wallet.Count(Item.XpPotions) == 1200, "every item comes back");
         Expect(Five.All(id => reopened.HeroScale(id) == progress.HeroScale(id)), "heroes fight at the same strength after reopening");
         Expect(reopened.Save.ToJson() == written, "writing the reloaded save gives the identical file");
+    }
+
+    static void Copies(string folder)
+    {
+        var progress = Progress(folder, out _);
+        var wallet = progress.Wallet;
+        var second = wallet.NewCard("hilde");
+        var third = wallet.NewCard("hilde");
+        Expect(second.Id == "hilde#2" && third.Id == "hilde#3" && second.Hero == "hilde" && wallet.Hero("hilde").Hero == "hilde", "a new copy gets the next card id: hilde, hilde#2, hilde#3");
+        Expect(second.Level == 1 && second.Xp == 0 && second.Stars == curve.Growth.StartStars(data.Hero("hilde").Rarity) && second.Skill == 1, "a new copy starts at level 1 and its rarity's starting stars");
+        Expect(Throws(() => wallet.NewCard("no-such-hero")), "a card for an unknown hero is refused");
+        var hildes = progress.Cards.Where(c => c.Hero == "hilde").Select(c => c.Id);
+        Expect(hildes.SequenceEqual(new[] { "hilde", "hilde#2", "hilde#3" }) && progress.Cards.Count == data.Heroes.Count + 2, "the cards list every copy, after the first");
+        Expect(progress.HeroOf("hilde#2").Id == "hilde", "a copy is the hero it copies");
+
+        // A team with two copies of Hilde: each card grows and fights at its own strength.
+        var cards = new[] { "hilde", "hilde#2", "grub", "korvald", "maren" };
+        wallet.ShareBattleXp(new[] { "hilde#2" }, (long)curve.Growth.XpToNext(1));
+        Expect(wallet.Hero("hilde#2").Level == 2 && wallet.Hero("hilde").Level == 1, "XP for one copy levels only that copy");
+        var team = progress.AutoPlace(cards);
+        Expect(team.Select(t => t.Id).OrderBy(x => x).SequenceEqual(cards.OrderBy(x => x)) && team.Select(t => t.Slot).Distinct().Count() == 5, "auto-placing keeps both copies, each in its own slot");
+        var fighting = progress.FightingTeam(team);
+        Expect(fighting.Count(t => t.Id == "hilde") == 2 && fighting.All(t => data.Hero(t.Id) != null), "the battle gets Hilde twice");
+        Expect(fighting.Zip(team, (f, c) => f.Slot == c.Slot && f.HpScale == progress.HeroScale(c.Id) && f.AtkScale == f.HpScale).All(x => x) && progress.HeroScale("hilde#2") > progress.HeroScale("hilde"), "each copy at its own card's strength");
+        var fight = new Battle(data, fighting, realm[0].Id, 1, new BattleOptions());
+        while (!fight.Over) fight.Step();
+        Expect(fight.Units.Count(u => u.Side == "A" && u.Id == "hilde") == 2, $"the fight plays with both ({fight.Result})");
+        long xp = curve.FirstClearXp(realm[0]);
+        long before = Total(progress, "hilde");
+        progress.RecordBattle(realm[0], "win", cards);
+        Expect(Total(progress, "hilde") == before + xp / 5 && Total(progress, "hilde#2") == curve.Growth.XpToNext(1) + xp / 5, "battle XP gives each copy its own share");
+        progress.SaveTeam(realm[1].Id, team, Battle.FormationOf(team.Select(t => t.Slot)));
+        Expect(Slots(progress.LoadTeam(realm[1].Id)) == Slots(team), "a team with copies is saved and put back");
+
+        var reopened = Progress(folder, out var warnings);
+        Expect(warnings.Count == 0 && Same(reopened.Wallet.Hero("hilde#2"), second) && Same(reopened.Wallet.Hero("hilde#3"), third), "copies come back after reopening");
+        Expect(Slots(reopened.LoadTeam(realm[1].Id)) == Slots(team), "and so does the team that fields them");
+
+        // A card whose hero left the game data (renamed or removed) isn't listed and can't be fielded.
+        reopened.Save.Heroes["ghost"] = new OwnedHero { Id = "ghost", Hero = "no-such-hero" };
+        reopened.SaveTeam(realm[2].Id, new List<TeamSlot> { new TeamSlot("ghost", "front0"), new TeamSlot("hilde", "front1") }, "2-3");
+        Expect(reopened.Cards.All(c => c.Id != "ghost") && reopened.LoadTeam(realm[2].Id).All(t => t.Id != "ghost"), "a card for a hero the game no longer has is left out");
+        reopened.SaveTeam(realm[3].Id, new List<TeamSlot> { new TeamSlot("hilde", "front0"), new TeamSlot("hilde", "front1") }, "2-3");
+        Expect(Slots(reopened.LoadTeam(realm[3].Id)) != "hilde@front0,hilde@front1", "the same card can't stand in two slots");
     }
 
     static long Total(PlayerProgress p, string id)
@@ -401,7 +447,7 @@ static class Program
         return Enumerable.Range(1, h.Level - 1).Sum(l => (long)curve.Growth.XpToNext(l)) + h.Xp;
     }
 
-    static bool Same(OwnedHero a, OwnedHero b) => a.Id == b.Id && a.Level == b.Level && a.Xp == b.Xp && a.Stars == b.Stars && a.Skill == b.Skill && a.Copies == b.Copies;
+    static bool Same(OwnedHero a, OwnedHero b) => a.Id == b.Id && a.Hero == b.Hero && a.Level == b.Level && a.Xp == b.Xp && a.Stars == b.Stars && a.Skill == b.Skill;
 
     static bool Throws(Action a)
     {
