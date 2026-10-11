@@ -1,23 +1,23 @@
 # Progression Report
 
-*Generated 2026-10-10 05:10 UTC by `dotnet run --project tools/ProgressionSim -c Release`. 12 player types × 6 players each, 365 days. Every campaign battle is a real fight on the battle engine (129,752 fights); rewards, upgrades, summons and star challenges follow `progression.json`. Roster: the 20 test kits, each at its own rarity, stand in for 60 launch heroes (8 Legendary, 12 Epic, 14 Rare, 14 Uncommon, 12 Common), plus 1 Rare, 2 Epic, 1 Legendary every 30 days. Numbers are medians across the players of each type.*
+*Generated 2026-10-11 08:52 UTC by `dotnet run --project tools/ProgressionSim -c Release`. 12 player types × 6 players each, 365 days. Every campaign battle is a real fight on the battle engine (130,272 fights); rewards, upgrades, summons and star challenges follow `progression.json`. Roster: the 20 test kits, each at its own rarity, stand in for 60 launch heroes (8 Legendary, 12 Epic, 14 Rare, 14 Uncommon, 12 Common), plus 1 Rare, 2 Epic, 1 Legendary every 30 days. Numbers are medians across the players of each type.*
 
 ## When each player type gets there
 
 | Player | Normal realm 3 | Normal realm 5 | Normal realm 10 | Hard realm 5 | Hard realm 10 | Nightmare realm 10 | Godless realm 10 | Where on day 365 |
 |---|---|---|---|---|---|---|---|---|
-| Casual Free | 15 | 24 | 48 | 71 | 97 | 156 | 285 | all done |
-| Casual Light | 13 | 23 | 44 | 64 | 85 | 135 | 194 | all done |
-| Casual Medium | 10 | 18 | 42 | 64 | 88 | 141 | 205 | all done |
-| Casual Heavy | 9 | 18 | 40 | 61 | 85 | 140 | 231 | all done |
-| Regular Free | 7 | 10 | 18 | 26 | 34 | 67 | 115 | all done |
-| Regular Light | 5 | 8 | 14 | 20 | 27 | 52 | 86 | all done |
-| Regular Medium | 5 | 8 | 13 | 19 | 26 | 50 | 86 | all done |
-| Regular Heavy | 4 | 7 | 14 | 21 | 29 | 63 | 111 | all done |
-| Dedicated Free | 4 | 6 | 10 | 14 | 20 | 41 | 74 | all done |
-| Dedicated Light | 4 | 5 | 9 | 13 | 20 | 48 | 71 | all done |
-| Dedicated Medium | 2 | 4 | 7 | 10 | 14 | 31 | 51 | all done |
-| Dedicated Heavy | 2 | 4 | 7 | 10 | 14 | 36 | 59 | all done |
+| Casual Free | 14 | 23 | 48 | 70 | 97 | 156 | 295 | all done |
+| Casual Light | 13 | 23 | 46 | 69 | 96 | 176 | – | all done |
+| Casual Medium | 9 | 17 | 39 | 60 | 84 | 138 | 201 | all done |
+| Casual Heavy | 9 | 17 | 39 | 60 | 84 | 140 | 225 | all done |
+| Regular Free | 6 | 9 | 17 | 25 | 33 | 66 | 117 | all done |
+| Regular Light | 5 | 8 | 14 | 21 | 29 | 56 | 85 | all done |
+| Regular Medium | 4 | 6 | 12 | 18 | 24 | 45 | 80 | all done |
+| Regular Heavy | 4 | 7 | 13 | 20 | 28 | 57 | 111 | all done |
+| Dedicated Free | 4 | 5 | 9 | 13 | 19 | 40 | 66 | all done |
+| Dedicated Light | 3 | 5 | 8 | 13 | 19 | 43 | 71 | all done |
+| Dedicated Medium | 2 | 4 | 6 | 10 | 14 | 34 | 55 | all done |
+| Dedicated Heavy | 2 | 3 | 6 | 10 | 14 | 36 | 58 | all done |
 
 Targets (doc 10 section 9): Normal done (realm 10) by day 40 (Casual), 21 (Regular), 12 (Dedicated); Hard done by day 120 (Casual), 75 (Regular), 50 (Dedicated). A dash means most players of that type hadn't reached it by day 365.
 
@@ -25,22 +25,22 @@ Targets (doc 10 section 9): Normal done (realm 10) by day 40 (Casual), 21 (Regul
 
 | Player | First Legendary | Longest gap between new heroes | Longest gap without a big moment | Longest wall (Normal, Hard) | Walls over 3 days | Longest wall (Nightmare, Godless) | Godshards per day (first 30 days) |
 |---|---|---|---|---|---|---|---|
-| Casual Free | day 5 | 30 days | 2 days | 1 days | 0 | 22 days | 298 |
-| Casual Light | day 3 | 32 days | 2 days | 1 days | 0 | 4 days | 585 |
-| Casual Medium | day 2 | 26 days | 2 days | 1 days | 0 | 1 days | 921 |
-| Casual Heavy | day 1 | 29 days | 2 days | 1 days | 0 | 14 days | 3487 |
-| Regular Free | day 3 | 27 days | 2 days | 1 days | 0 | 10 days | 568 |
-| Regular Light | day 1 | 26 days | 2 days | 0 days | 0 | 7 days | 847 |
-| Regular Medium | day 1 | 26 days | 2 days | 0 days | 0 | 7 days | 1203 |
-| Regular Heavy | day 1 | 26 days | 2 days | 0 days | 0 | 22 days | 3720 |
-| Dedicated Free | day 2 | 27 days | 2 days | 1 days | 0 | 6 days | 698 |
-| Dedicated Light | day 1 | 26 days | 2 days | 1 days | 0 | 10 days | 942 |
-| Dedicated Medium | day 1 | 26 days | 2 days | 0 days | 0 | 4 days | 1323 |
-| Dedicated Heavy | day 1 | 23 days | 2 days | 0 days | 0 | 9 days | 3820 |
+| Casual Free | day 4 | 37 days | 2 days | 1 days | 0 | 46 days | 328 |
+| Casual Light | day 3 | 27 days | 2 days | 1 days | 0 | 56 days | 595 |
+| Casual Medium | day 2 | 30 days | 1 days | 1 days | 0 | 1 days | 941 |
+| Casual Heavy | day 1 | 29 days | 2 days | 1 days | 0 | 17 days | 3515 |
+| Regular Free | day 2 | 26 days | 2 days | 0 days | 0 | 8 days | 596 |
+| Regular Light | day 1 | 26 days | 2 days | 0 days | 0 | 7 days | 860 |
+| Regular Medium | day 1 | 26 days | 2 days | 0 days | 0 | 5 days | 1222 |
+| Regular Heavy | day 1 | 27 days | 2 days | 0 days | 0 | 20 days | 3726 |
+| Dedicated Free | day 2 | 27 days | 2 days | 0 days | 0 | 6 days | 685 |
+| Dedicated Light | day 1 | 26 days | 2 days | 1 days | 0 | 8 days | 984 |
+| Dedicated Medium | day 1 | 25 days | 2 days | 0 days | 0 | 4 days | 1315 |
+| Dedicated Heavy | day 1 | 23 days | 2 days | 0 days | 0 | 9 days | 3831 |
 
 A **big moment** is a new Epic or Legendary hero, a stage chest, a star chest, an ascension or a large Codex reward. A **wall** is a stretch of days with no new campaign battle cleared.
 
-Free players' walls by difficulty and realm: Normal War (1).
+Free players' walls by difficulty and realm: Hard Trickster (1).
 
 ## Collection
 
@@ -48,26 +48,26 @@ Share of the released roster owned (it grows every month), then Epics and Legend
 
 | Player | Day 7 | Day 30 | Day 90 | Day 180 | Day 365 | Summons per day, month 1 | Summons per day, later |
 |---|---|---|---|---|---|---|---|
-| Casual Free | 35% · E 2/12 · L 1/8 | 55% · E 4/14 · L 1/9 | 68% · E 8/18 · L 1/11 | 70% · E 12/24 · L 4/14 | 71% · E 21/36 · L 9/20 | 1.9 | 1.4 |
-| Casual Light | 45% · E 3/12 · L 1/8 | 66% · E 6/14 · L 1/9 | 74% · E 10/18 · L 3/11 | 79% · E 15/24 · L 7/14 | 80% · E 24/36 · L 13/20 | 3.2 | 2.3 |
-| Casual Medium | 67% · E 5/12 · L 2/8 | 72% · E 7/14 · L 2/9 | 76% · E 11/18 · L 3/11 | 79% · E 16/24 · L 6/14 | 81% · E 25/36 · L 13/20 | 4.4 | 2.9 |
-| Casual Heavy | 90% · E 11/12 · L 4/8 | 84% · E 11/14 · L 4/9 | 86% · E 15/18 · L 6/11 | 88% · E 20/24 · L 9/14 | 93% · E 32/36 · L 16/20 | 12.4 | 6.8 |
-| Regular Free | 45% · E 4/12 · L 1/8 | 64% · E 7/14 · L 1/9 | 74% · E 9/18 · L 3/11 | 76% · E 13/24 · L 8/14 | 78% · E 20/36 · L 15/20 | 2.9 | 1.5 |
-| Regular Light | 50% · E 4/12 · L 2/8 | 70% · E 7/14 · L 2/9 | 78% · E 11/18 · L 5/11 | 81% · E 16/24 · L 9/14 | 87% · E 28/36 · L 17/20 | 4.3 | 2.4 |
-| Regular Medium | 67% · E 5/12 · L 2/8 | 75% · E 7/14 · L 2/9 | 82% · E 12/18 · L 5/11 | 86% · E 17/24 · L 10/14 | 87% · E 28/36 · L 17/20 | 5.5 | 3.0 |
-| Regular Heavy | 92% · E 11/12 · L 4/8 | 86% · E 11/14 · L 4/9 | 89% · E 15/18 · L 8/11 | 92% · E 20/24 · L 12/14 | 96% · E 34/36 · L 19/20 | 13.4 | 6.9 |
-| Dedicated Free | 50% · E 3/12 · L 1/8 | 69% · E 7/14 · L 2/9 | 79% · E 11/18 · L 4/11 | 82% · E 16/24 · L 8/14 | 81% · E 22/36 · L 16/20 | 3.4 | 1.8 |
-| Dedicated Light | 52% · E 4/12 · L 1/8 | 70% · E 8/14 · L 2/9 | 79% · E 12/18 · L 5/11 | 83% · E 17/24 · L 10/14 | 87% · E 26/36 · L 17/20 | 4.7 | 2.7 |
-| Dedicated Medium | 72% · E 6/12 · L 2/8 | 78% · E 9/14 · L 2/9 | 82% · E 12/18 · L 6/11 | 85% · E 17/24 · L 10/14 | 89% · E 27/36 · L 18/20 | 6.0 | 3.2 |
-| Dedicated Heavy | 92% · E 12/12 · L 4/8 | 86% · E 12/14 · L 4/9 | 93% · E 16/18 · L 9/11 | 94% · E 21/24 · L 13/14 | 97% · E 35/36 · L 19/20 | 13.8 | 7.2 |
+| Casual Free | 37% · E 2/12 · L 1/8 | 56% · E 6/14 · L 1/9 | 67% · E 8/18 · L 2/11 | 69% · E 13/24 · L 3/14 | 72% · E 21/36 · L 9/20 | 2.0 | 1.4 |
+| Casual Light | 47% · E 3/12 · L 1/8 | 64% · E 7/14 · L 1/9 | 75% · E 9/18 · L 2/11 | 77% · E 16/24 · L 6/14 | 80% · E 23/36 · L 13/20 | 3.2 | 2.3 |
+| Casual Medium | 65% · E 5/12 · L 2/8 | 73% · E 6/14 · L 2/9 | 78% · E 12/18 · L 3/11 | 82% · E 17/24 · L 7/14 | 82% · E 27/36 · L 13/20 | 4.4 | 2.9 |
+| Casual Heavy | 90% · E 11/12 · L 4/8 | 88% · E 12/14 · L 4/9 | 88% · E 15/18 · L 6/11 | 89% · E 20/24 · L 11/14 | 93% · E 31/36 · L 17/20 | 12.5 | 6.8 |
+| Regular Free | 42% · E 3/12 · L 1/8 | 64% · E 5/14 · L 1/9 | 71% · E 8/18 · L 3/11 | 74% · E 11/24 · L 7/14 | 80% · E 22/36 · L 15/20 | 3.0 | 1.5 |
+| Regular Light | 55% · E 4/12 · L 1/8 | 75% · E 7/14 · L 2/9 | 79% · E 13/18 · L 4/11 | 83% · E 17/24 · L 8/14 | 85% · E 24/36 · L 17/20 | 4.3 | 2.4 |
+| Regular Medium | 70% · E 5/12 · L 2/8 | 75% · E 8/14 · L 2/9 | 78% · E 10/18 · L 5/11 | 85% · E 17/24 · L 10/14 | 88% · E 27/36 · L 17/20 | 5.6 | 3.0 |
+| Regular Heavy | 92% · E 11/12 · L 4/8 | 86% · E 11/14 · L 4/9 | 88% · E 15/18 · L 7/11 | 90% · E 20/24 · L 12/14 | 95% · E 32/36 · L 19/20 | 13.4 | 6.9 |
+| Dedicated Free | 47% · E 3/12 · L 1/8 | 69% · E 8/14 · L 2/9 | 81% · E 12/18 · L 4/11 | 81% · E 16/24 · L 8/14 | 81% · E 22/36 · L 16/20 | 3.4 | 1.8 |
+| Dedicated Light | 58% · E 4/12 · L 1/8 | 70% · E 8/14 · L 1/9 | 82% · E 12/18 · L 5/11 | 85% · E 17/24 · L 10/14 | 86% · E 26/36 · L 18/20 | 4.9 | 2.7 |
+| Dedicated Medium | 68% · E 5/12 · L 2/8 | 78% · E 8/14 · L 2/9 | 83% · E 12/18 · L 6/11 | 88% · E 17/24 · L 12/14 | 89% · E 27/36 · L 18/20 | 6.0 | 3.2 |
+| Dedicated Heavy | 92% · E 11/12 · L 4/8 | 88% · E 11/14 · L 5/9 | 94% · E 16/18 · L 10/11 | 95% · E 22/24 · L 13/14 | 97% · E 34/36 · L 19/20 | 13.8 | 7.2 |
 
 Where free players' Godshards, hero shards and heroes came from over the whole run (per day, median player):
 
 | Player | Boss Hunts | Campaign | Codex | Dailies | Endless | Farming | Shop | Shrine | Stage chests | Stars | Weekly | Heroes gained by source (whole run) |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| Casual Free | 0 + 1.5 shards | 44 | 18 | 85 | 35 + 0.7 shards | 0 + 0.0 shards |  | 36 | 0 | 5 | 43 | Free picks 2, Hero shards 5, Starters 3, Summons 67, Summons (duplicate) 454 |
-| Regular Free | 0 + 2.7 shards | 44 | 22 | 92 | 40 + 0.8 shards | 0 + 1.0 shards |  | 72 | 2 | 7 | 43 | Free picks 2, Hero shards 10, Starters 3, Summons 69, Summons (duplicate) 531 |
-| Dedicated Free | 0 + 3.0 shards | 44 | 24 | 99 | 41 + 0.8 shards | 0 + 1.2 shards |  | 72 | 17 | 30 | 43 | Free picks 2, Hero shards 12, Starters 3, Summons 71, Summons (duplicate) 626 |
+| Casual Free | 0 + 1.5 shards | 44 | 18 | 87 | 36 + 0.7 shards | 0 + 0.0 shards |  | 36 | 0 | 5 | 43 | Free picks 2, Hero shards 5, Starters 3, Summons 67, Summons (duplicate) 457 |
+| Regular Free | 0 + 2.7 shards | 44 | 21 | 93 | 40 + 0.8 shards | 0 + 1.0 shards |  | 72 | 2 | 7 | 43 | Free picks 2, Hero shards 11, Starters 3, Summons 70, Summons (duplicate) 530 |
+| Dedicated Free | 0 + 3.1 shards | 44 | 23 | 99 | 41 + 0.8 shards | 0 + 1.2 shards |  | 72 | 17 | 30 | 43 | Free picks 2, Hero shards 12, Starters 3, Summons 70, Summons (duplicate) 628 |
 
 ## Spending (doc 08 shop)
 
@@ -82,18 +82,18 @@ Where free players' Godshards, hero shards and heroes came from over the whole r
 
 | Player | Days out of energy with time left (while campaign remains) | First day out | Farm fights per day | Boss Hunts per day | Campaign fights per day (first 30 days) |
 |---|---|---|---|---|---|
-| Casual Free | 0% | not reached | 2.0 | 3.0 | 9.1 |
-| Casual Light | 0% | not reached | 2.7 | 3.5 | 11.4 |
-| Casual Medium | 0% | not reached | 2.6 | 3.4 | 11.4 |
-| Casual Heavy | 0% | not reached | 2.4 | 3.3 | 10.9 |
-| Regular Free | 0% | not reached | 40.2 | 5.1 | 27.0 |
-| Regular Light | 0% | not reached | 43.8 | 5.3 | 31.6 |
-| Regular Medium | 0% | not reached | 44.8 | 5.4 | 33.7 |
-| Regular Heavy | 0% | not reached | 41.0 | 5.2 | 28.4 |
-| Dedicated Free | 3% | day 33 | 48.2 | 5.6 | 42.3 |
-| Dedicated Light | 0% | not reached | 55.7 | 5.7 | 45.3 |
-| Dedicated Medium | 0% | not reached | 55.6 | 5.7 | 48.3 |
-| Dedicated Heavy | 0% | not reached | 85.7 | 5.7 | 39.4 |
+| Casual Free | 0% | not reached | 1.9 | 2.9 | 9.6 |
+| Casual Light | 0% | not reached | 2.5 | 3.3 | 9.6 |
+| Casual Medium | 0% | not reached | 2.7 | 3.5 | 11.4 |
+| Casual Heavy | 0% | not reached | 2.4 | 3.3 | 11.4 |
+| Regular Free | 0% | not reached | 40.9 | 5.1 | 27.4 |
+| Regular Light | 0% | not reached | 43.9 | 5.3 | 31.8 |
+| Regular Medium | 0% | not reached | 45.1 | 5.4 | 34.9 |
+| Regular Heavy | 0% | not reached | 41.0 | 5.2 | 28.9 |
+| Dedicated Free | 3% | day 32 | 48.2 | 5.7 | 42.9 |
+| Dedicated Light | 0% | not reached | 55.6 | 5.7 | 46.4 |
+| Dedicated Medium | 0% | not reached | 55.7 | 5.7 | 47.4 |
+| Dedicated Heavy | 0% | not reached | 85.7 | 5.7 | 40.1 |
 
 Campaign fights never cost energy (doc 10 section 4). Energy runs out only when a player has time left after the campaign and the daily round and wants to keep farming.
 
@@ -101,83 +101,85 @@ Campaign fights never cost energy (doc 10 section 4). Energy runs out only when 
 
 | Day | Next battle | Team level | Star rank | Gear tier | Skill level | Team power vs recommended | Heroes | Stars earned | Godshards earned that day |
 |---|---|---|---|---|---|---|---|---|---|
-| 1 | Normal Hearth 5-4 | 7 | 3.4 | 1.0 | 1.4 | 87% | 14 | 19 | 570 |
-| 2 | Normal Hearth 9-3 | 12 | 3.8 | 1.0 | 2.0 | 97% | 16 | 34 | 409 |
-| 3 | Normal War 1-3 | 15 | 3.8 | 1.0 | 2.2 | 98% | 16 | 42 | 202 |
-| 5 | Normal War 8-2 | 23 | 3.8 | 2.0 | 2.6 | 101% | 17 | 69 | 232 |
-| 7 | Normal Grave 9-3 | 32 | 4.0 | 2.8 | 3.0 | 103% | 22 | 114 | 937 |
-| 10 | Normal Night 9-4 | 53 | 4.0 | 3.0 | 4.0 | 101% | 23 | 195 | 377 |
-| 14 | Normal Sea 7-3 | 79 | 4.2 | 5.0 | 5.0 | 105% | 31 | 306 | 1196 |
-| 21 | Hard Grave 4-2 | 107 | 4.2 | 8.0 | 6.0 | 104% | 39 | 493 | 757 |
-| 30 | Hard Sea 10-2 | 120 | 5.0 | 8.6 | 6.4 | 95% | 42 | 717 | 467 |
-| 45 | Nightmare Trickster 6-1 | 134 | 5.0 | 9.4 | 7.2 | 83% | 44 | 1020 | 492 |
-| 60 | Nightmare Forge 10-3 | 144 | 5.0 | 10.4 | 8.0 | 83% | 46 | 1170 | 322 |
-| 90 | Godless Forge 5-2 | 150 | 5.0 | 11.4 | 9.0 | 72% | 55 | 1559 | 277 |
-| 120 | all done | 169 | 5.0 | 12.0 | 10.0 | 100% | 60 | 1671 | 124 |
-| 150 | all done | 186 | 6.0 | 12.0 | 10.0 | 118% | 63 | 1731 | 484 |
-| 180 | all done | 200 | 6.0 | 12.0 | 10.0 | 125% | 65 | 1791 | 184 |
-| 210 | all done | 200 | 6.0 | 12.0 | 10.0 | 125% | 68 | 1851 | 484 |
-| 240 | all done | 200 | 6.0 | 12.0 | 10.0 | 125% | 72 | 1911 | 184 |
-| 300 | all done | 200 | 6.0 | 12.0 | 10.0 | 125% | 78 | 2031 | 184 |
-| 365 | all done | 200 | 6.0 | 12.0 | 10.0 | 125% | 82 | 2161 | 184 |
+| 1 | Normal Hearth 6-4 | 8 | 3.4 | 1.2 | 1.6 | 87% | 14 | 23 | 610 |
+| 2 | Normal Hearth 9-4 | 12 | 3.8 | 1.6 | 2.0 | 100% | 16 | 35 | 374 |
+| 3 | Normal War 2-4 | 17 | 3.8 | 2.0 | 2.2 | 103% | 17 | 47 | 307 |
+| 5 | Normal Grave 4-1 | 28 | 3.8 | 3.2 | 3.0 | 104% | 18 | 92 | 469 |
+| 7 | Normal Sun 5-2 | 39 | 3.8 | 4.0 | 3.4 | 105% | 22 | 137 | 882 |
+| 10 | Normal Trickster 6-1 | 60 | 4.0 | 5.4 | 4.4 | 108% | 25 | 220 | 557 |
+| 14 | Normal Forge 6-2 | 87 | 4.2 | 7.0 | 5.2 | 107% | 30 | 341 | 772 |
+| 21 | Hard Sun 2-4 | 107 | 4.2 | 8.2 | 6.2 | 98% | 38 | 527 | 822 |
+| 30 | Hard Forge 6-1 | 119 | 5.0 | 8.8 | 6.6 | 90% | 41 | 740 | 387 |
+| 45 | Nightmare Night 7-1 | 129 | 5.0 | 9.6 | 7.4 | 81% | 42 | 989 | 487 |
+| 60 | Nightmare Forge 5-3 | 137 | 5.0 | 10.6 | 8.2 | 80% | 47 | 1155 | 124 |
+| 90 | Godless Night 7-3 | 152 | 5.0 | 12.0 | 9.8 | 80% | 51 | 1431 | 292 |
+| 120 | Godless Wild 8-1 | 167 | 5.0 | 12.0 | 10.0 | 77% | 58 | 1662 | 254 |
+| 150 | all done | 188 | 6.0 | 12.0 | 10.0 | 115% | 61 | 1732 | 484 |
+| 180 | all done | 200 | 6.0 | 12.0 | 10.0 | 122% | 62 | 1792 | 184 |
+| 210 | all done | 200 | 6.0 | 12.0 | 10.0 | 122% | 67 | 1852 | 514 |
+| 240 | all done | 200 | 6.0 | 12.0 | 10.0 | 122% | 71 | 1912 | 204 |
+| 300 | all done | 200 | 6.0 | 12.0 | 10.0 | 122% | 77 | 2032 | 184 |
+| 365 | all done | 200 | 6.0 | 12.0 | 10.0 | 122% | 86 | 2162 | 284 |
 
 ## One casual free player, day by day
 
 | Day | Next battle | Team level | Star rank | Gear tier | Skill level | Team power vs recommended | Heroes | Stars earned | Godshards earned that day |
 |---|---|---|---|---|---|---|---|---|---|
 | 1 | Normal Hearth 3-1 | 4 | 3.4 | 0.6 | 1.2 | 86% | 14 | 8 | 439 |
-| 2 | Normal Hearth 5-4 | 7 | 3.4 | 1.0 | 1.6 | 87% | 14 | 19 | 181 |
-| 3 | Normal Hearth 8-1 | 10 | 3.4 | 1.0 | 2.0 | 88% | 15 | 28 | 193 |
-| 5 | Normal Hearth 9-4 | 14 | 3.8 | 1.0 | 2.0 | 100% | 17 | 35 | 126 |
-| 7 | Normal War 1-1 | 15 | 4.0 | 1.4 | 2.2 | 106% | 21 | 40 | 566 |
-| 10 | Normal War 10-2 | 25 | 4.0 | 2.0 | 3.0 | 106% | 22 | 77 | 201 |
-| 14 | Normal Grave 10-4 | 36 | 4.0 | 2.6 | 3.6 | 108% | 25 | 119 | 636 |
-| 21 | Normal Night 5-4 | 50 | 4.0 | 3.2 | 4.6 | 106% | 29 | 179 | 531 |
-| 30 | Normal Arcana 6-1 | 69 | 4.2 | 5.8 | 5.6 | 114% | 38 | 260 | 316 |
-| 45 | Normal Wild 5-2 | 99 | 4.2 | 8.8 | 7.0 | 123% | 42 | 377 | 418 |
-| 60 | Hard Grave 9-4 | 116 | 5.0 | 9.8 | 7.8 | 126% | 46 | 515 | 241 |
-| 90 | Hard Wild 1-1 | 133 | 5.0 | 10.8 | 8.8 | 110% | 50 | 760 | 251 |
-| 120 | Nightmare Night 7-2 | 144 | 5.0 | 11.6 | 9.4 | 101% | 52 | 985 | 166 |
-| 150 | Nightmare Wild 6-3 | 153 | 5.0 | 12.0 | 10.0 | 93% | 56 | 1182 | 436 |
-| 180 | Godless Night 5-3 | 158 | 5.0 | 12.0 | 10.0 | 86% | 57 | 1378 | 136 |
-| 210 | Godless Forge 6-1 | 163 | 5.0 | 12.0 | 10.0 | 80% | 61 | 1540 | 426 |
-| 240 | all done | 169 | 5.0 | 12.0 | 10.0 | 100% | 64 | 1615 | 87 |
-| 300 | all done | 181 | 6.0 | 12.0 | 10.0 | 115% | 69 | 1666 | 147 |
-| 365 | all done | 193 | 6.0 | 12.0 | 10.0 | 122% | 74 | 1722 | 147 |
+| 2 | Normal Hearth 5-4 | 7 | 3.4 | 1.2 | 1.6 | 88% | 14 | 19 | 181 |
+| 3 | Normal Hearth 8-1 | 10 | 3.4 | 1.6 | 2.0 | 90% | 15 | 28 | 193 |
+| 5 | Normal Hearth 10-4 | 14 | 3.8 | 2.0 | 2.2 | 103% | 17 | 39 | 241 |
+| 7 | Normal War 5-2 | 18 | 4.0 | 2.4 | 2.4 | 107% | 23 | 57 | 755 |
+| 10 | Normal Grave 4-3 | 29 | 4.0 | 3.2 | 3.0 | 110% | 23 | 94 | 276 |
+| 14 | Normal Sun 5-1 | 40 | 4.0 | 4.4 | 3.8 | 114% | 26 | 136 | 551 |
+| 21 | Normal Trickster 1-1 | 55 | 4.0 | 5.8 | 4.8 | 116% | 29 | 200 | 1235 |
+| 30 | Normal Arcana 10-4 | 74 | 4.2 | 7.2 | 5.8 | 119% | 35 | 279 | 251 |
+| 45 | Normal Wild 10-4 | 105 | 4.2 | 9.0 | 7.0 | 123% | 42 | 399 | 491 |
+| 60 | Hard Sun 4-2 | 118 | 5.0 | 9.8 | 7.8 | 125% | 45 | 533 | 256 |
+| 90 | Hard Wild 5-1 | 135 | 5.0 | 10.8 | 8.8 | 109% | 48 | 776 | 226 |
+| 120 | Nightmare Trickster 1-3 | 145 | 5.0 | 11.6 | 9.4 | 100% | 52 | 1002 | 266 |
+| 150 | Godless Hearth 1-4 | 154 | 5.0 | 12.0 | 10.0 | 93% | 56 | 1203 | 336 |
+| 180 | Godless Night 9-1 | 159 | 5.0 | 12.0 | 10.0 | 85% | 58 | 1392 | 156 |
+| 210 | Godless Forge 10-3 | 164 | 5.0 | 12.0 | 10.0 | 80% | 60 | 1558 | 436 |
+| 240 | all done | 170 | 6.0 | 12.0 | 10.0 | 109% | 65 | 1620 | 147 |
+| 300 | all done | 182 | 6.0 | 12.0 | 10.0 | 116% | 72 | 1671 | 277 |
+| 365 | all done | 194 | 6.0 | 12.0 | 10.0 | 122% | 79 | 1727 | 147 |
 
 ## One dedicated free player, day by day
 
 | Day | Next battle | Team level | Star rank | Gear tier | Skill level | Team power vs recommended | Heroes | Stars earned | Godshards earned that day |
 |---|---|---|---|---|---|---|---|---|---|
-| 1 | Normal War 6-1 | 17 | 3.6 | 1.0 | 2.2 | 86% | 14 | 60 | 1097 |
-| 2 | Normal Sun 1-1 | 32 | 3.6 | 2.0 | 3.0 | 87% | 16 | 120 | 916 |
-| 3 | Normal Night 6-1 | 46 | 3.6 | 3.0 | 3.6 | 88% | 19 | 180 | 832 |
-| 5 | Normal Arcana 10-2 | 70 | 4.2 | 5.0 | 4.8 | 98% | 22 | 279 | 900 |
-| 7 | Hard Hearth 4-3 | 97 | 4.2 | 7.0 | 5.6 | 97% | 31 | 416 | 1454 |
-| 10 | Hard Trickster 2-1 | 106 | 4.2 | 8.0 | 6.0 | 84% | 36 | 606 | 1534 |
-| 14 | Hard Sea 8-2 | 113 | 5.0 | 9.0 | 6.8 | 88% | 37 | 718 | 1262 |
-| 21 | Nightmare Sun 6-3 | 124 | 5.0 | 10.4 | 7.6 | 81% | 39 | 959 | 698 |
-| 30 | Nightmare Forge 1-3 | 137 | 5.0 | 11.8 | 8.8 | 82% | 44 | 1157 | 125 |
-| 45 | Godless Grave 9-3 | 151 | 5.0 | 12.0 | 10.0 | 80% | 50 | 1892 | 578 |
-| 60 | Godless Night 3-1 | 162 | 5.0 | 12.0 | 10.0 | 82% | 51 | 2987 | 306 |
-| 90 | all done | 184 | 6.0 | 12.0 | 10.0 | 110% | 55 | 5115 | 490 |
-| 120 | all done | 200 | 6.0 | 12.0 | 10.0 | 118% | 64 | 6352 | 182 |
-| 150 | all done | 200 | 6.0 | 12.0 | 10.0 | 118% | 69 | 6352 | 482 |
-| 180 | all done | 200 | 6.0 | 12.0 | 10.0 | 118% | 71 | 6352 | 182 |
-| 210 | all done | 200 | 6.0 | 12.0 | 10.0 | 118% | 73 | 6352 | 482 |
-| 240 | all done | 200 | 6.0 | 12.0 | 10.0 | 118% | 75 | 6352 | 182 |
-| 300 | all done | 200 | 6.0 | 12.0 | 10.0 | 118% | 84 | 6352 | 182 |
-| 365 | all done | 200 | 6.0 | 12.0 | 10.0 | 118% | 93 | 6352 | 182 |
+| 1 | Normal War 7-1 | 18 | 3.6 | 2.2 | 2.2 | 91% | 14 | 64 | 1137 |
+| 2 | Normal Sun 5-1 | 35 | 3.6 | 3.8 | 3.0 | 93% | 17 | 136 | 984 |
+| 3 | Normal Trickster 2-1 | 51 | 3.6 | 4.8 | 3.8 | 93% | 21 | 204 | 1172 |
+| 5 | Normal Forge 6-4 | 81 | 4.2 | 6.4 | 4.8 | 96% | 26 | 343 | 957 |
+| 7 | Hard Grave 1-2 | 100 | 4.2 | 7.4 | 5.4 | 92% | 30 | 481 | 1222 |
+| 10 | Hard Trickster 5-3 | 105 | 4.2 | 7.8 | 5.8 | 82% | 34 | 620 | 1075 |
+| 14 | Hard Sea 7-3 | 113 | 5.0 | 9.2 | 6.8 | 88% | 37 | 716 | 1174 |
+| 21 | Nightmare Grave 4-1 | 125 | 5.0 | 10.4 | 7.8 | 85% | 42 | 913 | 994 |
+| 30 | Nightmare Forge 4-3 | 138 | 5.0 | 11.8 | 8.8 | 82% | 44 | 1169 | 125 |
+| 45 | Godless Sun 3-1 | 155 | 5.0 | 12.0 | 10.0 | 81% | 51 | 1918 | 662 |
+| 60 | Godless Arcana 1-2 | 166 | 5.0 | 12.0 | 10.0 | 81% | 56 | 2872 | 404 |
+| 90 | all done | 188 | 6.0 | 12.0 | 10.0 | 112% | 60 | 5166 | 490 |
+| 120 | all done | 200 | 6.0 | 12.0 | 10.0 | 118% | 66 | 6352 | 182 |
+| 150 | all done | 200 | 6.0 | 12.0 | 10.0 | 118% | 68 | 6352 | 482 |
+| 180 | all done | 200 | 6.0 | 12.0 | 10.0 | 118% | 69 | 6352 | 182 |
+| 210 | all done | 200 | 6.0 | 12.0 | 10.0 | 118% | 71 | 6352 | 482 |
+| 240 | all done | 200 | 6.0 | 12.0 | 10.0 | 118% | 76 | 6352 | 282 |
+| 300 | all done | 200 | 6.0 | 12.0 | 10.0 | 118% | 82 | 6352 | 182 |
+| 365 | all done | 200 | 6.0 | 12.0 | 10.0 | 118% | 90 | 6352 | 182 |
 
 ## Flags
 
-- **Casual:** a light spender finishes Normal 8% sooner than a free player; the target is 25 to 35%.
-- **Regular Free** finishes Hard on day 34, much sooner than the target of about day 75.
-- **Dedicated Free** finishes Hard on day 20, much sooner than the target of about day 50.
-- **Dedicated:** a light spender finishes Normal 10% sooner than a free player; the target is 25 to 35%.
-- **Casual Free:** stuck on one Nightmare or Godless battle for up to 22 days; the limit is 14.
-- **Regular Heavy:** stuck on one Nightmare or Godless battle for up to 22 days; the limit is 14.
+- **Casual:** a light spender finishes Normal 4% sooner than a free player; the target is 25 to 35%.
+- **Regular Free** finishes Hard on day 33, much sooner than the target of about day 75.
+- **Dedicated Free** finishes Hard on day 19, much sooner than the target of about day 50.
+- **Dedicated:** a light spender finishes Normal 11% sooner than a free player; the target is 25 to 35%.
+- **Casual Free:** stuck on one Nightmare or Godless battle for up to 46 days; the limit is 14.
+- **Casual Light:** stuck on one Nightmare or Godless battle for up to 56 days; the limit is 14.
+- **Casual Heavy:** stuck on one Nightmare or Godless battle for up to 17 days; the limit is 14.
+- **Regular Heavy:** stuck on one Nightmare or Godless battle for up to 20 days; the limit is 14.
+- **Regular Free:** 3.0 summons a day in month 1; the target is 1.5 to 3.
 - **Dedicated Free:** 3.4 summons a day in month 1; the target is 1.5 to 3.
 - **Dedicated Free:** 1.8 summons a day after month 1; the target is 0.8 to 1.6.
-- **Collection:** Regular Free players own 35% of Epics and Legendaries on day 30; the target is 15 to 30%.
 - **Collection:** Regular Free players own 75% of Legendaries on day 365; the target is at most 60%.

@@ -429,9 +429,9 @@ class Player
             {
                 var o = group.Where(h => h.Level < Math.Min(upTo, C.Growth.LevelCap(h.Stars))).OrderBy(h => h.Level).FirstOrDefault();
                 if (o == null) break;
-                double cost = C.Growth.XpToNext(o.Level), goldCost = C.Growth.GoldToNext(o.Level);
-                if (xp < cost || gold < goldCost) break;
-                xp -= cost; gold -= goldCost; o.Level++;
+                double cost = C.Growth.XpToNext(o.Level);
+                if (xp < cost) break;
+                xp -= cost; o.Level++;
             }
         // Then gear beyond the recommendation, and skills.
         UpgradeGear(team, C.Growth.MaxGear);
