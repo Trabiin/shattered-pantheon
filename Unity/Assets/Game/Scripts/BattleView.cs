@@ -57,12 +57,14 @@ namespace ShatteredPantheon.Game
 
         IEnumerator Play()
         {
+            if (FightLog.Enabled) Debug.Log(FightLog.Start(Battle, stage, Seed));
             yield return new WaitForSeconds(0.6f);
             while (!Battle.Over && !Closed)
             {
                 int from = Battle.Events.Count;
                 Battle.Step();
                 for (int i = from; i < Battle.Events.Count; i++) Show(Battle.Events[i]);
+                if (FightLog.Enabled && FightLog.Action(Battle, Battle.Events.Skip(from)) is string line) Debug.Log(line);
                 foreach (var u in Battle.Units) cards[u.Key].Refresh(u);
                 yield return new WaitForSeconds(SecondsPerAction);
             }

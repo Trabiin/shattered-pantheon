@@ -190,7 +190,10 @@ namespace UnityEngine
     public static class Application { public static int targetFrameRate; public static string persistentDataPath; }
     public static class Debug
     {
-        public static readonly List<string> Warnings = new List<string>();
+        // False is a release build; true is the Unity editor or a development build.
+        public static bool isDebugBuild;
+        public static readonly List<string> Logs = new List<string>(), Warnings = new List<string>();
+        public static void Log(object message) => Logs.Add(message?.ToString());
         public static void LogWarning(object message) => Warnings.Add(message?.ToString());
     }
     public enum ScreenOrientation { Portrait }
