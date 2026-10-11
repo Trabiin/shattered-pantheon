@@ -1,6 +1,6 @@
 name: Unity compile
 
-# Compiles the game scripts against the real Unity 6.3 libraries, plays the screens on a stand-in
+# Checks a fresh clone opens in Unity Hub, compiles the game scripts against the real Unity 6.3 libraries, plays the screens on a stand-in
 # for Unity, and tests the save file and the campaign order. No Unity licence is needed: nothing here runs the Unity editor.
 on:
   push:
@@ -8,6 +8,21 @@ on:
   pull_request:
 
 jobs:
+  project:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: A fresh clone opens in Unity Hub (the project names its Unity 6.3 version, and every asset has its .meta file)
+        working-directory: Unity
+        run: |
+          v=ProjectSettings/ProjectVersion.txt
+          grep -qE '^m_EditorVersion: 6000\.3\.' $v || { echo "::error::Unity/$v is missing or doesn't name a Unity 6.3 editor, so Unity Hub can't add the project."; exit 1; }
+          echo "Project editor: $(grep '^m_EditorVersion:' $v)"
+          # Unity keeps each asset's id in its .meta file; without it every computer makes a different id and the scene loses its scripts.
+          missing=$(git ls-files Assets | grep -v '\.meta$' | while read -r f; do d=$f; while [ "$d" != Assets ]; do [ -f "$d.meta" ] || echo "$d"; d=$(dirname "$d"); done; done | sort -u)
+          [ -z "$missing" ] || { echo "::error::No .meta file for these (open the project in Unity once and commit the .meta files it makes):"; echo "$missing"; exit 1; }
+          echo "$(git ls-files Assets | grep -c '\.meta$') .meta files present"
+
   compile:
     runs-on: ubuntu-latest
     steps:

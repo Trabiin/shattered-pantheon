@@ -22,10 +22,15 @@ A mobile auto-battle gacha game, built in Unity. Design docs live in the project
 
 ## Open the game
 
-1. Install **Unity Hub**, then **Unity 6.3 LTS** with *Android Build Support* (and *iOS Build Support* on a Mac).
-2. In Unity Hub: **Add > Add project from disk**, pick the `Unity` folder, and open it with Unity 6.3 LTS. The first open takes a few minutes while Unity imports everything.
-3. The game's scene is created automatically (`Assets/Scenes/Main.unity`). Open it and press **Play**. If it's missing, use the menu **Shattered Pantheon > Rebuild Main Scene**.
-4. In the Game view, pick a portrait phone resolution (for example 1080x1920) to see it as on a phone.
+1. Install **Unity Hub**, then **Unity 6.3 LTS** with *Android Build Support* (and *iOS Build Support* on a Mac). The project names its exact editor in `Unity/ProjectSettings/ProjectVersion.txt` (6000.3.26f1); if you have a different 6.3 version, Unity Hub offers to install that one or open with yours.
+2. Clone the repository (for example with GitHub Desktop, or `git clone https://github.com/Trabiin/shattered-pantheon.git`).
+3. In Unity Hub: **Add > Add project from disk**, pick the `Unity` folder inside the clone, and open it. The first open takes a few minutes while Unity imports everything into `Unity/Library/`.
+4. In the Project window, open `Assets/Scenes/Main.unity` and press **Play**. If the scene is missing, use the menu **Shattered Pantheon > Rebuild Main Scene**.
+5. In the Game view, pick a portrait phone resolution (for example 1080x1920) to see it as on a phone.
+
+If Unity won't open the project because "another Unity instance is running", a Unity process from an earlier session is still running: end it in Task Manager (or Activity Monitor on a Mac) and open the project again.
+
+The repository holds everything a fresh clone needs: `Unity/ProjectSettings/`, `Unity/Packages/` and a `.meta` file beside every file and folder in `Unity/Assets/` (Unity keeps each asset's id there, and the scene finds its scripts by those ids). What Unity makes for each computer (`Library/`, `Temp/`, `Logs/`, `UserSettings/`, `obj/`) stays out of git (`.gitignore`). When you add a file under `Unity/Assets/`, commit the `.meta` file Unity makes beside it; the Unity compile check fails without it.
 
 The game opens on the campaign: realm 1 (Hearth) on Normal, its 10 stages with 4 battles each (battle 4 is the stage boss; stage 10's is the realm boss). Battles open in order: a new game opens only the first battle, each win opens the next, and beating a stage boss opens the next stage (locked battles are greyed out and say **Locked**). Cleared battles can always be replayed. Tap an open battle, set your team and formation (tap a slot, then a hero; the formation button switches between 2 in front and 3 in front), and press **Fight!**. The fight plays itself (tap the speed button for 1x/2x/3x, **Retreat** to go back), then the results show what each hero did, and won battles show as **Cleared**. Heroes have no levels yet and their rarity doesn't change their strength yet, so in each battle they fight at the strength the campaign was balanced for there.
 
@@ -65,6 +70,7 @@ dotnet run --project tools/ProgressionSim -c Release -- --build-campaign      # 
 ## Checks without Unity
 
 Every pull request runs these on GitHub (`.github/workflows/`):
+- **Fresh clone:** `Unity/ProjectSettings/ProjectVersion.txt` names a Unity 6.3 editor (without it Unity Hub can't add the project) and every file and folder in `Unity/Assets/` has its `.meta` file.
 - **Unity compile:** the game and editor scripts are compiled against the real Unity 6.3 libraries, taken from an official Unity editor image (from Docker Hub, or Google's copy of it if Docker Hub fails) and kept in GitHub's cache until a newer image comes out. No Unity licence is needed.
 - **Screen smoke test:** `dotnet run --project tools/ScreenSmokeTest` plays the screens on a stand-in for Unity, like a player would (locked battles can't be started, then all 40 realm 1 battles in order, each win opening the next, retrying lost ones, then closing and reopening the game and resetting progress), and fails on errors or on fights that differ from the engine.
 - **Save tests:** `dotnet run --project tools/SaveTests` saves and reloads progress, and checks a new game, damaged saves, upgrading an older version (version 1 saves keep the renamed heroes Jink and Korvald in their teams) and resetting.

@@ -1,4 +1,4 @@
-// Creates the game's scene the first time the project is opened, adds it to the build,
+// Creates the game's scene if it's missing (it's committed, so normally only after it was deleted), adds it to the build,
 // and sets the phone to portrait. Also available from the menu: Shattered Pantheon > Rebuild Main Scene.
 using System.IO;
 using UnityEditor;
