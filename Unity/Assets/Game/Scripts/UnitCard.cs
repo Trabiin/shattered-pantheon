@@ -16,7 +16,8 @@ namespace ShatteredPantheon.Game
         readonly CanvasGroup group;
         // Card animations run on the card itself, so they stop when the card is destroyed (on restart).
         readonly MonoBehaviour host;
-        Coroutine pulse;
+        readonly Color faceColor;
+        Coroutine pulse, flash;
 
         public UnitCard(Unit u, RectTransform parent, Vector2 pos)
         {
@@ -27,7 +28,8 @@ namespace ShatteredPantheon.Game
             group = frame.gameObject.AddComponent<CanvasGroup>();
             host = frame.gameObject.AddComponent<CoroutineHost>();
 
-            face = Ui.Panel(Root, "Face", Palette.Faction(u.Faction));
+            faceColor = Palette.Faction(u.Faction);
+            face = Ui.Panel(Root, "Face", faceColor);
             Ui.Stretch(face.rectTransform, 4);
 
             Ui.Label(Root, u.Def.Name, 30, Color.white, TextAnchor.UpperCenter, new Vector2(0, 75), new Vector2(280, 80)).Bold().FitText(18);
@@ -82,14 +84,18 @@ namespace ShatteredPantheon.Game
             Root.localScale = Vector3.one;
         }
 
-        public void Flash() => host.StartCoroutine(FlashRoutine());
+        // A hit during an earlier flash restarts it; the card always ends on its own colour.
+        public void Flash()
+        {
+            if (flash != null) host.StopCoroutine(flash);
+            flash = host.StartCoroutine(FlashRoutine());
+        }
 
         IEnumerator FlashRoutine()
         {
-            Color baseColor = face.color;
-            face.color = Color.Lerp(baseColor, Color.white, 0.6f);
+            face.color = Color.Lerp(faceColor, Color.white, 0.6f);
             yield return new WaitForSeconds(0.08f);
-            face.color = baseColor;
+            face.color = faceColor;
         }
     }
 }

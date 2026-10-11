@@ -34,17 +34,22 @@ The repository holds everything a fresh clone needs: `Unity/ProjectSettings/`, `
 
 The game opens on the campaign: realm 1 (Hearth) on Normal, its 10 stages with 4 battles each (battle 4 is the stage boss; stage 10's is the realm boss). Battles open in order: a new game opens only the first battle, each win opens the next, and beating a stage boss opens the next stage (locked battles are greyed out and say **Locked**). Cleared battles can always be replayed. Tap an open battle, set your team and formation (tap a slot, then a hero; the formation button switches between 2 in front and 3 in front), and press **Fight!**. The fight plays itself (tap the speed button for 1x/2x/3x, **Retreat** to go back), then the results show what each hero did, and won battles show as **Cleared**. Heroes have no levels yet and their rarity doesn't change their strength yet, so in each battle they fight at the strength the campaign was balanced for there.
 
+## Testing tools (Unity editor and development builds only)
+
+These are for testing and are never in a release build (they switch on with Unity's `Debug.isDebugBuild`, which is true in the editor and in builds made with *Development Build* ticked):
+
+- **Testing speeds:** the battle speed button goes on past 3x to **10x** and **20x**, so a whole realm can be played quickly.
+- **Fight log:** every battle writes what happened to the Console (**Window > General > Console**). The first line names the battle, its seed and both teams; then one line per action, starting with the fight time at 1x and the action number, holding everything in it: turns, skills and ultimates, damage, healing, shields, effects (and resists), rituals starting and completing, interrupts, deaths, and the result. Units that share a name also say where they stand. To find one thing (an interrupt, a death), type a word from it ("interrupts", "falls", "ritual") in the Console's search box. The log only reads what the battle engine already reports, so a release build does no extra work.
+
 ## Your save
 
 Progress is kept in one file on the device, `save.json`, written after every battle and whenever the app is paused or closed. It holds the stars earned on each battle (a win is 1 star until star challenges arrive), the furthest battle cleared on each difficulty, and the team last used on each battle. Which battles are open isn't saved: it's worked out from the cleared ones. It lives in Unity's [persistent data folder](https://docs.unity3d.com/ScriptReference/Application-persistentDataPath.html):
 
 | Where the game runs | Folder |
 |---|---|
-| Unity editor or a build on Windows | `%USERPROFILE%\AppData\LocalLow\<company>\<product>\` |
-| Unity editor or a build on a Mac | `~/Library/Application Support/<company>/<product>/` |
-| Android | the app's own storage, `Android/data/<package name>/files/` |
-
-Until the build settings name the app, Unity uses `DefaultCompany` and `Unity` for the company and product.
+| Unity editor or a build on Windows | `%USERPROFILE%\AppData\LocalLow\Shattered Pantheon\Shattered Pantheon\save.json` (Unity also keeps its own `Unity` folder there) |
+| Unity editor or a build on a Mac | `~/Library/Application Support/Shattered Pantheon/Shattered Pantheon/save.json` |
+| Android | the app's own storage, `Android/data/<package name>/files/save.json` |
 
 **To start again:** tap **Reset progress** at the bottom of the campaign screen, then **Tap again to reset**. Or close the game and delete `save.json`. The button is for testing and goes before the closed test.
 
@@ -72,8 +77,8 @@ dotnet run --project tools/ProgressionSim -c Release -- --build-campaign      # 
 Every pull request runs these on GitHub (`.github/workflows/`):
 - **Fresh clone:** `Unity/ProjectSettings/ProjectVersion.txt` names a Unity 6.3 editor (without it Unity Hub can't add the project) and every file and folder in `Unity/Assets/` has its `.meta` file.
 - **Unity compile:** the game and editor scripts are compiled against the real Unity 6.3 libraries, taken from an official Unity editor image (from Docker Hub, or Google's copy of it if Docker Hub fails) and kept in GitHub's cache until a newer image comes out. No Unity licence is needed.
-- **Screen smoke test:** `dotnet run --project tools/ScreenSmokeTest` plays the screens on a stand-in for Unity, like a player would (locked battles can't be started, then all 40 realm 1 battles in order, each win opening the next, retrying lost ones, then closing and reopening the game and resetting progress), and fails on errors or on fights that differ from the engine.
-- **Save tests:** `dotnet run --project tools/SaveTests` saves and reloads progress, and checks a new game, damaged saves, upgrading an older version (version 1 saves keep the renamed heroes Jink and Korvald in their teams) and resetting.
+- **Screen smoke test:** `dotnet run --project tools/ScreenSmokeTest` plays the screens on a stand-in for Unity, like a player would (a card hit twice in quick succession going back to its own colour, locked battles can't be started, the first fights as a release build with no testing speeds and no fight log, then all 40 realm 1 battles in order as a development build at 20x with the fight log checked against every event, each win opening the next, retrying lost ones, results bars inside their rows, then closing and reopening the game and resetting progress), and fails on errors or on fights that differ from the engine.
+- **Save tests:** `dotnet run --project tools/SaveTests` saves and reloads progress, and checks a new game, damaged saves (and that their warning reads as whole sentences), upgrading an older version (version 1 saves keep the renamed heroes Jink and Korvald in their teams) and resetting.
 - **Campaign order tests:** `dotnet run --project tools/CampaignTests` checks the order battles open in across all 4 difficulties: a new game, each win, stage and realm bosses, the next difficulty, replays and a reloaded save.
 - **Growth tests:** `dotnet run --project tools/GrowthTests` checks the growth rules on the real `progression.json` against values worked out by hand from doc 07: health and attack multipliers, level caps, XP and gold per level, fodder to ascend, skill tomes and gear costs.
 - **Battle data:** the files `tools/BattleData/gen_data.py` writes match the ones in the repository, and its checks pass (kits fit their rarity, no names close to a god's).
