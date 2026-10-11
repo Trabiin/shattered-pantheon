@@ -1,6 +1,6 @@
 // What the player has done, kept in the save file on the device (SaveStore): stars earned on each
 // battle, the furthest battle cleared on each difficulty, the team of hero cards last used on each
-// battle, and (through the Wallet) the hero cards they own and their items.
+// battle, and (through the Wallet) the hero cards they own and their items, which every win adds to.
 // Which battles are open isn't saved: CampaignOrder works it out from the cleared battles.
 // Every change is written straight away; GameApp also writes when the app is paused or closed.
 // Plain C# with no Unity code, so the save tests run without Unity (tools/SaveTests).
@@ -15,7 +15,7 @@ namespace ShatteredPantheon.Game
     public class PlayerProgress
     {
         readonly GameData data;
-        readonly CampaignCurve curve;
+        readonly CampaignRewards rewards;
         readonly SaveStore store;
         readonly Action<string> warn;
         readonly CampaignOrder campaign;
@@ -23,14 +23,14 @@ namespace ShatteredPantheon.Game
         public SaveData Save { get; private set; }
         public Wallet Wallet { get; }
 
-        public PlayerProgress(GameData data, CampaignCurve curve, SaveStore store, Action<string> warn)
+        public PlayerProgress(GameData data, CampaignRewards rewards, SaveStore store, Action<string> warn)
         {
             this.data = data;
-            this.curve = curve;
+            this.rewards = rewards;
             this.store = store;
             this.warn = warn;
             campaign = new CampaignOrder(data.Stages);
-            Wallet = new Wallet(data, curve.Growth, () => Save, Write);
+            Wallet = new Wallet(data, rewards.Curve.Growth, () => Save, Write);
             Save = store.Load(out string problem);
             if (problem != null) warn(problem);
             if (Save.Heroes.Count == 0) StartingHeroes();
@@ -56,7 +56,7 @@ namespace ShatteredPantheon.Game
         public double HeroScale(string card)
         {
             var c = Wallet.Hero(card);
-            return curve.Growth.StatScale(HeroOf(card).Rarity, c.Level, c.Stars, 0, c.Skill);
+            return rewards.Curve.Growth.StatScale(HeroOf(card).Rarity, c.Level, c.Stars, 0, c.Skill);
         }
 
         // The team of cards as the battle engine takes it: each slot names the card's hero and carries the
@@ -70,22 +70,74 @@ namespace ShatteredPantheon.Game
         public bool IsOpen(StageDef battle) => campaign.IsOpen(battle, IsCleared);
         public string Furthest(string difficulty) => Save.Furthest.TryGetValue(difficulty, out var id) ? id : null;
 
-        // Called when a fight ends, whatever the result, with the hero cards that fought, and saved. The
-        // first win on a battle shares its battle XP among them.
-        public void RecordBattle(StageDef battle, string result, IEnumerable<string> cards)
+        // The player's current campaign battle, where rewards counted in level-ups are valued: the one after
+        // the furthest battle cleared on any difficulty (the last battle once everything is cleared).
+        public StageDef CurrentBattle()
         {
+            int furthest = Save.Furthest.Values.Select(id => campaign.IndexOf(data.Stages.Find(b => b.Id == id))).DefaultIfEmpty(-1).Max();
+            return campaign.Battles[Math.Min(furthest + 1, campaign.Battles.Count - 1)];
+        }
+
+        // Called when a fight ends, whatever the result, with the hero cards that fought and the fight's
+        // seed, and saved. A win gives the battle's reward from progression.json (CampaignRewards): the
+        // first win its first-clear reward (on a stage boss with the stage clear and its Vessel chance), a
+        // replay the farm reward. Their XP is battle XP, shared by the heroes who fought; everything else
+        // goes into the inventory. The win's star and the challenge stars it met (2 to 5) are saved, and
+        // stars can open the stage's chests (6, 12 and 20 of its stars) and the star track's (every 100 on a difficulty).
+        // The seed makes the reward's chances (a 40% Vessel) the same whenever the same fight is checked.
+        public BattleRewards RecordBattle(StageDef battle, string result, IEnumerable<string> cards, int seed = 0, IEnumerable<int> challengeStars = null)
+        {
+            var got = new BattleRewards();
             if (result == "win")
             {
-                // TODO(E7-F6-S1-T6): replays give no XP until they give the farm reward for Devotion.
-                if (!IsCleared(battle.Id)) Wallet.ShareBattleXp(cards, curve.FirstClearXp(battle));
-                // TODO(E7-F5-S3-T2): a win is 1 star until challenge checks award stars 2 to 5.
+                var rng = new Random(seed);
+                got.FirstWin = !IsCleared(battle.Id);
+                var (diff, k) = rewards.Curve.Position(got.FirstWin ? battle : CurrentBattle());
+                // TODO(E10-F3-S1-T2): replays are free until Devotion exists; then each costs rewards.ReplayDevotion.
+                var loot = (got.FirstWin ? rewards.FirstWin(diff, k) : rewards.Replay(rewards.Curve.Position(battle).diff, diff, k)).Whole(rng);
+                var levels = cards.Distinct().Where(Wallet.Owns).ToDictionary(c => c, c => Wallet.Hero(c).Level);
+                var shares = Wallet.ShareBattleXp(cards, (long)loot.Xp);
+                got.Heroes = levels.Select(c => new HeroXp { Card = c.Key, Xp = shares.TryGetValue(c.Key, out var x) ? x : 0, Capped = !shares.ContainsKey(c.Key), LevelBefore = c.Value, LevelAfter = Wallet.Hero(c.Key).Level }).ToList();
+                loot.Xp = 0;
+                got.Add(loot);
+
                 var stars = Save.Stars.TryGetValue(battle.Id, out var s) ? s : Save.Stars[battle.Id] = new List<int>();
-                if (!stars.Contains(1)) { stars.Add(1); stars.Sort(); }
+                int stageBefore = StageStars(battle), difficultyBefore = DifficultyStars(battle);
+                var earned = new[] { 1 }.Concat((challengeStars ?? Enumerable.Empty<int>()).Where(n => n >= 2 && n <= 5)).Distinct().Where(n => !stars.Contains(n)).ToList();
+                stars.AddRange(earned);
+                stars.Sort();
+                got.Add(rewards.Stars(earned.Count(n => n > 1), diff, k).Whole(rng));
+                for (int chest = rewards.StageChestsAt(stageBefore); chest < rewards.StageChestsAt(StageStars(battle)); chest++)
+                {
+                    got.Chests.Add($"Stage chest ({rewards.StageChestStars[chest]}★)");
+                    got.Add(rewards.StageChest(chest, diff, k).Whole(rng));
+                }
+                for (int chest = rewards.StarChestsAt(difficultyBefore); chest < rewards.StarChestsAt(DifficultyStars(battle)); chest++)
+                {
+                    got.Chests.Add($"Star track chest ({(chest + 1) * rewards.StarChestEvery}★)");
+                    got.Add(rewards.StarTrackChest(diff, k).Whole(rng));
+                }
+                Wallet.Earn(got.Items);
+
                 string furthest = Furthest(battle.Difficulty);
                 var before = furthest == null ? null : data.Stages.Find(b => b.Id == furthest);
                 if (before == null || campaign.IndexOf(battle) > campaign.IndexOf(before)) Save.Furthest[battle.Difficulty] = battle.Id;
             }
             Write();
+            return got;
+        }
+
+        // The stars earned on a battle's stage (its battles share the stage chests), and on its difficulty (the star track).
+        int StageStars(StageDef battle) => StarsWhere(b => b.Difficulty == battle.Difficulty && b.RealmNumber == battle.RealmNumber && b.StageNumber == battle.StageNumber);
+        int DifficultyStars(StageDef battle) => StarsWhere(b => b.Difficulty == battle.Difficulty);
+        int StarsWhere(Func<StageDef, bool> battles) => campaign.Battles.Where(battles).Sum(b => Stars(b.Id).Count);
+
+        // The battle after this one in the order battles open, if it's open (a win opens it); null after the last.
+        public StageDef NextBattle(StageDef battle)
+        {
+            int i = campaign.IndexOf(battle);
+            var next = i >= 0 && i + 1 < campaign.Battles.Count ? campaign.Battles[i + 1] : null;
+            return next != null && IsOpen(next) ? next : null;
         }
 
         public void SaveTeam(string battleId, List<TeamSlot> team, string formation)
@@ -153,5 +205,34 @@ namespace ShatteredPantheon.Game
             Save = new SaveData();
             StartingHeroes();
         }
+    }
+
+    // What a fight gave, for the results screen: everything that went into the inventory, each hero's
+    // battle XP, and the chests that opened.
+    public class BattleRewards
+    {
+        public bool FirstWin;
+        public Dictionary<string, long> Items = new Dictionary<string, long>();
+        public List<HeroXp> Heroes = new List<HeroXp>();
+        public List<string> Chests = new List<string>();
+
+        // Adds a whole reward's items (its XP, if any, as XP potions). Campaign rewards give no Devotion.
+        public void Add(Loot loot)
+        {
+            void Put(string item, double n) { if (n > 0) Items[item] = (Items.TryGetValue(item, out var had) ? had : 0) + (long)n; }
+            Put(Item.Gold, loot.Gold); Put(Item.XpPotions, loot.Xp); Put(Item.Godshards, loot.Godshards); Put(Item.SummonTickets, loot.SummonTickets);
+            Put(Item.GearMats, loot.GearMats); Put(Item.SkillTomes, loot.SkillTomes); Put(Item.HeroShards, loot.HeroShards);
+            foreach (var v in loot.Vessels) Put(Item.Vessel(v.Key), v.Value);
+        }
+    }
+
+    // A hero card's battle XP from one fight, and its level before and after. A card already at its
+    // level cap gets no share (Capped).
+    public class HeroXp
+    {
+        public string Card;
+        public long Xp;
+        public bool Capped;
+        public int LevelBefore, LevelAfter;
     }
 }

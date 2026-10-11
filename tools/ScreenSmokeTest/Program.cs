@@ -1,12 +1,13 @@
 // Plays the game's screens on fake Unity (FakeUnity.cs) the way a player would: the campaign screen,
 // locked battles, team and formation editing, every realm 1 battle in order (each win opening the
-// next, and the first win sharing battle XP among the heroes who fought), retreating mid-fight,
-// results, retry, closing and reopening the game with its save, and resetting progress. The first
+// next, giving its rewards and sharing battle XP among the heroes who fought, and Next battle going
+// on to it), retreating mid-fight, results, retry, closing and reopening the game with its save, and
+// resetting progress. The first
 // fights run as a release build; realm 1 is then played as a development build, at the testing speed
 // of 20x with the fight log on.
 // Fails on any exception a screen throws, on a fight that differs from the engine run directly, on
-// heroes fighting at anything but their own level's strength, on battle XP that doesn't add up, on
-// screens or animations left behind, or on a team that isn't what the player picked.
+// heroes fighting at anything but their own level's strength, on battle XP or rewards that don't add
+// up, on screens or animations left behind, or on a team that isn't what the player picked.
 //   dotnet run --project tools/ScreenSmokeTest
 using System;
 using System.Collections.Generic;
@@ -25,6 +26,7 @@ static class Program
     static readonly string[] Starter = { "solenne", "mordecai", "dagna", "oriel", "thessaly" };
     static int failures;
     static GameApp app;
+    static CampaignRewards rewards;
     static CampaignCurve curve;
 
     static int Main()
@@ -34,7 +36,8 @@ static class Program
         string dir = Path.Combine(UnityEngine.Resources.Root, "BattleData");
         string R(string f) => File.ReadAllText(Path.Combine(dir, f + ".json"));
         var data = GameData.FromJson(R("rules"), R("heroes"), R("enemies"), R("campaign"));
-        curve = CampaignCurve.FromJson(R("progression"));
+        rewards = CampaignRewards.FromJson(R("progression"));
+        curve = rewards.Curve;
         Application.persistentDataPath = Path.Combine(Path.GetTempPath(), "sp-smoke-" + Guid.NewGuid().ToString("N"));
         string saveFile = Path.Combine(Application.persistentDataPath, SaveStore.FileName);
         var realm = CampaignView.Battles(data);
@@ -143,7 +146,15 @@ static class Program
             int tries = 1;
             while (!CheckFight(data, stage, team) && tries < MaxTries) { Click("Retry Button"); tries++; }
             Expect(app.Progress.IsCleared(stage.Id), $"{stage.Name}: won within {MaxTries} tries ({tries})");
-            Click("Stages Button");
+            Expect((Find("Next battle Button") != null) == (next != null), $"{stage.Name}: {(next != null ? "the results offer Next battle" : "the realm boss offers no Next battle: realm 2 isn't in the game yet")}");
+            if (next != null && stage.StageNumber % 2 == 1)
+            {
+                // Half the stages go on with Next battle, which opens the team screen for the battle the win opened.
+                Click("Next battle Button");
+                Expect(Current is TeamView && ((StageDef)Field(Current, "stage")).Id == next.Id, $"{stage.Name}: Next battle opens the team screen for {next.Name}");
+                Click("Back Button");
+            }
+            else Click("Stages Button");
             if (next != null) Expect(!IsShownLocked(next), $"{stage.Name}: the win opens {opens}");
         }
         Expect(realm.All(b => IsShownCleared(b)), "every won battle shows as cleared");
@@ -226,7 +237,9 @@ static class Program
         var scale = team.ToDictionary(s => s.Id, s => app.Progress.HeroScale(s.Id));
         var fighting = app.Progress.FightingTeam(team);
         var xpBefore = team.ToDictionary(s => s.Id, s => TotalXp(s.Id));
+        var itemsBefore = Item.All.ToDictionary(i => i, i => app.Progress.Wallet.Count(i));
         bool firstWin = !app.Progress.IsCleared(stage.Id);
+        var (diff, k) = curve.Position(app.Progress.CurrentBattle());
         float t = RunUntil(() => Current is ResultsView, 3600);
         var strong = team.Select(s => new TeamSlot(app.Progress.HeroOf(s.Id).Id, s.Row, s.Slot) { HpScale = scale[s.Id], AtkScale = scale[s.Id] }).ToList();
         var direct = Battle.Run(data, strong, stage.Id, view.Seed, new BattleOptions { Formation = view.Battle.HeroFormation });
@@ -238,9 +251,17 @@ static class Program
         Expect(TeamSet(shown.Units.Where(u => u.Side == "A").Select(u => new TeamSlot(u.Id, u.Row, u.Slot)).ToList()) == TeamSet(strong), $"{stage.Name}: the fight used the picked team and formation");
         Expect(results != null && results.Title == (direct.Result == "win" ? "Victory" : direct.Result == "lose" ? "Defeat" : "Time's up"), $"{stage.Name}: result title is right");
         Expect(fighting.Zip(strong, (a, b) => a.Id == b.Id && a.Slot == b.Slot && a.HpScale == b.HpScale && a.AtkScale == b.AtkScale).All(x => x), $"{stage.Name}: heroes fight at their own strength ({string.Join(", ", scale.Values.Select(v => v.ToString("0.00")))}x; the battle expects {stage.HeroScale:0.00}x)");
-        long share = firstWin && direct.Result == "win" ? curve.FirstClearXp(stage) / team.Count : 0;
-        Expect(team.All(s => TotalXp(s.Id) - xpBefore[s.Id] == share), $"{stage.Name}: {(share > 0 ? $"a first win gives each hero who fought {share} XP" : "no battle XP for a loss or a replay")}");
+        long battleXp = direct.Result != "win" ? 0 : firstWin ? rewards.FirstClearXp(stage) : (long)Math.Round(rewards.Replay(curve.Position(stage).diff, diff, k).Xp);
+        long share = battleXp / team.Count;
+        string won = firstWin ? "a first win" : "a replay";
+        Expect(team.All(s => TotalXp(s.Id) - xpBefore[s.Id] == share), $"{stage.Name}: {(share > 0 ? $"{won} gives each hero who fought {share} XP" : "no battle XP for a loss")}");
+        Expect(share == 0 || direct.Heroes.All(h => Label(Find("Row: " + h.Id)).Contains($"+{share} XP")), $"{stage.Name}: {(share > 0 ? "each hero's row shows their battle XP" : "no XP shown")}");
+        var gained = Item.All.Where(i => app.Progress.Wallet.Count(i) > itemsBefore[i]).ToList();
+        var listed = Find("Rewards: items") is GameObject items ? items.GetComponent<Text>().text : null;
+        Expect(direct.Result == "win" ? listed != null && gained.Contains(Item.Gold) && gained.All(i => listed.Contains(Item.Describe(i, app.Progress.Wallet.Count(i) - itemsBefore[i]))) : listed == null && gained.Count == 0,
+            $"{stage.Name}: {(direct.Result == "win" ? $"the results list what {won} put in the inventory ({listed?.Replace("\n", " ")})" : "a loss gives and lists nothing")}");
         Expect(direct.Result != "win" || app.Progress.IsCleared(stage.Id), $"{stage.Name}: a win marks the battle cleared");
+        Expect(direct.Result == "win" || Find("Next battle Button") == null, $"{stage.Name}: no Next battle after a loss");
         Expect(SaveData.FromJson(File.ReadAllText(Path.Combine(Application.persistentDataPath, SaveStore.FileName))).Stars.ContainsKey(stage.Id) == app.Progress.IsCleared(stage.Id), $"{stage.Name}: the save on the device matches after the fight");
         Expect(direct.Heroes.All(h => Find("Row: " + h.Id) != null), $"{stage.Name}: every hero has a results row");
         var bars = Named("Row: ").SelectMany(r => r.transform.Cast<Transform>()).Where(c => c.name == "Bar").Select(c => (RectTransform)c).ToList();

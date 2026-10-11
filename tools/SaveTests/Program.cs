@@ -1,6 +1,7 @@
 // Tests for the game's save file: a new game, saving and loading, closing and reopening, damaged and
 // unreadable saves, upgrading an older version, keeping sections a later system adds, the hero cards
-// and items the player owns, the wallet every change to them goes through, battle XP, and copies.
+// and items the player owns, the wallet every change to them goes through, battle XP, copies, and the
+// rewards every win gives (first clears, replays, stage clears, challenge stars and chests).
 // Each test works in its own temporary folder, standing in for the phone's save folder.
 //   dotnet run --project tools/SaveTests
 using System;
@@ -14,6 +15,7 @@ static class Program
 {
     static int failures;
     static GameData data;
+    static CampaignRewards rewards;
     static CampaignCurve curve;
     static List<StageDef> realm;
     static readonly string[] Five = { "hilde", "solenne", "thessaly", "maren", "pip" };
@@ -23,7 +25,8 @@ static class Program
         string dir = Path.Combine(FindRoot(), "Unity", "Assets", "Resources", "BattleData");
         string R(string f) => File.ReadAllText(Path.Combine(dir, f + ".json"));
         data = GameData.FromJson(R("rules"), R("heroes"), R("enemies"), R("campaign"));
-        curve = CampaignCurve.FromJson(R("progression"));
+        rewards = CampaignRewards.FromJson(R("progression"));
+        curve = rewards.Curve;
         realm = data.Stages.Where(s => s.RealmNumber == 1 && s.Difficulty == "normal").OrderBy(s => s.StageNumber).ThenBy(s => s.BattleNumber).ToList();
 
         Test("A missing save is a new game", NewGame);
@@ -39,7 +42,9 @@ static class Program
         Test("A new game owns the starting heroes and no items", StartingHeroes);
         Test("A save from before heroes were kept gets the starting heroes", SaveWithoutHeroes);
         Test("The wallet: earning, spending and refusing to overspend", WalletItems);
-        Test("Battle XP after a first win", BattleXp);
+        Test("Battle XP after a win", BattleXp);
+        Test("Every win gives its rewards", WinRewards);
+        Test("Stage chests and the star track open with stars", Chests);
         Test("Battle XP stops at the level cap", LevelCaps);
         Test("Heroes fight at their own strength", Strength);
         Test("Heroes and items survive closing and reopening", HeroesReload);
@@ -154,7 +159,7 @@ static class Program
             File.WriteAllText(store.FilePath, text);
             var warnings = new List<string>();
             PlayerProgress progress = null;
-            try { progress = new PlayerProgress(data, curve, store, warnings.Add); }
+            try { progress = new PlayerProgress(data, rewards, store, warnings.Add); }
             catch (Exception e) { Expect(false, $"{what}: loading throws {e.GetType().Name}: {e.Message}"); continue; }
             var kept = Directory.GetFiles(folder, "save.damaged-*.json");
             Expect(progress.Save.Stars.Count == 0 && progress.Save.Version == SaveData.CurrentVersion, $"{what}: starts a new game");
@@ -325,33 +330,127 @@ static class Program
     {
         var progress = Progress(folder, out _);
         var growth = curve.Growth;
-        long xp = curve.FirstClearXp(realm[0]);
-        Expect(xp == Math.Round(curve.FirstClearXpLevels * growth.XpToNext(1)) && xp > 0, $"realm 1's first battle gives {xp} XP: progression.json's first-clear XP at its recommended level");
-        long late = curve.FirstClearXp(realm[39]);
-        Expect(late == Math.Round(curve.FirstClearXpLevels * growth.XpToNext(curve.RecLevel(0, 39))) && late > xp, $"later battles give more ({late} XP at the realm boss)");
+        long xp = rewards.FirstClearXp(realm[0]);
+        Expect(xp == Math.Round(rewards.FirstClear.XpLevels * growth.XpToNext(1)) && xp > 0, $"realm 1's first battle gives {xp} XP: progression.json's first-clear XP at its recommended level");
+        long late = rewards.FirstClearXp(realm[39]);
+        Expect(late == Math.Round(rewards.FirstClear.XpLevels * growth.XpToNext(curve.RecLevel(0, 39))) && late > xp, $"later battles give more ({late} XP at the realm boss)");
 
         var three = new[] { "hilde", "grub", "korvald" };
         progress.RecordBattle(realm[0], "lose", three);
         Expect(three.All(id => Total(progress, id) == 0), "a loss gives no XP");
-        progress.RecordBattle(realm[0], "win", three);
+        var won = progress.RecordBattle(realm[0], "win", three);
         Expect(three.All(id => Total(progress, id) == xp / 3), $"a first win shares the XP evenly by the heroes who fought ({xp / 3} each)");
+        Expect(won.Heroes.Count == 3 && won.Heroes.All(h => three.Contains(h.Card) && h.Xp == xp / 3 && h.LevelBefore == 1), "the results get each hero's battle XP");
         Expect(data.Heroes.Where(h => !three.Contains(h.Id)).All(h => Total(progress, h.Id) == 0), "heroes who didn't fight get none");
-        progress.RecordBattle(realm[0], "win", three);
-        Expect(three.All(id => Total(progress, id) == xp / 3), "replaying a cleared battle gives none (until farming arrives)");
+        // A replay gives the farm reward's XP, valued at the player's current battle (now the second).
+        long farm = (long)Math.Round(rewards.Farm.XpLevels * growth.XpToNext(curve.RecLevel(0, 1)) + rewards.FarmByDifficulty[0].XpLevels * growth.XpToNext(curve.RecLevel(0, 1)));
+        var replay = progress.RecordBattle(realm[0], "win", three);
+        Expect(farm > 0 && three.All(id => Total(progress, id) == xp / 3 + farm / 3), $"replaying a cleared battle shares the farm reward's XP ({farm / 3} each)");
+        Expect(!replay.FirstWin && replay.Heroes.All(h => h.Xp == farm / 3), "the results show it as a replay, with each hero's XP");
         Expect(Progress(folder, out _).Wallet.Hero("hilde").Xp == progress.Wallet.Hero("hilde").Xp, "battle XP is saved");
 
         // Levelling up: every time XP reaches the next level, without gold.
         var wallet = progress.Wallet;
         var pip = wallet.Hero("pip");
+        long gold = wallet.Count(Item.Gold);
         wallet.ShareBattleXp(new[] { "pip" }, (long)growth.XpToNext(1) - 1);
         Expect(pip.Level == 1 && pip.Xp == growth.XpToNext(1) - 1, "one XP short of the next level stays at level 1");
         wallet.ShareBattleXp(new[] { "pip" }, 1);
         Expect(pip.Level == 2 && pip.Xp == 0, "reaching it levels up, with nothing left over");
         wallet.ShareBattleXp(new[] { "pip" }, (long)(growth.XpToNext(2) + growth.XpToNext(3) + growth.XpToNext(4)) + 7);
         Expect(pip.Level == 5 && pip.Xp == 7, "enough XP for several levels gives them all at once, and keeps the rest");
-        Expect(wallet.Count(Item.Gold) == 0, "levelling up costs no gold");
+        Expect(wallet.Count(Item.Gold) == gold, "levelling up costs no gold");
         wallet.ShareBattleXp(new[] { "pip", "pip", "no-such-hero" }, 10);
         Expect(pip.Xp == 17, "a hero listed twice gets one share, and an unknown hero none");
+    }
+
+    // Normal's first battles are worth level-ups at level 1 (30 XP): a first clear 0.8 of one in XP and
+    // in gold (at 0.5 gold per XP), 5 Godshards and a gear material (progression.json, "firstClear").
+    static void WinRewards(string folder)
+    {
+        var progress = Progress(folder, out _);
+        var wallet = progress.Wallet;
+        var three = new[] { "hilde", "grub", "korvald" };
+        var lost = progress.RecordBattle(realm[0], "lose", three, 7);
+        Expect(lost.Items.Count == 0 && lost.Heroes.Count == 0 && Item.All.All(i => wallet.Count(i) == 0), "a loss gives nothing");
+
+        var first = progress.RecordBattle(realm[0], "win", three, 7);
+        Expect(first.FirstWin && wallet.Count(Item.Gold) == 12 && wallet.Count(Item.Godshards) == 5 && wallet.Count(Item.GearMats) == 1, "a first clear gives 12 gold, 5 Godshards and a gear material");
+        Expect(first.Items.Count == 3 && first.Items[Item.Gold] == 12 && first.Items[Item.Godshards] == 5 && first.Items[Item.GearMats] == 1 && first.Chests.Count == 0, "the results list exactly what went into the inventory");
+        Expect(wallet.Count(Item.XpPotions) == 0, "its XP went to the heroes as battle XP, not into potions");
+        Expect(Item.Describe(Item.Gold, 12) == "12 Gold" && Item.Describe(Item.SummonTickets, 1) == "1 Summon ticket" && Item.Describe(Item.GearMats, 2) == "2 Gear materials" && Item.Describe(Item.Vessel(2), 1) == "1 Vessel (2★)",
+            "the results name each item in plain words: 12 Gold, 1 Summon ticket, 2 Gear materials, 1 Vessel (2★)");
+
+        // Battle 4 is the stage boss: its first clear adds the stage clear (20 Godshards, 2.4 gear materials
+        // and skill tomes, so 2 or 3 of each) and a 40% chance of a 2★ Vessel on Normal (doc 08 section 4).
+        progress.RecordBattle(realm[1], "win", three, 7);
+        progress.RecordBattle(realm[2], "win", three, 7);
+        long shards = wallet.Count(Item.Godshards), mats = wallet.Count(Item.GearMats);
+        var boss = progress.RecordBattle(realm[3], "win", three, 7);
+        Expect(wallet.Count(Item.Godshards) - shards == 25, "a stage boss's first clear gives 5 + 20 Godshards");
+        Expect(wallet.Count(Item.GearMats) - mats is 3 or 4 && wallet.Count(Item.SkillTomes) is 2 or 3, "and 1 + 2.4 gear materials and 2.4 skill tomes, the fraction a chance of one more");
+        Expect(wallet.Count(Item.Vessel(2)) is 0 or 1 && Enumerable.Range(1, 5).Where(n => n != 2).All(n => wallet.Count(Item.Vessel(n)) == 0), $"and at most one 2★ Vessel ({wallet.Count(Item.Vessel(2))})");
+        int vessels = Enumerable.Range(0, 400).Count(seed => rewards.FirstWin(0, 3).Whole(new Random(seed)).Vessels[2] == 1);
+        Expect(vessels > 120 && vessels < 200, $"the stage clear's Vessel comes about 40% of the time ({vessels} of 400 seeds)");
+
+        // Replays give the farm reward at the player's current battle (now the 5th), and Normal's farm drops.
+        var at = curve.RecLevel(0, 4);
+        long gold = wallet.Count(Item.Gold), godshards = wallet.Count(Item.Godshards);
+        var replay = progress.RecordBattle(realm[0], "win", three, 11);
+        long farmGold = (long)Math.Round(rewards.Farm.GoldLevels * curve.Growth.XpToNext(at) * curve.Growth.GoldPerXp);
+        Expect(!replay.FirstWin && wallet.Count(Item.Gold) - gold == farmGold && wallet.Count(Item.Godshards) == godshards, $"a replay gives the farm reward's gold ({farmGold}) and no Godshards");
+        Expect(replay.Items.TryGetValue(Item.GearMats, out var m) && m is 1 or 2, "and 1 gear material plus Normal's 0.5 chance of another");
+        Expect(rewards.ReplayDevotion == 8, "a replay will cost 8 Devotion (not charged until Devotion exists, E10-F3-S1)");
+
+        // The same fight always gives the same reward, so it can be checked later.
+        var again = Progress(Path.Combine(folder, "again"), out _);
+        foreach (var (b, seed) in new[] { (0, 7), (1, 7), (2, 7), (3, 7), (0, 11) }) again.RecordBattle(realm[b], "win", three, seed);
+        Expect(Item.All.All(i => again.Wallet.Count(i) == wallet.Count(i)), "the same fights with the same seeds give the same rewards");
+
+        // Everything earned is kept: Godshards and summon tickets wait in the save for summons (E9-F2-S1).
+        wallet.Earn(new Dictionary<string, long> { [Item.SummonTickets] = 2, [Item.HeroShards] = 1 });
+        var reopened = Progress(folder, out var warnings);
+        Expect(warnings.Count == 0 && Item.All.All(i => reopened.Wallet.Count(i) == wallet.Count(i)), "after reopening every item is back");
+        Expect(reopened.Wallet.Count(Item.Godshards) == wallet.Count(Item.Godshards) && reopened.Wallet.Count(Item.SummonTickets) == 2 && reopened.Wallet.Count(Item.Godshards) > 0, "including Godshards and summon tickets");
+    }
+
+    // A stage's chests open at 6, 12 and 20 of its 20 stars, and the star track's every 100 stars on a difficulty (doc 06
+    // section 1.4). Until challenge checks exist a win is 1 star, so here the fights pass challenge stars.
+    static void Chests(string folder)
+    {
+        var progress = Progress(folder, out _);
+        var wallet = progress.Wallet;
+        var three = new[] { "hilde", "grub", "korvald" };
+        foreach (var b in realm.Take(4)) Expect(progress.RecordBattle(b, "win", three).Chests.Count == 0, $"{b.Name}: 1 star, no chest");
+        long lc = (long)curve.Growth.XpToNext(curve.RecLevel(0, 4));
+
+        long shards = wallet.Count(Item.Godshards), potions = wallet.Count(Item.XpPotions);
+        var small = progress.RecordBattle(realm[0], "win", three, 1, new[] { 2, 3 });
+        Expect(small.Chests.SequenceEqual(new[] { "Stage chest (6★)" }) && progress.Stars(realm[0].Id).SequenceEqual(new[] { 1, 2, 3 }), "two challenge stars make 6 of the stage's stars: the small chest opens");
+        Expect(wallet.Count(Item.XpPotions) - potions == Math.Round(0.3 * lc) && small.Items[Item.XpPotions] == Math.Round(0.3 * lc), $"it holds 0.3 level-ups of XP as potions ({Math.Round(0.3 * lc)})");
+        Expect(wallet.Count(Item.Godshards) - shards == 2, "each new challenge star gives a Godshard");
+        Expect(progress.RecordBattle(realm[0], "win", three, 1, new[] { 2, 3 }).Chests.Count == 0, "stars already held open nothing again");
+        shards = wallet.Count(Item.Godshards);
+        var ten = progress.RecordBattle(realm[1], "win", three, 1, new[] { 2, 3, 4, 5, 6, 0 });
+        Expect(ten.Chests.Count == 0 && progress.Stars(realm[1].Id).SequenceEqual(new[] { 1, 2, 3, 4, 5 }), "four more make 10 (stars outside 2 to 5 don't count): no chest yet");
+        var medium = progress.RecordBattle(realm[2], "win", three, 1, new[] { 2, 3 });
+        Expect(medium.Chests.SequenceEqual(new[] { "Stage chest (12★)" }) && medium.Items[Item.Godshards] == 22 && wallet.Count(Item.Godshards) - shards == 26, "12 stars: the medium chest's 20 Godshards, beside a Godshard for each star");
+        progress.RecordBattle(realm[2], "win", three, 1, new[] { 4, 5 });
+        progress.RecordBattle(realm[3], "win", three, 1, new[] { 2, 3, 4, 5 });
+        long tomes = wallet.Count(Item.SkillTomes);
+        var large = progress.RecordBattle(realm[0], "win", three, 1, new[] { 4, 5 });
+        Expect(large.Chests.SequenceEqual(new[] { "Stage chest (20★)" }) && wallet.Count(Item.SkillTomes) - tomes >= 2 && large.Items[Item.GearMats] >= 3, "all 20 stars: the large chest's 3 gear materials and 2 skill tomes");
+        Expect(progress.RecordBattle(realm[4], "win", three, 1, new[] { 2, 3, 4, 5 }).Chests.Count == 0, "the next stage's stars count for its own chests");
+
+        // The star track: 100 stars on Normal. Hard's stars count towards Hard's own track.
+        int total = progress.Save.Stars.Values.Sum(s => s.Count);
+        var normal = realm.Skip(5).ToList();
+        while (total < 95) { progress.RecordBattle(normal[0], "win", three, 1, new[] { 2, 3, 4, 5 }); normal.RemoveAt(0); total += 5; }
+        var hard = data.Stages.First(b => b.Id == "c1-0");
+        Expect(total == 95 && progress.RecordBattle(hard, "win", three, 1, new[] { 2, 3, 4, 5 }).Chests.Count == 0, "95 stars on Normal and 5 on Hard open no star track chest");
+        var star = progress.RecordBattle(normal[0], "win", three, 1, new[] { 2, 3, 4, 5 });
+        Expect(star.Chests.Contains("Star track chest (100★)") && wallet.Count(Item.SummonTickets) == 1 && wallet.Count(Item.Vessel(3)) == 1 && star.Items[Item.Godshards] >= 100, "Normal's 100th star opens its chest: a summon ticket, a 3★ Vessel and 100 Godshards");
+        Expect(Progress(folder, out _).Wallet.Count(Item.SummonTickets) == 1, "the ticket is kept after reopening");
     }
 
     static void LevelCaps(string folder)
@@ -369,6 +468,8 @@ static class Program
         Expect(kesh.Level == cap && kesh.Xp == 0 && Total(progress, "maren") == 1000, "a capped hero takes no share: the others get it all");
         wallet.ShareBattleXp(new[] { "kesh" }, 1000);
         Expect(kesh.Level == cap && kesh.Xp == 0, "a team of capped heroes gets nothing");
+        var capped = progress.RecordBattle(realm[0], "win", new[] { "kesh", "maren" });
+        Expect(capped.Heroes.Single(h => h.Card == "kesh") is var k && k.Capped && k.Xp == 0 && !capped.Heroes.Single(h => h.Card == "maren").Capped, "the results say which heroes are at their level cap");
     }
 
     static void Strength(string folder)
@@ -422,7 +523,7 @@ static class Program
         var fight = new Battle(data, fighting, realm[0].Id, 1, new BattleOptions());
         while (!fight.Over) fight.Step();
         Expect(fight.Units.Count(u => u.Side == "A" && u.Id == "hilde") == 2, $"the fight plays with both ({fight.Result})");
-        long xp = curve.FirstClearXp(realm[0]);
+        long xp = rewards.FirstClearXp(realm[0]);
         long before = Total(progress, "hilde");
         progress.RecordBattle(realm[0], "win", cards);
         Expect(Total(progress, "hilde") == before + xp / 5 && Total(progress, "hilde#2") == curve.Growth.XpToNext(1) + xp / 5, "battle XP gives each copy its own share");
@@ -458,7 +559,7 @@ static class Program
     static PlayerProgress Progress(string folder, out List<string> warnings)
     {
         var w = warnings = new List<string>();
-        return new PlayerProgress(data, curve, new SaveStore(folder), w.Add);
+        return new PlayerProgress(data, rewards, new SaveStore(folder), w.Add);
     }
 
     static bool IsCleared(this SaveData save, string id) => save.Stars.TryGetValue(id, out var s) && s.Contains(1);

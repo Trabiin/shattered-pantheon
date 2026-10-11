@@ -13,7 +13,7 @@ static class Program
 {
     static int failures;
     static GameData data;
-    static CampaignCurve curve;
+    static CampaignRewards rewards;
     static readonly string[] Team = { "hilde", "grub", "korvald" };
     static CampaignOrder order;
 
@@ -22,7 +22,7 @@ static class Program
         string dir = Path.Combine(FindRoot(), "Unity", "Assets", "Resources", "BattleData");
         string R(string f) => File.ReadAllText(Path.Combine(dir, f + ".json"));
         data = GameData.FromJson(R("rules"), R("heroes"), R("enemies"), R("campaign"));
-        curve = CampaignCurve.FromJson(R("progression"));
+        rewards = CampaignRewards.FromJson(R("progression"));
         order = new CampaignOrder(data.Stages);
 
         Test("The order covers the whole campaign", WholeOrder);
@@ -34,7 +34,7 @@ static class Program
         Test("Cleared battles can always be replayed", Replay);
         Test("Clearing the campaign in order opens one battle at a time", WalkTheCampaign);
         Test("Battles outside the campaign are never open", OutsideCampaign);
-        Test("A loss or a timeout opens nothing", Losses);
+        Test("A loss or a timeout opens nothing, and Next battle goes where a win leads", Losses);
         Test("What's open comes back after reopening the game, and isn't saved", ReloadedSave);
 
         Console.WriteLine(failures == 0 ? "All campaign order checks passed." : $"{failures} campaign order check(s) failed.");
@@ -155,24 +155,29 @@ static class Program
 
     static void Losses(string folder)
     {
-        var progress = new PlayerProgress(data, curve, new SaveStore(folder), _ => { });
+        var progress = new PlayerProgress(data, rewards, new SaveStore(folder), _ => { });
         var b1 = Find("normal", 1, 1, 1); var b2 = Find("normal", 1, 1, 2);
         progress.RecordBattle(b1, "lose", Team);
         progress.RecordBattle(b1, "timeout", Team);
         Expect(progress.IsOpen(b1) && !progress.IsOpen(b2), "battle 2 stays locked after a loss and a timeout on battle 1");
+        Expect(progress.NextBattle(b1) == null, "before the win there's no next battle to go to");
         progress.RecordBattle(b1, "win", Team);
         Expect(progress.IsOpen(b2), "and opens with the win");
+        Expect(progress.NextBattle(b1) == b2 && progress.NextBattle(b2) == null, "the win's next battle is battle 2, which has none of its own yet");
+        progress.RecordBattle(b2, "win", Team);
+        Expect(progress.NextBattle(b1) == b2 && progress.NextBattle(b2) == Find("normal", 1, 1, 3), "a replay of battle 1 leads on to battle 2, and battle 2's win to battle 3");
+        Expect(progress.NextBattle(order.Battles.Last()) == null, "the very last battle has no next one");
     }
 
     static void ReloadedSave(string folder)
     {
-        var progress = new PlayerProgress(data, curve, new SaveStore(folder), _ => { });
+        var progress = new PlayerProgress(data, rewards, new SaveStore(folder), _ => { });
         var played = order.Battles.Where(b => b.Difficulty == "normal" && (b.RealmNumber == 1 || (b.RealmNumber == 2 && b.StageNumber == 1 && b.BattleNumber <= 2))).ToList();
         foreach (var b in played) progress.RecordBattle(b, "win", Team);
         var openBefore = order.Battles.Where(progress.IsOpen).Select(b => b.Id).ToList();
 
         var warnings = new List<string>();
-        var reopened = new PlayerProgress(data, curve, new SaveStore(folder), warnings.Add);
+        var reopened = new PlayerProgress(data, rewards, new SaveStore(folder), warnings.Add);
         var openAfter = order.Battles.Where(reopened.IsOpen).Select(b => b.Id).ToList();
         Expect(warnings.Count == 0, "the save loads without warnings");
         Expect(openAfter.SequenceEqual(openBefore), $"the same {openAfter.Count} battles are open after reopening");

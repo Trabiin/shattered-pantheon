@@ -1,5 +1,5 @@
-// Tests for the hero growth and cost rules (Growth) and the campaign's recommended power and battle XP
-// (CampaignCurve), on the real progression.json: each formula against values worked out by hand from
+// Tests for the hero growth and cost rules (Growth) and the campaign's recommended power (CampaignCurve),
+// on the real progression.json: each formula against values worked out by hand from
 // doc 07 sections 1 and 2, the generated campaign against the curve, and a changed progression.json
 // changing the result.
 //   dotnet run --project tools/GrowthTests
@@ -30,7 +30,6 @@ static class Program
         Test("Gear materials and gold to the next tier", GearCosts);
         Test("Recommended power through the campaign", Recommended);
         Test("Rewards ease into each difficulty", RewardScale);
-        Test("Battle XP of a first win", FirstClearXp);
         Test("The generated campaign follows the curve", CampaignMatches);
         Test("A change in progression.json changes the rules", FollowsTheFile);
 
@@ -125,17 +124,6 @@ static class Program
         Close(curve.LevelCost(1, 40), growth.XpToNext(curve.RecLevel(1, 40)) * 0.2, "a level-up at a battle is that battle's next level's XP times the reward scale");
     }
 
-    // 0.8 level-ups at the battle's recommended level.
-    static void FirstClearXp()
-    {
-        var data = Campaign();
-        StageDef Battle(string id) => data.Stages.First(s => s.Id == id);
-        Expect(curve.FirstClearXpLevels == 0.8, "a first clear is worth 0.8 level-ups of XP");
-        Expect(curve.FirstClearXp(Battle("c0-0")) == 24, "Normal's first battle: 0.8 x 30 = 24 XP");
-        Expect(curve.FirstClearXp(Battle("c1-0")) == 38038, "Hard's first battle: 0.8 x 47547 (level 100) = 38038 XP");
-        Expect(curve.FirstClearXp(Battle("c0-39")) > curve.FirstClearXp(Battle("c0-38")), "later battles give more");
-    }
-
     static void CampaignMatches()
     {
         var data = Campaign();
@@ -157,8 +145,6 @@ static class Program
         Expect(json.Contains("\"levelGain\": 0.03") && json.Contains("\"perLevel\": 5"), "progression.json has the values this check changes");
         Close(changed.StatScale("Epic", 11, 3, 0, 1), 1.4, "levelGain 0.04: level 11 gives x1.4");
         Expect(changed.TomesToNext(2) == 14, "7 tomes per level: skill 2 to 3 costs 14");
-        var richer = CampaignCurve.FromJson(json.Replace("\"xpLevels\": 0.8,", "\"xpLevels\": 1.6,"));
-        Expect(richer.FirstClearXpLevels == 1.6 && richer.LevelCost(0, 0) * 1.6 == 48, "first-clear xpLevels 1.6: Normal's first battle gives 48 XP");
     }
 
     static void Test(string name, Action test)
