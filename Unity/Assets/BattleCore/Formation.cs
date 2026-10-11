@@ -17,7 +17,9 @@ namespace ShatteredPantheon.Battle
             string formation = fronts.Count >= 3 && hs.Count - 3 <= 2 ? "3-2" : "2-3";
             int frontCount = formation == "3-2" ? 3 : 2, backCount = 5 - frontCount;
             var front = fronts.Take(frontCount).ToList();
-            var rest = hs.Where(h => !front.Contains(h)).ToList();
+            // One entry removed per front hero, so copies of the same hero are each placed once.
+            var rest = hs.ToList();
+            foreach (var h in front) rest.Remove(h);
             while (front.Count < frontCount && rest.Count > backCount) { front.Add(rest[0]); rest.RemoveAt(0); }
             return Place(front, Battle.SlotsOf(formation).Where(s => s.StartsWith("front")).ToList())
                 .Concat(Place(rest, Battle.SlotsOf(formation).Where(s => s.StartsWith("back")).ToList())).ToList();
