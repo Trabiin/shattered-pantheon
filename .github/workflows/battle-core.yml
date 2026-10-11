@@ -20,6 +20,8 @@ jobs:
           for f in rules heroes enemies stages; do diff generated/$f.json Unity/Assets/Resources/BattleData/$f.json; done
       - name: Build the battle core and simulator
         run: dotnet build tools/BattleSim -c Release
+      - name: Test the hero growth and cost rules against doc 07
+        run: dotnet run --project tools/GrowthTests
       - name: The same seed always gives the same fight
         run: |
           dotnet tools/BattleSim/bin/Release/net8.0/BattleSim.dll --fingerprint 1000 > a.txt
