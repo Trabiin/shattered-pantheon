@@ -19,6 +19,7 @@ using ShatteredPantheon.Battle;
 static partial class Program
 {
     static GameData data;
+    static string dataDir;
     static BattleOptions options = new BattleOptions();
 
     static int Main(string[] argv)
@@ -29,7 +30,8 @@ static partial class Program
         string Arg(string k, string def) => args.TryGetValue(k, out var v) && v != null ? v : def;
 
         string root = args.ContainsKey("data") ? null : FindRoot();
-        data = GameData.LoadDirectory(Arg("data", root != null ? Path.Combine(root, DataPath) : null));
+        dataDir = Arg("data", root != null ? Path.Combine(root, DataPath) : null);
+        data = GameData.LoadDirectory(dataDir);
         options.Deterministic = args.ContainsKey("puzzle");
 
         if (args.ContainsKey("replays")) { WriteReplays(Arg("replays", "replays.json")); return 0; }
@@ -107,8 +109,10 @@ static partial class Program
     static string Names(IEnumerable<string> ids) => string.Join(", ", ids.Select(Short));
     static string Slots(List<TeamSlot> team) => string.Join(", ", team.Select(t => Short(t.Id) + " " + t.Slot));
 
-    // Reproducible team sampler (a double-precision LCG).
-    static List<string[]> SampleTeams(int n, double seed = 12345)
+    // Reproducible team sampler (a double-precision LCG). Any team a player could field: each slot is
+    // any hero, so copies of one hero turn up (a team may field up to 5, decided 2026-10-11).
+    // With copies false, 5 different heroes.
+    static List<string[]> SampleTeams(int n, double seed = 12345, bool copies = true)
     {
         var ids = data.Heroes.Select(h => h.Id).ToArray();
         double s = seed;
@@ -116,6 +120,7 @@ static partial class Program
         var teams = new List<string[]>();
         for (int k = 0; k < n; k++)
         {
+            if (copies) { teams.Add(Enumerable.Range(0, 5).Select(_ => ids[(int)Math.Floor(Rnd() * ids.Length)]).ToArray()); continue; }
             var a = (string[])ids.Clone();
             for (int i = a.Length - 1; i > 0; i--) { int j = (int)Math.Floor(Rnd() * (i + 1)); (a[i], a[j]) = (a[j], a[i]); }
             teams.Add(a.Take(5).ToArray());
@@ -151,7 +156,7 @@ static partial class Program
         var o = new StringBuilder();
         o.Append("# Battle Balance Report\n\n");
         o.Append($"*Generated {DateTime.UtcNow:yyyy-MM-dd HH:mm} UTC by `dotnet run --project tools/BattleSim`. Rules: battle system draft 3 (doc 04) with the 10 factions and 10 types of doc 09. ");
-        o.Append($"{teamCount} random 5-hero teams × {runs} fights per stage, auto-placed (tanks and warriors in front). Fight length assumes {R.SecondsPerActionAt1x.ToString(CultureInfo.InvariantCulture)}s per action at 1x.*\n\n");
+        o.Append($"{teamCount} random 5-hero teams × {runs} fights per stage, auto-placed (tanks and warriors in front). Each slot is any hero, so about 4 teams in 10 hold copies of a hero (a team may field up to 5). Fight length assumes {R.SecondsPerActionAt1x.ToString(CultureInfo.InvariantCulture)}s per action at 1x.*\n\n");
         var flags = new List<string>();
         var overallLift = data.Heroes.ToDictionary(h => h.Id, h => 0.0);
         var stageRanks = new List<(string Stage, List<string> Ranked)>();   // heroes by win-rate difference, best first, on stages where one helps
@@ -244,8 +249,57 @@ static partial class Program
             }
         }
         o.Append('\n');
+        FiveCopies(o, flags);
         o.Append("## Flags\n\n" + (flags.Count > 0 ? string.Join("\n", flags.Select(f => "- " + f)) : "- None.") + "\n");
         return o.ToString();
+    }
+
+    // Teams of 5 copies of one hero (doc 05 section 6, doc 04 section 10 "no single best team"). Copies
+    // share a faction and a type, so they always get the 4-hero doctrine and the 3-hero type bonus.
+    // Checked on early and late campaign battles against teams of 5 different heroes at the same strength.
+    static void FiveCopies(StringBuilder o, List<string> flags)
+    {
+        string campaignPath = Path.Combine(dataDir, "campaign.json");
+        var campaign = new GameData
+        {
+            Rules = data.Rules, Heroes = data.Heroes, Enemies = data.Enemies,
+            Stages = GameData.FromJson(File.ReadAllText(Path.Combine(dataDir, "rules.json")), "[]", "[]", File.ReadAllText(campaignPath)).Stages,
+        };
+        // A spread of battles in each group: plain battles, stage bosses and the realm boss.
+        int[] offsets = { 1, 3, 6, 15, 19, 26, 33, 39 };
+        var groups = new[] { ("normal", 1), ("nightmare", 10), ("godless", 10) }
+            .Select(g => (Name: $"{Short(g.Item1)} realm {g.Item2}", Battles: offsets.Select(k => campaign.Stages.Where(st => st.Difficulty == g.Item1 && st.RealmNumber == g.Item2).ElementAt(k)).ToList()))
+            .ToList();
+        const int stackRuns = 10, mixedTeams = 100, mixedRuns = 2;
+        // At full strength nearly every team wins these battles, which hides the difference; at 70% the
+        // mixed teams' win rates spread out.
+        const double strength = 0.7;
+        var mixed = SampleTeams(mixedTeams, 4321, copies: false);
+        double Rate(string[] ids, List<StageDef> battles, int runs, long seed) => battles.Average(st =>
+        {
+            var team = Formation.AutoPlace(campaign, ids);
+            foreach (var t in team) t.HpScale = t.AtkScale = st.HeroScale * strength;
+            int wins = 0;
+            for (int i = 0; i < runs; i++) if (Battle.Run(campaign, team, st.Id, seed + i * 7919L, options).Result == "win") wins++;
+            return (double)wins / runs;
+        });
+        var mixedRates = groups.Select(g => mixed.AsParallel().AsOrdered().Select((t, i) => Rate(t, g.Battles, mixedRuns, 2000 + i * 31)).OrderBy(x => x).ToList()).ToList();
+        var stacks = data.Heroes.AsParallel().AsOrdered().Select(h => (Hero: h, Rates: groups.Select(g => Rate(Enumerable.Repeat(h.Id, 5).ToArray(), g.Battles, stackRuns, 3000)).ToList())).ToList();
+
+        o.Append("## Five copies of one hero\n\n");
+        o.Append($"A team may field up to 5 copies of one hero (decided 2026-10-11). Copies share a faction and a type, so 5 of them always get the 4-hero faction doctrine and the 3-hero type bonus. Each hero's five-copy team fights {offsets.Length} campaign battles per group (plain battles, stage bosses and the realm boss) {stackRuns} times each, at {Pct(strength)} of the strength the campaign expects there (`campaign.json` `heroScale`; at full strength nearly every team wins), against {mixedTeams} random teams of 5 different heroes ({mixedRuns} fights per battle). A five-copy team is flagged when it beats 90% of the mixed teams.\n\n");
+        o.Append("| Team | " + string.Join(" | ", groups.Select(g => g.Name)) + " |\n|---|" + string.Concat(groups.Select(_ => "---|")) + "\n");
+        o.Append("| Mixed teams: average | " + string.Join(" | ", mixedRates.Select(r => Pct(r.Average()))) + " |\n");
+        o.Append("| Mixed teams: best 10% start at | " + string.Join(" | ", mixedRates.Select(r => Pct(r[r.Count * 9 / 10]))) + " |\n");
+        foreach (var st in stacks.OrderByDescending(x => x.Rates.Average()))
+        {
+            o.Append($"| 5 × {st.Hero.Name} ({st.Hero.Role}, {st.Hero.Faction}, {st.Hero.Type}) | ");
+            o.Append(string.Join(" | ", st.Rates.Select((r, g) => r > mixedRates[g][mixedRates[g].Count * 9 / 10] ? $"**{Pct(r)}**" : Pct(r))) + " |\n");
+            for (int g = 0; g < groups.Count; g++)
+                if (st.Rates[g] > mixedRates[g][mixedRates[g].Count * 9 / 10])
+                    flags.Add($"**Five copies:** 5 × {st.Hero.Name} wins {Pct(st.Rates[g])} on {groups[g].Name}, more than 90% of mixed teams (average {Pct(mixedRates[g].Average())}).");
+        }
+        o.Append('\n');
     }
 
     // One line per fight with every number the engine produces, to check that a seed always replays the same fight.
