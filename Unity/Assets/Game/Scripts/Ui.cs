@@ -1,5 +1,5 @@
 // Small helpers for building uGUI from code, and the placeholder colour palette.
-// Layout uses a 1080x1920 portrait reference with positions measured from the screen centre.
+// Screens are laid out on a 1080x1920 portrait page (SafeArea) with positions measured from its centre.
 namespace ShatteredPantheon.Game
 {
     using UnityEngine;
@@ -7,6 +7,9 @@ namespace ShatteredPantheon.Game
 
     public static class Ui
     {
+        // Thumbs need about 9 mm: no button or other tap area is narrower or shorter than this on the page.
+        public const float MinTap = 120;
+
         static Font font;
         static Font DefaultFont => font != null ? font : (font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf"));
 
@@ -101,6 +104,27 @@ namespace ShatteredPantheon.Game
             img.raycastTarget = true;
             img.gameObject.AddComponent<Button>().onClick.AddListener(onClick);
             return img;
+        }
+
+        // A list that scrolls up and down when its content is taller than `size`. Returns the content to build in:
+        // `contentHeight` tall, positions measured from its centre like everywhere else.
+        public static RectTransform ScrollList(Transform parent, string name, Vector2 pos, Vector2 size, float contentHeight)
+        {
+            var view = Area(parent, name, pos, size);
+            view.gameObject.AddComponent<RectMask2D>();
+            // Catches drags that start in the gaps between cards.
+            var drag = Panel(view, "Drag area", new Color(0, 0, 0, 0));
+            Stretch(drag.rectTransform);
+            drag.raycastTarget = true;
+            var content = Area(view, "Content", Vector2.zero, new Vector2(size.x, Mathf.Max(contentHeight, size.y)));
+            content.anchorMin = content.anchorMax = content.pivot = new Vector2(0.5f, 1);
+            content.anchoredPosition = Vector2.zero;
+            var scroll = view.gameObject.AddComponent<ScrollRect>();
+            scroll.viewport = view;
+            scroll.content = content;
+            scroll.horizontal = false;
+            scroll.scrollSensitivity = 40;
+            return content;
         }
 
         public static string Capitalise(string s) => string.IsNullOrEmpty(s) ? s : char.ToUpperInvariant(s[0]) + s.Substring(1);

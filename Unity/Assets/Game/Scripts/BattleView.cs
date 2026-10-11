@@ -36,8 +36,8 @@ namespace ShatteredPantheon.Game
             Battle = new Battle(App.Data, App.Progress.FightingTeam(team), stage.Id, Seed, new BattleOptions { Formation = formation });
 
             Ui.Label(Root, $"{stage.Name}\n<size=26>{Ui.Capitalise(stage.Difficulty)}</size>", 40, Color.white, TextAnchor.MiddleLeft, new Vector2(-180, 860), new Vector2(660, 120)).Bold();
-            speedLabel = Ui.MakeButton(Root, GameApp.Speeds[App.SpeedIndex] + "x", new Vector2(250, 860), new Vector2(130, 90), CycleSpeed, "Speed Button");
-            Ui.MakeButton(Root, "Retreat", new Vector2(420, 860), new Vector2(190, 90), () => App.ShowTeam(stage));
+            speedLabel = Ui.MakeButton(Root, GameApp.Speeds[App.SpeedIndex] + "x", new Vector2(250, 860), new Vector2(130, Ui.MinTap), CycleSpeed, "Speed Button");
+            Ui.MakeButton(Root, "Retreat", new Vector2(420, 860), new Vector2(190, Ui.MinTap), () => App.ShowTeam(stage));
             Ui.Panel(Root, "Divider", new Color(1, 1, 1, 0.08f), new Vector2(0, 40), new Vector2(1000, 4));
             logLine = Ui.Label(Root, "", 32, new Color(1, 1, 1, 0.85f), TextAnchor.MiddleCenter, new Vector2(0, -780), new Vector2(1000, 110));
 

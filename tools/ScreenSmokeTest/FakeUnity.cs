@@ -1,9 +1,10 @@
 // A tiny stand-in for the parts of Unity the game screens use, with real behaviour where it
 // matters for catching bugs: object hierarchy, destroy (touching a destroyed object throws,
 // like Unity's MissingReferenceException), coroutines on a simulated clock, Resources loading
-// from the Unity project, a save folder (Application.persistentDataPath), and button clicks.
-// It is not Unity: layout and rendering are not checked here. The real-API compile check runs in CI
-// (.github/workflows/unity-compile.yml).
+// from the Unity project, a save folder (Application.persistentDataPath), button clicks, and a phone
+// screen with its safe area. RectTransforms keep Unity's anchors, pivot, offsets and scale, so Layout.cs
+// can work out where everything lands on a phone; nothing is rendered. The real-API compile check runs
+// in CI (.github/workflows/unity-compile.yml).
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -18,7 +19,8 @@ namespace UnityEngine
     {
         internal static readonly List<Object> All = new List<Object>();
         internal bool destroyed;
-        public string name;
+        string ownName;
+        public virtual string name { get => ownName; set => ownName = value; }
         protected Object() { All.Add(this); }
         internal void Check() { if (destroyed) throw new MissingReferenceException($"The object '{name}' ({GetType().Name}) has been destroyed but you are still trying to access it."); }
         public static void Destroy(Object o) { if (o is GameObject g) g.DestroyTree(); else if (o != null) o.destroyed = true; }
@@ -33,6 +35,8 @@ namespace UnityEngine
     public class Component : Object
     {
         internal GameObject go;
+        // Like Unity, a component's name is its GameObject's.
+        public override string name { get => go != null ? go.name : base.name; set { if (go != null) go.name = value; else base.name = value; } }
         public GameObject gameObject { get { Check(); return go; } }
         public Transform transform { get { Check(); return go.transform; } }
         public T GetComponent<T>() => gameObject.GetComponent<T>();
@@ -129,16 +133,25 @@ namespace UnityEngine
         public IEnumerator GetEnumerator() => children.ToList().GetEnumerator();
     }
 
+    // Unity's defaults and its offset arithmetic: offsets are another view of anchoredPosition and sizeDelta.
     public class RectTransform : Transform
     {
-        Vector2 aMin, aMax, piv, pos, size, oMin, oMax;
+        Vector2 aMin = new Vector2(0.5f, 0.5f), aMax = new Vector2(0.5f, 0.5f), piv = new Vector2(0.5f, 0.5f), pos, size = new Vector2(100, 100);
         public Vector2 anchorMin { get { Check(); return aMin; } set { Check(); aMin = value; } }
         public Vector2 anchorMax { get { Check(); return aMax; } set { Check(); aMax = value; } }
         public Vector2 pivot { get { Check(); return piv; } set { Check(); piv = value; } }
         public Vector2 anchoredPosition { get { Check(); return pos; } set { Check(); pos = value; } }
         public Vector2 sizeDelta { get { Check(); return size; } set { Check(); size = value; } }
-        public Vector2 offsetMin { get { Check(); return oMin; } set { Check(); oMin = value; } }
-        public Vector2 offsetMax { get { Check(); return oMax; } set { Check(); oMax = value; } }
+        public Vector2 offsetMin
+        {
+            get { Check(); return pos - Vector2.Scale(size, piv); }
+            set { var o = value - offsetMin; size = size - o; pos = pos + Vector2.Scale(o, Vector2.one - piv); }
+        }
+        public Vector2 offsetMax
+        {
+            get { Check(); return pos + Vector2.Scale(size, Vector2.one - piv); }
+            set { var o = value - offsetMax; size = size + o; pos = pos + Vector2.Scale(o, piv); }
+        }
     }
 
     public struct Vector2
@@ -148,8 +161,24 @@ namespace UnityEngine
         public static Vector2 zero => new Vector2(0, 0);
         public static Vector2 one => new Vector2(1, 1);
         public static Vector2 operator +(Vector2 a, Vector2 b) => new Vector2(a.x + b.x, a.y + b.y);
+        public static Vector2 operator -(Vector2 a, Vector2 b) => new Vector2(a.x - b.x, a.y - b.y);
         public static Vector2 operator *(Vector2 a, float b) => new Vector2(a.x * b, a.y * b);
+        public static Vector2 Scale(Vector2 a, Vector2 b) => new Vector2(a.x * b.x, a.y * b.y);
         public override string ToString() => $"({x}, {y})";
+    }
+
+    // Screen pixels, from the bottom-left corner, like Unity's Rect.
+    public struct Rect
+    {
+        public float x, y, width, height;
+        public Rect(float x, float y, float width, float height) { this.x = x; this.y = y; this.width = width; this.height = height; }
+        public float xMin => x;
+        public float yMin => y;
+        public float xMax => x + width;
+        public float yMax => y + height;
+        public static bool operator ==(Rect a, Rect b) => a.x == b.x && a.y == b.y && a.width == b.width && a.height == b.height;
+        public static bool operator !=(Rect a, Rect b) => !(a == b);
+        public override string ToString() => $"(x:{x:0}, y:{y:0}, width:{width:0}, height:{height:0})";
     }
 
     public struct Vector3
@@ -173,6 +202,7 @@ namespace UnityEngine
         public const float PI = (float)Math.PI;
         public static float Sin(float f) => (float)Math.Sin(f);
         public static float Min(float a, float b) => Math.Min(a, b);
+        public static float Min(params float[] v) => v.Min();
         public static float Max(float a, float b) => Math.Max(a, b);
         public static float Clamp(float v, float lo, float hi) => Math.Min(hi, Math.Max(lo, v));
         public static float Clamp01(float v) => Clamp(v, 0, 1);
@@ -197,7 +227,13 @@ namespace UnityEngine
         public static void LogWarning(object message) => Warnings.Add(message?.ToString());
     }
     public enum ScreenOrientation { Portrait }
-    public static class Screen { public static ScreenOrientation orientation; }
+    // The phone the game runs on: its size in pixels and the part of it clear of notches, rounded corners and the home bar.
+    public static class Screen
+    {
+        public static ScreenOrientation orientation;
+        public static int width = 1080, height = 1920;
+        public static Rect safeArea = new Rect(0, 0, 1080, 1920);
+    }
     public class TextAsset : Object { public string text; }
 
     public class Font : Object { }
@@ -271,9 +307,21 @@ namespace UnityEngine.UI
     public class CanvasScaler : EventSystems.UIBehaviour
     {
         public enum ScaleMode { ConstantPixelSize, ScaleWithScreenSize }
+        public enum ScreenMatchMode { MatchWidthOrHeight, Expand, Shrink }
         public ScaleMode uiScaleMode;
+        public ScreenMatchMode screenMatchMode;
         public Vector2 referenceResolution;
         public float matchWidthOrHeight;
+    }
+    // Hides whatever of its children lies outside its own rectangle.
+    public class RectMask2D : EventSystems.UIBehaviour { }
+    public class ScrollRect : EventSystems.UIBehaviour
+    {
+        public enum MovementType { Unrestricted, Elastic, Clamped }
+        public RectTransform content, viewport;
+        public bool horizontal = true, vertical = true;
+        public MovementType movementType = MovementType.Elastic;
+        public float scrollSensitivity = 1;
     }
     public class GraphicRaycaster : EventSystems.UIBehaviour { }
 }
