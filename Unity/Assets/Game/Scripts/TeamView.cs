@@ -2,6 +2,7 @@
 // (staggered rows), with the stage's enemies shown, and each card's level, star rank and type match-up against them.
 // Every copy of a hero is its own card, and a team may field several copies of the same hero.
 // Tap a slot to select it, then tap a hero to put them there. Tap a selected filled slot to empty it.
+// The roster scrolls when there are more heroes than fit.
 namespace ShatteredPantheon.Game
 {
     using System.Collections.Generic;
@@ -16,7 +17,7 @@ namespace ShatteredPantheon.Game
         string[] Slots => Battle.SlotsOf(formation).ToArray();
         readonly Dictionary<string, string> placed = new Dictionary<string, string>(); // slot -> card id
         string selected;
-        RectTransform content;
+        RectTransform content, roster;
 
         public TeamView(GameApp app, StageDef stage) : base(app)
         {
@@ -43,8 +44,10 @@ namespace ShatteredPantheon.Game
 
         void Refresh()
         {
+            // The roster keeps its scroll position while the screen is rebuilt after a tap.
+            float scrolled = roster != null ? roster.anchoredPosition.y : 0;
             if (content != null) Object.Destroy(content.gameObject);
-            content = Ui.Area(Root, "Content", Vector2.zero, new Vector2(1080, 1920));
+            content = Ui.Area(Root, "Content", Vector2.zero, SafeArea.PageSize);
 
             // Enemies.
             Ui.Label(content, "Enemies", 28, Palette.Muted, TextAnchor.MiddleLeft, new Vector2(0, 770), new Vector2(1000, 40));
@@ -63,22 +66,28 @@ namespace ShatteredPantheon.Game
             // Formation: rows are staggered, so a row of two stands in the gaps of the row of three.
             Ui.Label(content, "Front", 28, Palette.Muted, TextAnchor.MiddleLeft, new Vector2(0, 520), new Vector2(1000, 40));
             Ui.Label(content, "Back", 28, Palette.Muted, TextAnchor.MiddleLeft, new Vector2(0, 280), new Vector2(1000, 40));
-            Ui.MakeButton(content, formation, new Vector2(400, 520), new Vector2(170, 70), SwitchFormation, "Formation Button");
             foreach (var slot in Slots)
                 SlotCard(slot, new Vector2((float)Battle.SlotX(formation, slot) * 230, slot.StartsWith("front") ? 410 : 170));
 
-            // Roster.
+            // Roster: rows of five that scroll; four rows and the top of a fifth fit on the page.
             Ui.Label(content, "Heroes", 28, Palette.Muted, TextAnchor.MiddleLeft, new Vector2(0, 30), new Vector2(1000, 40));
             var cards = App.Progress.Cards;
+            float rows = (cards.Count + 4) / 5 * 160f;
+            roster = Ui.ScrollList(content, "Roster", new Vector2(0, -345), new Vector2(1040, 690), rows);
+            roster.anchoredPosition = new Vector2(0, Mathf.Clamp(scrolled, 0, Mathf.Max(0, rows - 690)));
+            float top = roster.sizeDelta.y / 2 - 80;
             for (int i = 0; i < cards.Count; i++)
-                RosterCard(cards[i].Id, new Vector2((i % 5 - 2) * 205, -60 - (i / 5) * 160));
+                RosterCard(cards[i].Id, new Vector2((i % 5 - 2) * 205, top - (i / 5) * 160));
 
             // Actions.
             int count = placed.Count;
-            Ui.Label(content, $"{count}/5 heroes", 30, count > 0 ? Color.white : Palette.Damage, TextAnchor.MiddleCenter, new Vector2(0, -680), new Vector2(600, 50));
-            Ui.MakeButton(content, "Auto", new Vector2(-380, -800), new Vector2(220, 110), AutoPlace);
-            Ui.MakeButton(content, "Clear", new Vector2(-140, -800), new Vector2(220, 110), () => { placed.Clear(); selected = Slots[0]; Refresh(); });
-            var fight = Ui.MakeButton(content, "Fight!", new Vector2(270, -800), new Vector2(400, 130), Fight);
+            Ui.Label(content, $"{count}/5 heroes", 30, count > 0 ? Color.white : Palette.Damage, TextAnchor.MiddleCenter, new Vector2(0, -715), new Vector2(600, 40));
+            var size = new Vector2(180, Ui.MinTap);
+            Ui.MakeButton(content, "Auto", new Vector2(-400, -830), size, AutoPlace);
+            Ui.MakeButton(content, "Clear", new Vector2(-200, -830), size, () => { placed.Clear(); selected = Slots[0]; Refresh(); });
+            var switcher = Ui.MakeButton(content, $"Formation\n<size=40>{formation}</size>", new Vector2(0, -830), size, SwitchFormation, "Formation Button");
+            switcher.fontSize = 26;
+            var fight = Ui.MakeButton(content, "Fight!", new Vector2(300, -830), new Vector2(380, 130), Fight);
             fight.fontSize = 44;
             fight.Bold();
         }
@@ -105,7 +114,7 @@ namespace ShatteredPantheon.Game
             bool inTeam = placed.ContainsValue(id);
             var color = Palette.Faction(hero.Faction);
             if (inTeam) color.a = 0.35f;
-            var card = Ui.MakeTapArea(content, "Hero: " + id, color, pos, new Vector2(195, 150), () => TapHero(id)).rectTransform;
+            var card = Ui.MakeTapArea(roster, "Hero: " + id, color, pos, new Vector2(195, 150), () => TapHero(id)).rectTransform;
             Ui.Label(card, hero.Name, 22, Color.white, TextAnchor.MiddleCenter, new Vector2(0, 45), new Vector2(185, 52)).Bold().FitText(14);
             Ui.Label(card, $"{GrowthText(id)} · {hero.Role} · {hero.Faction} · {hero.Type}", 15, Palette.Muted, TextAnchor.MiddleCenter, new Vector2(0, 8), new Vector2(190, 24)).FitText(11);
             Ui.Label(card, inTeam ? "In team" : MatchupText(hero), 17, inTeam ? Palette.Status : Color.white, TextAnchor.MiddleCenter, new Vector2(0, -42), new Vector2(190, 52));

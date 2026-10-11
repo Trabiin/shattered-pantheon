@@ -1,5 +1,6 @@
 // The game's entry point: loads the data, owns the canvas, and switches between screens
-// (campaign -> team and formation -> battle -> results). Every screen builds its own UI in code.
+// (campaign -> team and formation -> battle -> results). Every screen builds its own UI in code,
+// on the page of the safe-area container (SafeArea), so nothing sits under a notch or off the edge.
 namespace ShatteredPantheon.Game
 {
     using System.Collections.Generic;
@@ -19,6 +20,7 @@ namespace ShatteredPantheon.Game
         public int SpeedIndex { get; set; }
 
         RectTransform canvas;
+        SafeArea safeArea;
         View current;
 
         void Start()
@@ -54,10 +56,12 @@ namespace ShatteredPantheon.Game
             go.GetComponent<Canvas>().renderMode = RenderMode.ScreenSpaceOverlay;
             var scaler = go.GetComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1080, 1920);
-            scaler.matchWidthOrHeight = 0.5f;
+            scaler.referenceResolution = SafeArea.PageSize;
+            // The canvas grows past 1080x1920 on taller or wider screens rather than cutting the page off.
+            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.Expand;
             canvas = (RectTransform)go.transform;
             Ui.Stretch(Ui.Panel(canvas, "Background", Palette.Background).rectTransform);
+            safeArea = SafeArea.Create(canvas);
         }
 
         public void ShowStages() => Show(new CampaignView(this));
@@ -70,7 +74,7 @@ namespace ShatteredPantheon.Game
         {
             current?.Close();
             current = next;
-            next.Open(Ui.Area(canvas, next.GetType().Name, Vector2.zero, new Vector2(1080, 1920)));
+            next.Open(Ui.Area(safeArea.Page, next.GetType().Name, Vector2.zero, SafeArea.PageSize));
         }
     }
 
@@ -105,7 +109,7 @@ namespace ShatteredPantheon.Game
 
         protected Text Header(string title, string subtitle, UnityEngine.Events.UnityAction back)
         {
-            if (back != null) Ui.MakeButton(Root, "Back", new Vector2(-430, 860), new Vector2(160, 90), back);
+            if (back != null) Ui.MakeButton(Root, "Back", new Vector2(-430, 860), new Vector2(160, Ui.MinTap), back);
             var t = Ui.Label(Root, $"{title}\n<size=26>{subtitle}</size>", 40, Color.white, TextAnchor.MiddleLeft, new Vector2(back != null ? 90 : -10, 860), new Vector2(back != null ? 820 : 1000, 120)).Bold();
             return t;
         }

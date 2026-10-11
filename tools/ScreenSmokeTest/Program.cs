@@ -3,10 +3,11 @@
 // next, and the first win sharing battle XP among the heroes who fought), retreating mid-fight,
 // results, retry, closing and reopening the game with its save, and resetting progress. The first
 // fights run as a release build; realm 1 is then played as a development build, at the testing speed
-// of 20x with the fight log on.
+// of 20x with the fight log on. Every screen is also laid out on five phone shapes (Layout.cs).
 // Fails on any exception a screen throws, on a fight that differs from the engine run directly, on
 // heroes fighting at anything but their own level's strength, on battle XP that doesn't add up, on
-// screens or animations left behind, or on a team that isn't what the player picked.
+// screens or animations left behind, on a team that isn't what the player picked, or on a screen that
+// doesn't fit a phone (outside the safe area, text cut off or overlapping, buttons too small for a thumb).
 //   dotnet run --project tools/ScreenSmokeTest
 using System;
 using System.Collections.Generic;
@@ -23,6 +24,17 @@ static class Program
     const int MaxTries = 5;
     // The strongest 5 of a new game's heroes, which the team screen offers first; they play realm 1 at their real levels.
     static readonly string[] Starter = { "solenne", "mordecai", "dagna", "oriel", "thessaly" };
+    // The phone shapes every screen is checked on: the screen in pixels, and its safe area (from the bottom-left corner)
+    // clear of the notch or camera hole, the rounded corners and the home bar.
+    static readonly (string name, int width, int height, Rect safe)[] Phones =
+    {
+        ("9:16 (1080x1920)", 1080, 1920, new Rect(0, 0, 1080, 1920)),
+        ("9:19.5 with a notch and home bar (1170x2532, like an iPhone 13)", 1170, 2532, new Rect(0, 102, 1170, 2289)),
+        ("9:21 with a camera hole (1080x2520, like a Sony Xperia 10)", 1080, 2520, new Rect(0, 0, 1080, 2424)),
+        ("a small phone (750x1334, like an iPhone SE)", 750, 1334, new Rect(0, 0, 750, 1334)),
+        // Rare, but the one shape where the safe area is shorter than the page: the page moves below the hole and shrinks to fit.
+        ("9:16 with a camera hole (1080x1920, 80 px kept at the top)", 1080, 1920, new Rect(0, 0, 1080, 1840)),
+    };
     static int failures;
     static GameApp app;
     static CampaignCurve curve;
@@ -152,6 +164,9 @@ static class Program
         Expect(Starter.All(id => levels[id] > 1) && data.Heroes.Where(h => !Starter.Contains(h.Id) && h.Id != "ysolde").All(h => levels[h.Id] == 1), "the heroes who fought levelled up; the others didn't");
         Expect(realm.All(b => !IsShownLocked(b)), "every won battle stays open to replay");
 
+        // Every screen on every phone shape: inside the safe area, nothing cut off or overlapping, buttons big enough for a thumb.
+        PhoneShapes(data, realm);
+
         // A fight in the 3-2 formation, on the realm boss.
         var wide = realm.Last();
         Click("Battle: " + wide.Id);
@@ -210,6 +225,18 @@ static class Program
         Click("Retreat Button");
         Expect(Team().Select(t => t.Id).OrderBy(x => x).SequenceEqual(new[] { "hilde", "hilde#2" }), "the team with both copies is kept");
         Click("Back Button");
+
+        // More heroes than fit on the page: the roster scrolls, and keeps its place while the team changes.
+        Click("Battle: " + first.Id);
+        string lastCard = "Hero: " + app.Progress.Cards.Last().Id;
+        Expect(app.Progress.Cards.Count == 21 && Layout.SeenShare(RectOf(lastCard)) < 0.5f, $"the last of 21 hero cards starts mostly below the roster's edge ({Layout.SeenShare(RectOf(lastCard)):0.00} showing)");
+        var roster = (RectTransform)Field(Current, "roster");
+        roster.anchoredPosition = new Vector2(0, roster.sizeDelta.y - ((RectTransform)roster.parent).sizeDelta.y);
+        Expect(Layout.SeenShare(RectOf(lastCard)) == 1, "scrolling the roster shows the last hero card");
+        Fits("the team screen with a scrolled roster of 21 heroes", () => { });
+        Click("Slot: front0"); Click(lastCard);
+        Expect(Layout.SeenShare(RectOf(lastCard)) == 1 && Has(lastCard.Substring(6), "front0"), "tapping a hero at the bottom of the roster keeps it scrolled there");
+        Click("Back Button");
         Directory.Delete(Application.persistentDataPath, true);
 
         foreach (var e in Scheduler.Errors.Distinct().Take(5)) Console.WriteLine("ERROR " + e);
@@ -247,8 +274,69 @@ static class Program
         Expect(bars.Count > 0 && bars.All(b => Math.Abs(b.anchoredPosition.x) + b.sizeDelta.x / 2 <= 500 - 10), $"{stage.Name}: the results bars keep a margin inside their row");
         if (Debug.isDebugBuild) CheckFightLog(stage, shown);
         Expect(Scheduler.Running == 0, $"{stage.Name}: no animations left running ({Scheduler.Running})");
-        Expect(CanvasChildren() == 2, $"{stage.Name}: old screens are cleaned up ({CanvasChildren()} canvas children)");
+        Expect(PageChildren() == 1, $"{stage.Name}: old screens are cleaned up ({PageChildren()} screens on the page)");
         return direct.Result == "win";
+    }
+
+    // Lays out the campaign, the team screen of every realm 1 battle in both formations, fights under way and
+    // the results of a win and of a loss on each phone shape.
+    static void PhoneShapes(GameData data, List<StageDef> realm)
+    {
+        int speed = app.SpeedIndex;
+        app.SpeedIndex = 0;
+        var bosses = realm.Where(b => b.Boss != null).ToList();
+        var team = Formation.AutoPlace(data, Starter);
+        Fits("the campaign", app.ShowStages);
+        Fits("the team screen of every realm 1 battle", realm.Select(b => (Action)(() => app.ShowTeam(b))).ToArray());
+        Fits("the team screen in the 3-2 formation", () => { app.ShowTeam(realm[0]); Click("Formation Button"); });
+        Fits("the battle screen during a fight", new[] { realm[0], bosses[0], realm.Last() }.Select(b => (Action)(() => { app.ShowBattle(b, team, "2-3"); RunFor(4); })).ToArray());
+        Fits("the results of a win and of a loss with its hint", () => ShowResult(data, realm.Last(), team), () => ShowResult(data, realm.Last(), team.Take(1).ToList()));
+        foreach (var phone in Phones)
+        {
+            SetPhone(phone);
+            float fit = RectOf("Page").localScale.x;
+            var page = Layout.Rect(RectOf("Page"));
+            bool shorter = phone.safe.height * SafeArea.PageSize.x / phone.width < SafeArea.PageSize.y;
+            Expect(page.Inside(Layout.SafeArea, 0.5f) && (shorter ? Math.Abs(page.H - phone.safe.height) < 1 : Math.Abs(fit - 1) < 1e-4),
+                $"{phone.name}: the page {(shorter ? $"shrinks to {fit:0.00} to fit the safe area" : "fits the safe area at full size")}");
+        }
+        SetPhone(Phones[0]);
+        Expect(Scheduler.Errors.Count == 0, "changing phone shapes throws nothing");
+        app.SpeedIndex = speed;
+        app.ShowStages();
+    }
+
+    static void ShowResult(GameData data, StageDef stage, List<TeamSlot> team)
+    {
+        var scaled = team.Select(s => new TeamSlot(s.Id, s.Row, s.Slot) { HpScale = stage.HeroScale, AtkScale = stage.HeroScale }).ToList();
+        var battle = new Battle(data, scaled, stage.Id, 7, new BattleOptions());
+        while (!battle.Over) battle.Step();
+        app.ShowResults(stage, team, battle);
+    }
+
+    // Shows each screen on every phone shape and checks it fits.
+    static void Fits(string what, params Action[] screens)
+    {
+        foreach (var phone in Phones)
+        {
+            SetPhone(phone);
+            var problems = new List<string>();
+            foreach (var show in screens)
+            {
+                show();
+                problems.AddRange(Layout.Check((RectTransform)Find("Page").transform.Cast<Transform>().Last(), Ui.MinTap).Select(p => $"{Current.GetType().Name}: {p}"));
+            }
+            problems = problems.Distinct().ToList();
+            Expect(problems.Count == 0, $"{phone.name}: {what} fits{(problems.Count > 0 ? $" ({problems.Count} problems: " + string.Join("; ", problems.Take(6)) + ")" : "")}");
+        }
+        SetPhone(Phones[0]);
+    }
+
+    // The phone changes shape, and the safe-area container notices on its next frame.
+    static void SetPhone((string name, int width, int height, Rect safe) phone)
+    {
+        Screen.width = phone.width; Screen.height = phone.height; Screen.safeArea = phone.safe;
+        Call(UnityEngine.Object.FindAnyObjectByType<SafeArea>(), "Update");
     }
 
     // All the XP a hero has earned: the levels they've reached plus their XP towards the next.
@@ -320,6 +408,7 @@ static class Program
     static float RunUntil(Func<bool> done, float limit) { float t = 0; while (!done() && t < limit) { Scheduler.Frame(1 / 60f); t += 1 / 60f; } return t; }
 
     static IEnumerable<GameObject> Named(string part) => UnityEngine.Object.All.OfType<GameObject>().Where(g => g != null && g.name.Contains(part));
+    static RectTransform RectOf(string name) => (RectTransform)Find(name).transform;
     static GameObject Find(string name) => UnityEngine.Object.All.OfType<GameObject>().LastOrDefault(g => g != null && g.name == name);
     static string Label(GameObject go, int n = 0) => go.transform.Cast<Transform>().Select(t => t.GetComponent<Text>()).Where(t => t != null).ElementAt(n).text;
     static void Click(string name)
@@ -328,7 +417,7 @@ static class Program
         if (go == null) { Expect(false, $"\"{name}\" exists to tap"); return; }
         go.GetComponent<Button>().onClick.Invoke();
     }
-    static int CanvasChildren() => Find("Canvas").transform.Cast<Transform>().Count();
+    static int PageChildren() => Find("Page").transform.Cast<Transform>().Count();
 
     static object Field(object o, string name) => o.GetType().GetField(name, BindingFlags.NonPublic | BindingFlags.Instance).GetValue(o);
     static void Call(object o, string name) => o.GetType().GetMethod(name, BindingFlags.NonPublic | BindingFlags.Instance).Invoke(o, null);

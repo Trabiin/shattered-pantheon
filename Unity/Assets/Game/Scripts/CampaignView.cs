@@ -27,7 +27,7 @@ namespace ShatteredPantheon.Game
         {
             var battles = Battles(App.Data);
             Header($"Realm {Realm}: {battles[0].Realm}", $"{Ui.Capitalise(Difficulty)}  ·  choose a battle", null);
-            float height = 140, gap = 16, top = 700;
+            float height = 148, gap = 10, top = 700;
             var stages = battles.GroupBy(b => b.StageNumber).ToList();
             for (int i = 0; i < stages.Count; i++)
             {
@@ -45,7 +45,7 @@ namespace ShatteredPantheon.Game
         {
             bool armed = false;
             Text label = null;
-            label = Ui.MakeButton(Root, "Reset progress", new Vector2(310, -880), new Vector2(380, 90), () =>
+            label = Ui.MakeButton(Root, "Reset progress", new Vector2(310, -890), new Vector2(380, Ui.MinTap), () =>
             {
                 if (!armed) { armed = true; label.text = "Tap again to reset"; return; }
                 App.Progress.Reset();
