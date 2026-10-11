@@ -1,10 +1,12 @@
 // Plays the game's screens on fake Unity (FakeUnity.cs) the way a player would: the campaign screen,
 // locked battles, team and formation editing, every realm 1 battle in order (each win opening the
-// next), retreating mid-fight, results, retry, closing and reopening the game with its save, and
-// resetting progress. The first fights run as a release build; realm 1 is then played as a development
-// build, at the testing speed of 20x with the fight log on.
-// Fails on any exception a screen throws, on a fight that differs from the engine run directly,
-// on screens or animations left behind, or on a team that isn't what the player picked.
+// next, and the first win sharing battle XP among the heroes who fought), retreating mid-fight,
+// results, retry, closing and reopening the game with its save, and resetting progress. The first
+// fights run as a release build; realm 1 is then played as a development build, at the testing speed
+// of 20x with the fight log on.
+// Fails on any exception a screen throws, on a fight that differs from the engine run directly, on
+// heroes fighting at anything but their own level's strength, on battle XP that doesn't add up, on
+// screens or animations left behind, or on a team that isn't what the player picked.
 //   dotnet run --project tools/ScreenSmokeTest
 using System;
 using System.Collections.Generic;
@@ -19,9 +21,11 @@ using UnityEngine.UI;
 static class Program
 {
     const int MaxTries = 5;
-    static readonly string[] Starter = { "hilde", "solenne", "thessaly", "maren", "pip" };
+    // The strongest 5 of a new game's heroes, which the team screen offers first; they play realm 1 at their real levels.
+    static readonly string[] Starter = { "solenne", "mordecai", "dagna", "oriel", "thessaly" };
     static int failures;
     static GameApp app;
+    static CampaignCurve curve;
 
     static int Main()
     {
@@ -30,6 +34,7 @@ static class Program
         string dir = Path.Combine(UnityEngine.Resources.Root, "BattleData");
         string R(string f) => File.ReadAllText(Path.Combine(dir, f + ".json"));
         var data = GameData.FromJson(R("rules"), R("heroes"), R("enemies"), R("campaign"));
+        curve = CampaignCurve.FromJson(R("progression"));
         Application.persistentDataPath = Path.Combine(Path.GetTempPath(), "sp-smoke-" + Guid.NewGuid().ToString("N"));
         string saveFile = Path.Combine(Application.persistentDataPath, SaveStore.FileName);
         var realm = CampaignView.Battles(data);
@@ -41,6 +46,8 @@ static class Program
         app = new GameObject("Game").AddComponent<GameApp>();
         Call(app, "Start");
         Expect(Current is CampaignView, "game opens on the campaign");
+        Expect(data.Heroes.All(h => app.Progress.Wallet.Hero(h.Id)?.Level == 1), "a new game owns the test heroes at level 1");
+        Expect(app.Progress.StrongestTeam().OrderBy(x => x).SequenceEqual(Starter.OrderBy(x => x)), $"a new game's strongest team is the one this test plays ({string.Join(", ", app.Progress.StrongestTeam())})");
         Expect(realm.All(b => Find("Battle: " + b.Id) != null), "every realm 1 battle is listed");
         Expect(Named("Battle: ").Count() == realm.Count, $"only realm 1 battles are listed ({Named("Battle: ").Count()})");
         var testStages = GameData.LoadDirectory(dir).Stages;
@@ -57,13 +64,14 @@ static class Program
         var first = realm[0];
         Click("Battle: " + first.Id);
         Expect(Current is TeamView, "tapping a battle opens the team screen");
-        Expect(Team().Count == 5, "a default team of 5 is ready");
+        Expect(TeamSet(Team()) == TeamSet(Formation.AutoPlace(data, Starter)), "the strongest team is ready");
+        Expect(data.Heroes.All(h => Label(Find("Hero: " + h.Id), 1).StartsWith($"Lv 1 {app.Progress.Wallet.Hero(h.Id).Stars}★")), "every hero card shows its level and star rank");
         Click("Clear Button");
         Expect(Team().Count == 0, "Clear empties the team");
         Click("Fight! Button");
         Expect(Current is TeamView, "can't start a fight with no heroes");
         Click("Auto Button");
-        Expect(Team().Count == 5, "Auto fills the default team");
+        Expect(TeamSet(Team()) == TeamSet(Formation.AutoPlace(data, Starter)), "Auto fills the strongest team");
         Click("Slot: back2"); Click("Slot: back2");
         Expect(Team().Count == 4 && Team().All(t => t.Slot != "back2"), "tapping a selected slot empties it");
         Click("Hero: ysolde");
@@ -139,6 +147,9 @@ static class Program
             if (next != null) Expect(!IsShownLocked(next), $"{stage.Name}: the win opens {opens}");
         }
         Expect(realm.All(b => IsShownCleared(b)), "every won battle shows as cleared");
+        var levels = data.Heroes.ToDictionary(h => h.Id, h => app.Progress.Wallet.Hero(h.Id).Level);
+        Console.WriteLine("After realm 1: " + string.Join(", ", Starter.Select(id => $"{id} level {levels[id]}")));
+        Expect(Starter.All(id => levels[id] > 1) && data.Heroes.Where(h => !Starter.Contains(h.Id) && h.Id != "ysolde").All(h => levels[h.Id] == 1), "the heroes who fought levelled up; the others didn't");
         Expect(realm.All(b => !IsShownLocked(b)), "every won battle stays open to replay");
 
         // A fight in the 3-2 formation, on the realm boss.
@@ -171,6 +182,7 @@ static class Program
         Expect(realm.All(b => !IsShownLocked(b)), "after reopening, every won battle is still open");
         Expect(realm.All(b => app.Progress.Stars(b.Id).SequenceEqual(new[] { 1 })), "after reopening, every won battle has its 1 star");
         Expect(app.Progress.Furthest("normal") == realm.Last().Id, "after reopening, the furthest battle reached is the realm boss");
+        Expect(data.Heroes.All(h => app.Progress.Wallet.Hero(h.Id).Level == levels[h.Id]), "after reopening, every hero keeps their level");
         Click("Battle: " + first.Id);
         Expect(Team().Select(t => t.Id + "@" + t.Slot).SequenceEqual(picked.Select(t => t.Id + "@" + t.Slot)), "after reopening, a battle still opens with the team last used on it");
         Click("Back Button");
@@ -182,8 +194,22 @@ static class Program
         Expect(IsShownCleared(first) && File.Exists(saveFile), "one tap on Reset progress only asks to confirm");
         Click("Reset progress Button");
         Expect(Current is CampaignView && realm.All(b => !IsShownCleared(b)) && !File.Exists(saveFile), "the second tap clears all progress and the save");
+        Expect(data.Heroes.All(h => app.Progress.Wallet.Hero(h.Id).Level == 1), "after a reset the heroes are back at level 1");
         Expect(app.Progress.Furthest("normal") == null, "after a reset nothing has been reached");
         Expect(!IsShownLocked(realm[0]) && realm.Skip(1).All(IsShownLocked), "after a reset only the first battle is open");
+
+        // Every copy of a hero is its own card, and copies can fight side by side.
+        app.Progress.Wallet.NewCard("hilde");
+        Click("Battle: " + first.Id);
+        Expect(Find("Hero: hilde") != null && Find("Hero: hilde#2") != null && Named("Hero: ").Count() == data.Heroes.Count + 1, "a second copy of Hilde gets its own hero card");
+        Click("Clear Button");
+        Click("Hero: hilde"); Click("Hero: hilde#2");
+        Expect(Team().Select(t => t.Id).OrderBy(x => x).SequenceEqual(new[] { "hilde", "hilde#2" }), "both copies can be placed in one team");
+        Click("Fight! Button");
+        Expect(Current is BattleView && ((BattleView)Current).Battle.Units.Count(u => u.Side == "A" && u.Id == "hilde") == 2, "both copies fight");
+        Click("Retreat Button");
+        Expect(Team().Select(t => t.Id).OrderBy(x => x).SequenceEqual(new[] { "hilde", "hilde#2" }), "the team with both copies is kept");
+        Click("Back Button");
         Directory.Delete(Application.persistentDataPath, true);
 
         foreach (var e in Scheduler.Errors.Distinct().Take(5)) Console.WriteLine("ERROR " + e);
@@ -196,18 +222,24 @@ static class Program
     static bool CheckFight(GameData data, StageDef stage, List<TeamSlot> team)
     {
         var view = (BattleView)Current;
+        // Each hero card fights at its own strength, from its level, star rank and skill level before the fight.
+        var scale = team.ToDictionary(s => s.Id, s => app.Progress.HeroScale(s.Id));
+        var fighting = app.Progress.FightingTeam(team);
+        var xpBefore = team.ToDictionary(s => s.Id, s => TotalXp(s.Id));
+        bool firstWin = !app.Progress.IsCleared(stage.Id);
         float t = RunUntil(() => Current is ResultsView, 3600);
-        // Until heroes have levels, they fight at the strength the battle was sim-checked for.
-        var strong = team.Select(s => new TeamSlot(s.Id, s.Row, s.Slot) { HpScale = stage.HeroScale, AtkScale = stage.HeroScale }).ToList();
+        var strong = team.Select(s => new TeamSlot(app.Progress.HeroOf(s.Id).Id, s.Row, s.Slot) { HpScale = scale[s.Id], AtkScale = scale[s.Id] }).ToList();
         var direct = Battle.Run(data, strong, stage.Id, view.Seed, new BattleOptions { Formation = view.Battle.HeroFormation });
         var shown = view.Battle;
         var results = Current as ResultsView;
         Console.WriteLine($"{stage.Name}: {results?.Title ?? "no results"} after {shown.Actions} actions ({t:0}s at {GameApp.Speeds[app.SpeedIndex]}x)");
         Expect(results != null, $"{stage.Name}: results screen opens when the fight ends");
         Expect(shown.Result == direct.Result && shown.Actions == direct.Actions, $"{stage.Name}: fight on screen matches the engine run directly ({direct.Result}, {direct.Actions} actions)");
-        Expect(TeamSet(shown.Units.Where(u => u.Side == "A").Select(u => new TeamSlot(u.Id, u.Row, u.Slot)).ToList()) == TeamSet(team), $"{stage.Name}: the fight used the picked team and formation");
+        Expect(TeamSet(shown.Units.Where(u => u.Side == "A").Select(u => new TeamSlot(u.Id, u.Row, u.Slot)).ToList()) == TeamSet(strong), $"{stage.Name}: the fight used the picked team and formation");
         Expect(results != null && results.Title == (direct.Result == "win" ? "Victory" : direct.Result == "lose" ? "Defeat" : "Time's up"), $"{stage.Name}: result title is right");
-        Expect(((List<TeamSlot>)Field(view, "team")).All(s => s.HpScale == stage.HeroScale && s.AtkScale == stage.HeroScale), $"{stage.Name}: heroes fight at the battle's expected strength ({stage.HeroScale}x)");
+        Expect(fighting.Zip(strong, (a, b) => a.Id == b.Id && a.Slot == b.Slot && a.HpScale == b.HpScale && a.AtkScale == b.AtkScale).All(x => x), $"{stage.Name}: heroes fight at their own strength ({string.Join(", ", scale.Values.Select(v => v.ToString("0.00")))}x; the battle expects {stage.HeroScale:0.00}x)");
+        long share = firstWin && direct.Result == "win" ? curve.FirstClearXp(stage) / team.Count : 0;
+        Expect(team.All(s => TotalXp(s.Id) - xpBefore[s.Id] == share), $"{stage.Name}: {(share > 0 ? $"a first win gives each hero who fought {share} XP" : "no battle XP for a loss or a replay")}");
         Expect(direct.Result != "win" || app.Progress.IsCleared(stage.Id), $"{stage.Name}: a win marks the battle cleared");
         Expect(SaveData.FromJson(File.ReadAllText(Path.Combine(Application.persistentDataPath, SaveStore.FileName))).Stars.ContainsKey(stage.Id) == app.Progress.IsCleared(stage.Id), $"{stage.Name}: the save on the device matches after the fight");
         Expect(direct.Heroes.All(h => Find("Row: " + h.Id) != null), $"{stage.Name}: every hero has a results row");
@@ -217,6 +249,13 @@ static class Program
         Expect(Scheduler.Running == 0, $"{stage.Name}: no animations left running ({Scheduler.Running})");
         Expect(CanvasChildren() == 2, $"{stage.Name}: old screens are cleaned up ({CanvasChildren()} canvas children)");
         return direct.Result == "win";
+    }
+
+    // All the XP a hero has earned: the levels they've reached plus their XP towards the next.
+    static long TotalXp(string id)
+    {
+        var h = app.Progress.Wallet.Hero(id);
+        return Enumerable.Range(1, h.Level - 1).Sum(l => (long)curve.Growth.XpToNext(l)) + h.Xp;
     }
 
     // A card hit twice in quick succession goes back to its own colour, not the half-white one of the first hit.
@@ -282,7 +321,7 @@ static class Program
 
     static IEnumerable<GameObject> Named(string part) => UnityEngine.Object.All.OfType<GameObject>().Where(g => g != null && g.name.Contains(part));
     static GameObject Find(string name) => UnityEngine.Object.All.OfType<GameObject>().LastOrDefault(g => g != null && g.name == name);
-    static string Label(GameObject go) => go.transform.Cast<Transform>().Select(t => t.GetComponent<Text>()).First(t => t != null).text;
+    static string Label(GameObject go, int n = 0) => go.transform.Cast<Transform>().Select(t => t.GetComponent<Text>()).Where(t => t != null).ElementAt(n).text;
     static void Click(string name)
     {
         var go = Find(name);

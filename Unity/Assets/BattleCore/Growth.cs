@@ -54,9 +54,8 @@ namespace ShatteredPantheon.Battle
         // The highest level a hero of this star rank can reach.
         public int LevelCap(int stars) => LevelCapByStars.TryGetValue(stars, out var c) ? c : LevelCapByStars.Values.Max();
 
-        // XP and gold to go from this level to the next.
+        // XP to go from this level to the next. Levels cost XP only: gold is for gear and shops.
         public double XpToNext(int level) => Math.Round(XpA * Math.Pow(level, XpExp));
-        public double GoldToNext(int level) => XpToNext(level) * GoldPerXp;
 
         // Heroes of the same star rank (or Vessels) used up to ascend from this star rank to the next.
         public int FodderToAscend(int stars) => AscendFodder[stars];
@@ -64,7 +63,7 @@ namespace ShatteredPantheon.Battle
         // Skill tomes to go from this skill level to the next.
         public double TomesToNext(int skill) => TomesPerLevel * skill;
 
-        // Gear materials and gold to go from this gear tier to the next; the gold follows the hero's level cost.
+        // Gear materials and gold to go from this gear tier to the next; the gold follows the XP of the hero's next level.
         public double GearMatsToNext(int gear) => GearMatsPerTier * (gear + 1);
         public double GearGoldToNext(int level) => GearGoldLevels * XpToNext(Math.Max(1, level)) * GoldPerXp;
     }

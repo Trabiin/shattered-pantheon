@@ -12,7 +12,7 @@ namespace ShatteredPantheon.Game
     public class BattleView : View
     {
         readonly StageDef stage;
-        readonly List<TeamSlot> team;
+        readonly List<TeamSlot> team; // hero cards
         readonly Dictionary<string, UnitCard> cards = new Dictionary<string, UnitCard>();
         public Battle Battle { get; private set; }
         public int Seed { get; private set; }
@@ -25,8 +25,6 @@ namespace ShatteredPantheon.Game
             this.stage = stage;
             this.team = team;
             this.formation = formation;
-            // Heroes have no levels yet (E8), so they fight at the strength this battle was sim-checked for.
-            foreach (var t in team) t.HpScale = t.AtkScale = stage.HeroScale;
         }
 
         float SecondsPerAction => (float)(App.Data.Rules.SecondsPerActionAt1x / GameApp.Speeds[App.SpeedIndex]);
@@ -34,7 +32,8 @@ namespace ShatteredPantheon.Game
         protected override void Build()
         {
             Seed = Random.Range(1, int.MaxValue);
-            Battle = new Battle(App.Data, team, stage.Id, Seed, new BattleOptions { Formation = formation });
+            // Each card fights at its own strength: its hero's rarity, and its level, star rank and skill level.
+            Battle = new Battle(App.Data, App.Progress.FightingTeam(team), stage.Id, Seed, new BattleOptions { Formation = formation });
 
             Ui.Label(Root, $"{stage.Name}\n<size=26>{Ui.Capitalise(stage.Difficulty)}</size>", 40, Color.white, TextAnchor.MiddleLeft, new Vector2(-180, 860), new Vector2(660, 120)).Bold();
             speedLabel = Ui.MakeButton(Root, GameApp.Speeds[App.SpeedIndex] + "x", new Vector2(250, 860), new Vector2(130, 90), CycleSpeed, "Speed Button");
@@ -72,7 +71,7 @@ namespace ShatteredPantheon.Game
             logLine.text = Battle.Result == "win" ? "Victory!" : Battle.Result == "lose" ? "Defeat..." : "Time's up";
             yield return new WaitForSeconds(1.2f);
             if (Closed) yield break;
-            App.Progress.RecordBattle(stage, Battle.Result);
+            App.Progress.RecordBattle(stage, Battle.Result, team.Select(t => t.Id));
             App.ShowResults(stage, team, Battle);
         }
 

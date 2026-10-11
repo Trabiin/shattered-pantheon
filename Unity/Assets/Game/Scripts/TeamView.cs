@@ -1,5 +1,6 @@
-// Team and formation: pick up to 5 heroes and place them in a 2-3 or 3-2 formation (staggered rows),
-// with the stage's enemies shown and each hero's type match-up against them.
+// Team and formation: pick up to 5 of the player's hero cards and place them in a 2-3 or 3-2 formation
+// (staggered rows), with the stage's enemies shown, and each card's level, star rank and type match-up against them.
+// Every copy of a hero is its own card, and a team may field several copies of the same hero.
 // Tap a slot to select it, then tap a hero to put them there. Tap a selected filled slot to empty it.
 namespace ShatteredPantheon.Game
 {
@@ -13,7 +14,7 @@ namespace ShatteredPantheon.Game
         readonly StageDef stage;
         string formation = "2-3";
         string[] Slots => Battle.SlotsOf(formation).ToArray();
-        readonly Dictionary<string, string> placed = new Dictionary<string, string>(); // slot -> hero id
+        readonly Dictionary<string, string> placed = new Dictionary<string, string>(); // slot -> card id
         string selected;
         RectTransform content;
 
@@ -68,9 +69,9 @@ namespace ShatteredPantheon.Game
 
             // Roster.
             Ui.Label(content, "Heroes", 28, Palette.Muted, TextAnchor.MiddleLeft, new Vector2(0, 30), new Vector2(1000, 40));
-            var heroes = App.Data.Heroes;
-            for (int i = 0; i < heroes.Count; i++)
-                RosterCard(heroes[i], new Vector2((i % 5 - 2) * 205, -60 - (i / 5) * 160));
+            var cards = App.Progress.Cards;
+            for (int i = 0; i < cards.Count; i++)
+                RosterCard(cards[i].Id, new Vector2((i % 5 - 2) * 205, -60 - (i / 5) * 160));
 
             // Actions.
             int count = placed.Count;
@@ -85,8 +86,8 @@ namespace ShatteredPantheon.Game
         void SlotCard(string slot, Vector2 pos)
         {
             if (slot == selected) Ui.Panel(content, "Selected", Palette.Selected, pos, new Vector2(214, 224));
-            string id = placed.TryGetValue(slot, out var h) ? h : null;
-            var hero = id != null ? App.Data.Heroes.First(x => x.Id == id) : null;
+            string id = placed.TryGetValue(slot, out var c) ? c : null;
+            var hero = id != null ? App.Progress.HeroOf(id) : null;
             var card = Ui.MakeTapArea(content, "Slot: " + slot, hero != null ? Palette.Faction(hero.Faction) : Palette.PanelFill, pos, new Vector2(200, 210), () => TapSlot(slot)).rectTransform;
             if (hero == null)
             {
@@ -94,19 +95,27 @@ namespace ShatteredPantheon.Game
                 return;
             }
             Ui.Label(card, hero.Name, 26, Color.white, TextAnchor.MiddleCenter, new Vector2(0, 55), new Vector2(185, 80)).Bold().FitText(16);
-            Ui.Label(card, hero.Role, 22, Palette.Muted, TextAnchor.MiddleCenter, new Vector2(0, 0), new Vector2(185, 30));
+            Ui.Label(card, $"{GrowthText(id)} · {hero.Role}", 22, Palette.Muted, TextAnchor.MiddleCenter, new Vector2(0, 0), new Vector2(185, 30)).FitText(14);
             Ui.Label(card, MatchupText(hero), 20, Color.white, TextAnchor.MiddleCenter, new Vector2(0, -60), new Vector2(190, 60));
         }
 
-        void RosterCard(UnitDef hero, Vector2 pos)
+        void RosterCard(string id, Vector2 pos)
         {
-            bool inTeam = placed.ContainsValue(hero.Id);
+            var hero = App.Progress.HeroOf(id);
+            bool inTeam = placed.ContainsValue(id);
             var color = Palette.Faction(hero.Faction);
             if (inTeam) color.a = 0.35f;
-            var card = Ui.MakeTapArea(content, "Hero: " + hero.Id, color, pos, new Vector2(195, 150), () => TapHero(hero.Id)).rectTransform;
+            var card = Ui.MakeTapArea(content, "Hero: " + id, color, pos, new Vector2(195, 150), () => TapHero(id)).rectTransform;
             Ui.Label(card, hero.Name, 22, Color.white, TextAnchor.MiddleCenter, new Vector2(0, 45), new Vector2(185, 52)).Bold().FitText(14);
-            Ui.Label(card, $"{hero.Role} · {hero.Faction} · {hero.Type}", 15, Palette.Muted, TextAnchor.MiddleCenter, new Vector2(0, 8), new Vector2(190, 24)).FitText(11);
+            Ui.Label(card, $"{GrowthText(id)} · {hero.Role} · {hero.Faction} · {hero.Type}", 15, Palette.Muted, TextAnchor.MiddleCenter, new Vector2(0, 8), new Vector2(190, 24)).FitText(11);
             Ui.Label(card, inTeam ? "In team" : MatchupText(hero), 17, inTeam ? Palette.Status : Color.white, TextAnchor.MiddleCenter, new Vector2(0, -42), new Vector2(190, 52));
+        }
+
+        // A card's level and star rank, for example "Lv 12 3★".
+        string GrowthText(string card)
+        {
+            var h = App.Progress.Wallet.Hero(card);
+            return $"Lv {h.Level} {h.Stars}★";
         }
 
         // How this hero's type matches up against the stage's enemies on average (damage dealt and taken),
@@ -162,11 +171,11 @@ namespace ShatteredPantheon.Game
             Refresh();
         }
 
-        // Re-places the chosen heroes (or the default team if none) with tanks and warriors in front.
+        // Re-places the chosen cards (or the strongest team if none) with tanks and warriors in front.
         void AutoPlace()
         {
-            var ids = Slots.Where(placed.ContainsKey).Select(s => placed[s]).ToList();
-            var team = ids.Count > 0 ? ShatteredPantheon.Battle.Formation.AutoPlace(App.Data, ids) : App.Progress.LoadTeam(stage.Id);
+            var cards = Slots.Where(placed.ContainsKey).Select(s => placed[s]).ToList();
+            var team = App.Progress.AutoPlace(cards.Count > 0 ? cards : App.Progress.StrongestTeam());
             formation = Battle.FormationOf(team.Select(t => t.Slot));
             placed.Clear();
             foreach (var t in team) placed[t.Slot] = t.Id;

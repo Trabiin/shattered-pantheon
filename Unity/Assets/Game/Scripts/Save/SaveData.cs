@@ -1,8 +1,9 @@
 // The player's save, as it is written to the device: campaign progress (stars per battle, the
-// furthest battle reached on each difficulty) and the team last used on each battle.
+// furthest battle reached on each difficulty), the team last used on each battle, the heroes the
+// player owns and the items they hold.
 //
-// The file is JSON split into sections ("campaign", "teams"), so later systems add their own section
-// (heroes and inventory in E8-F2-S1, currencies and the daily loop in E10) without touching these.
+// The file is JSON split into sections ("campaign", "teams", "heroes", "inventory"), so later systems
+// add their own section (currencies and the daily loop in E10) without touching these.
 // Reading is forgiving in one direction and strict in the other:
 //   - a section or field that's missing gets its default, so an older save loads into a newer game;
 //   - a section this version doesn't know is kept as it was and written back unchanged;
@@ -50,11 +51,15 @@ namespace ShatteredPantheon.Game
         // Battle id -> the team last sent into it; LastTeam is the last team sent anywhere.
         public Dictionary<string, SavedTeam> Teams = new Dictionary<string, SavedTeam>();
         public SavedTeam LastTeam;
+        // Card id -> that hero card's progress (OwnedHero). Empty until the game gives a new player their heroes (PlayerProgress).
+        public Dictionary<string, OwnedHero> Heroes = new Dictionary<string, OwnedHero>();
+        // Item id (Item) -> how many the player holds. Items a newer game added are kept as they are.
+        public Dictionary<string, long> Items = Item.All.ToDictionary(i => i, i => 0L);
 
         // Sections written by a newer game (or a later system) that this version doesn't read.
         readonly Dictionary<string, object> otherSections = new Dictionary<string, object>();
 
-        static readonly string[] KnownSections = { "version", "campaign", "teams" };
+        static readonly string[] KnownSections = { "version", "campaign", "teams", "heroes", "inventory" };
 
         public string ToJson()
         {
@@ -71,6 +76,8 @@ namespace ShatteredPantheon.Game
                     ["last"] = LastTeam?.ToJson(),
                     ["battles"] = Teams.OrderBy(p => p.Key, StringComparer.Ordinal).ToDictionary(p => p.Key, p => (object)p.Value.ToJson()),
                 },
+                ["heroes"] = Heroes.OrderBy(p => p.Key, StringComparer.Ordinal).ToDictionary(p => p.Key, p => (object)p.Value.ToJson()),
+                ["inventory"] = Items.OrderBy(p => p.Key, StringComparer.Ordinal).ToDictionary(p => p.Key, p => (object)p.Value),
             };
             var sb = new StringBuilder();
             Write(sb, root, "");
@@ -116,9 +123,15 @@ namespace ShatteredPantheon.Game
             var teams = Section(root, "teams");
             if (teams.TryGetValue("last", out var last) && last != null) save.LastTeam = SavedTeam.FromJson((Dictionary<string, object>)last);
             foreach (var p in Section(teams, "battles")) save.Teams[p.Key] = SavedTeam.FromJson((Dictionary<string, object>)p.Value);
+            foreach (var p in Section(root, "heroes")) save.Heroes[p.Key] = OwnedHero.FromJson(p.Key, (Dictionary<string, object>)p.Value);
+            foreach (var p in Section(root, "inventory")) save.Items[p.Key] = Count(p.Value, 0, long.MaxValue, $"Bad amount of {p.Key}.");
             foreach (var p in root.Where(p => !KnownSections.Contains(p.Key))) save.otherSections[p.Key] = p.Value;
             return save;
         }
+
+        // A whole number from min to max, or the save is damaged.
+        internal static long Count(object value, long min, long max, string problem) =>
+            value is double d && d == Math.Floor(d) && d >= min && d <= max ? (long)d : throw new FormatException(problem);
 
         static Dictionary<string, object> Section(Dictionary<string, object> parent, string name) =>
             parent.TryGetValue(name, out var s) && s != null ? (Dictionary<string, object>)s : new Dictionary<string, object>();
@@ -132,6 +145,7 @@ namespace ShatteredPantheon.Game
                 case string s: WriteString(sb, s); break;
                 case bool b: sb.Append(b ? "true" : "false"); break;
                 case int i: sb.Append(i.ToString(CultureInfo.InvariantCulture)); break;
+                case long l: sb.Append(l.ToString(CultureInfo.InvariantCulture)); break;
                 case double d: sb.Append(d.ToString("R", CultureInfo.InvariantCulture)); break;
                 case Dictionary<string, object> obj:
                     if (obj.Count == 0) { sb.Append("{}"); break; }
@@ -169,7 +183,7 @@ namespace ShatteredPantheon.Game
         }
     }
 
-    // A team as saved: its formation and which hero stands in which slot.
+    // A team as saved: its formation and which hero card stands in which slot.
     public class SavedTeam
     {
         public string Formation;
@@ -190,5 +204,44 @@ namespace ShatteredPantheon.Game
         public static SavedTeam FromJson(Dictionary<string, object> o) => new SavedTeam(
             (string)o["formation"],
             ((List<object>)o["heroes"]).Cast<Dictionary<string, object>>().Select(h => new TeamSlot((string)h["hero"], (string)h["slot"])));
+    }
+
+    // One hero card the player owns: which hero it is, its level, XP towards the next level, star rank
+    // and skill level. Every copy of a hero is its own card (decided 2026-10-11). The first copy's card id
+    // is the hero's id; later copies add "#2", "#3"... (Wallet.NewCard).
+    public class OwnedHero
+    {
+        public string Id, Hero;
+        public int Level = 1, Stars = 1, Skill = 1;
+        public long Xp;
+
+        public Dictionary<string, object> ToJson() => new Dictionary<string, object>
+        {
+            ["hero"] = Hero, ["level"] = Level, ["xp"] = Xp, ["stars"] = Stars, ["skill"] = Skill,
+        };
+
+        public static OwnedHero FromJson(string id, Dictionary<string, object> o)
+        {
+            int Whole(string k, int def) => o.TryGetValue(k, out var v) ? (int)SaveData.Count(v, 1, int.MaxValue, $"Bad {k} for hero {id}.") : def;
+            if (o.TryGetValue("hero", out var hero) && !(hero is string)) throw new FormatException($"Bad hero for card {id}.");
+            return new OwnedHero
+            {
+                Id = id, Hero = (string)hero ?? id, Level = Whole("level", 1), Stars = Whole("stars", 1), Skill = Whole("skill", 1),
+                Xp = o.TryGetValue("xp", out var xp) ? SaveData.Count(xp, 0, long.MaxValue, $"Bad xp for hero {id}.") : 0,
+            };
+        }
+    }
+
+    // The items the player can hold, by their id in the save's "inventory" section.
+    public static class Item
+    {
+        // XP potions are counted in XP: any amount can go to any hero (E8-F5).
+        public const string Gold = "gold", XpPotions = "xpPotions", SkillTomes = "skillTomes", RebirthScrolls = "rebirthScrolls";
+        // A Vessel counts as any hero of its star rank when ascending (doc 08 section 4), so there are
+        // Vessels for every rank a hero ascends from: 1★ to 5★.
+        public static string Vessel(int stars) => "vessel" + stars;
+        public const int MaxVesselStars = 5;
+        public static readonly string[] All = new[] { Gold, XpPotions, SkillTomes, RebirthScrolls }
+            .Concat(Enumerable.Range(1, MaxVesselStars).Select(Vessel)).ToArray();
     }
 }
