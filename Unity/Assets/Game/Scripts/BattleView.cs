@@ -25,8 +25,8 @@ namespace ShatteredPantheon.Game
             this.stage = stage;
             this.team = team;
             this.formation = formation;
-            // Heroes have no levels yet (E8), so they fight at the strength this battle was sim-checked for.
-            foreach (var t in team) t.HpScale = t.AtkScale = stage.HeroScale;
+            // Each hero fights at their own strength: rarity, level, star rank and skill level.
+            foreach (var t in team) t.HpScale = t.AtkScale = app.Progress.HeroScale(t.Id);
         }
 
         float SecondsPerAction => (float)(App.Data.Rules.SecondsPerActionAt1x / GameApp.Speeds[App.SpeedIndex]);
@@ -70,7 +70,7 @@ namespace ShatteredPantheon.Game
             logLine.text = Battle.Result == "win" ? "Victory!" : Battle.Result == "lose" ? "Defeat..." : "Time's up";
             yield return new WaitForSeconds(1.2f);
             if (Closed) yield break;
-            App.Progress.RecordBattle(stage, Battle.Result);
+            App.Progress.RecordBattle(stage, Battle.Result, team.Select(t => t.Id));
             App.ShowResults(stage, team, Battle);
         }
 

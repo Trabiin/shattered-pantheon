@@ -24,7 +24,9 @@ namespace ShatteredPantheon.Game
             Screen.orientation = ScreenOrientation.Portrait;
             Application.targetFrameRate = 60;
             Data = LoadData();
-            Progress = new PlayerProgress(Data, new SaveStore(Application.persistentDataPath), Debug.LogWarning);
+            // Hero growth, the campaign's recommended power and battle XP follow progression.json, as in the progression simulator.
+            var curve = CampaignCurve.FromJson(Resources.Load<TextAsset>("BattleData/progression").text);
+            Progress = new PlayerProgress(Data, curve, new SaveStore(Application.persistentDataPath), Debug.LogWarning);
             BuildCanvas();
             ShowStages();
         }

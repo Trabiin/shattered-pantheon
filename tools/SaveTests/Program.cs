@@ -1,5 +1,6 @@
 // Tests for the game's save file: a new game, saving and loading, closing and reopening, damaged and
-// unreadable saves, upgrading an older version, and keeping sections a later system adds.
+// unreadable saves, upgrading an older version, keeping sections a later system adds, the heroes and
+// items the player owns, the wallet every change to them goes through, and battle XP.
 // Each test works in its own temporary folder, standing in for the phone's save folder.
 //   dotnet run --project tools/SaveTests
 using System;
@@ -13,13 +14,16 @@ static class Program
 {
     static int failures;
     static GameData data;
+    static CampaignCurve curve;
     static List<StageDef> realm;
+    static readonly string[] Five = { "hilde", "solenne", "thessaly", "maren", "pip" };
 
     static int Main()
     {
         string dir = Path.Combine(FindRoot(), "Unity", "Assets", "Resources", "BattleData");
         string R(string f) => File.ReadAllText(Path.Combine(dir, f + ".json"));
         data = GameData.FromJson(R("rules"), R("heroes"), R("enemies"), R("campaign"));
+        curve = CampaignCurve.FromJson(R("progression"));
         realm = data.Stages.Where(s => s.RealmNumber == 1 && s.Difficulty == "normal").OrderBy(s => s.StageNumber).ThenBy(s => s.BattleNumber).ToList();
 
         Test("A missing save is a new game", NewGame);
@@ -32,6 +36,13 @@ static class Program
         Test("Sections a later system adds are kept, and missing ones get defaults", Sections);
         Test("Saving replaces the file in one step", Writing);
         Test("Reset progress", Reset);
+        Test("A new game owns the starting heroes and no items", StartingHeroes);
+        Test("A save from before heroes were kept gets the starting heroes", SaveWithoutHeroes);
+        Test("The wallet: earning, spending and refusing to overspend", WalletItems);
+        Test("Battle XP after a first win", BattleXp);
+        Test("Battle XP stops at the level cap", LevelCaps);
+        Test("Heroes fight at their own strength", Strength);
+        Test("Heroes and items survive closing and reopening", HeroesReload);
 
         Console.WriteLine(failures == 0 ? "All save checks passed." : $"{failures} save check(s) failed.");
         return failures == 0 ? 0 : 1;
@@ -49,8 +60,8 @@ static class Program
     static void SaveAndReload(string folder)
     {
         var progress = Progress(folder, out var warnings);
-        foreach (var b in realm.Take(6)) progress.RecordBattle(b, "win");
-        progress.RecordBattle(realm[6], "lose");
+        foreach (var b in realm.Take(6)) progress.RecordBattle(b, "win", Five);
+        progress.RecordBattle(realm[6], "lose", Five);
         var team = Formation.AutoPlace(data, new[] { "hilde", "solenne", "thessaly", "maren", "pip" });
         progress.SaveTeam(realm[2].Id, team, "2-3");
         string written = File.ReadAllText(Path.Combine(folder, SaveStore.FileName));
@@ -68,23 +79,23 @@ static class Program
     {
         var progress = Progress(folder, out _);
         Expect(progress.Furthest("normal") == null && !progress.IsCleared(realm[0].Id), "nothing cleared at first");
-        progress.RecordBattle(realm[0], "lose");
-        progress.RecordBattle(realm[1], "timeout");
+        progress.RecordBattle(realm[0], "lose", Five);
+        progress.RecordBattle(realm[1], "timeout", Five);
         Expect(!progress.IsCleared(realm[0].Id) && !progress.IsCleared(realm[1].Id) && progress.Furthest("normal") == null, "a loss or a timeout clears nothing");
         Expect(File.Exists(Path.Combine(folder, SaveStore.FileName)), "the save is written after every battle, even a loss");
-        progress.RecordBattle(realm[4], "win");
+        progress.RecordBattle(realm[4], "win", Five);
         Expect(progress.Stars(realm[4].Id).SequenceEqual(new[] { 1 }), "a win is 1 star (until challenges exist)");
         Expect(progress.Furthest("normal") == realm[4].Id, "a win further on moves the furthest battle");
-        progress.RecordBattle(realm[4], "win");
+        progress.RecordBattle(realm[4], "win", Five);
         Expect(progress.Stars(realm[4].Id).SequenceEqual(new[] { 1 }), "winning again doesn't add the star twice");
-        progress.RecordBattle(realm[2], "win");
+        progress.RecordBattle(realm[2], "win", Five);
         Expect(progress.Furthest("normal") == realm[4].Id, "winning an earlier battle keeps the furthest battle");
-        progress.RecordBattle(realm[2], "lose");
+        progress.RecordBattle(realm[2], "lose", Five);
         Expect(progress.IsCleared(realm[2].Id), "losing a cleared battle keeps it cleared");
-        progress.RecordBattle(realm[13], "win");
+        progress.RecordBattle(realm[13], "win", Five);
         Expect(progress.Furthest("normal") == realm[13].Id, "a later stage is further than an earlier one");
         var hard = data.Stages.First(s => s.Difficulty != "normal");
-        progress.RecordBattle(hard, "win");
+        progress.RecordBattle(hard, "win", Five);
         Expect(progress.Furthest(hard.Difficulty) == hard.Id && progress.Furthest("normal") == realm[13].Id, "each difficulty keeps its own furthest battle");
         Expect(Progress(folder, out _).Furthest("normal") == realm[13].Id, "the furthest battle survives a reload");
     }
@@ -128,6 +139,11 @@ static class Program
             ("a star out of range", goodJson.Replace("[1]", "[7]")),
             ("a star twice", goodJson.Replace("[1]", "[1, 1]")),
             ("a team missing its heroes", "{\"version\": 1, \"teams\": {\"last\": {\"formation\": \"2-3\"}}}"),
+            ("a hero at level 0", "{\"version\": 2, \"heroes\": {\"hilde\": {\"level\": 0}}}"),
+            ("a hero with negative XP", "{\"version\": 2, \"heroes\": {\"hilde\": {\"level\": 3, \"xp\": -1}}}"),
+            ("a hero that isn't an object", "{\"version\": 2, \"heroes\": {\"hilde\": 3}}"),
+            ("a negative amount of gold", "{\"version\": 2, \"inventory\": {\"gold\": -5}}"),
+            ("part of a skill tome", "{\"version\": 2, \"inventory\": {\"skillTomes\": 1.5}}"),
         };
         foreach (var (what, text) in cases)
         {
@@ -136,14 +152,14 @@ static class Program
             File.WriteAllText(store.FilePath, text);
             var warnings = new List<string>();
             PlayerProgress progress = null;
-            try { progress = new PlayerProgress(data, store, warnings.Add); }
+            try { progress = new PlayerProgress(data, curve, store, warnings.Add); }
             catch (Exception e) { Expect(false, $"{what}: loading throws {e.GetType().Name}: {e.Message}"); continue; }
             var kept = Directory.GetFiles(folder, "save.damaged-*.json");
             Expect(progress.Save.Stars.Count == 0 && progress.Save.Version == SaveData.CurrentVersion, $"{what}: starts a new game");
             Expect(warnings.Count == 1 && kept.Length == 1 && warnings[0].Contains(Path.GetFileName(kept[0])), $"{what}: reports where the old file was kept ({warnings.FirstOrDefault()})");
             Expect(kept.Length == 1 && File.ReadAllText(kept[0]) == text, $"{what}: the old file is kept unchanged");
             Expect(!File.Exists(store.FilePath), $"{what}: the damaged file no longer sits in the save's place");
-            progress.RecordBattle(realm[0], "win");
+            progress.RecordBattle(realm[0], "win", Five);
             Expect(Progress(folder, out var w).IsCleared(realm[0].Id) && w.Count == 0, $"{what}: the new game saves and reloads normally");
         }
 
@@ -204,19 +220,23 @@ static class Program
 
     static void Sections(string folder)
     {
-        // A save from a later game that has a heroes and an inventory section this version doesn't read.
+        // A save from a later game that has a daily section and an item this version doesn't read.
         var later = new SaveData();
         later.Stars["c0-0"] = new List<int> { 1 };
-        string json = later.ToJson().TrimEnd().TrimEnd('}') + ",\n  \"heroes\": {\"hilde\": {\"level\": 12}},\n  \"inventory\": {\"gold\": 1500}\n}\n";
+        later.Items["godshards"] = 300;
+        string json = later.ToJson().TrimEnd().TrimEnd('}') + ",\n  \"daily\": {\"shrine\": {\"collected\": 12}}\n}\n";
         var read = SaveData.FromJson(json);
         Expect(read.IsCleared("c0-0"), "the parts this version knows are read");
         read.Stars["c0-1"] = new List<int> { 1 };
         var again = Parse(read.ToJson());
-        Expect(again.ContainsKey("heroes") && again.ContainsKey("inventory") && Json.Parse(read.ToJson()) is Dictionary<string, object>, "sections this version doesn't know are written back");
-        Expect(((Dictionary<string, object>)((Dictionary<string, object>)again["heroes"])["hilde"])["level"] is double lvl && lvl == 12, "and their contents are unchanged");
+        Expect(again.ContainsKey("daily"), "sections this version doesn't know are written back");
+        Expect(((Dictionary<string, object>)((Dictionary<string, object>)again["daily"])["shrine"])["collected"] is double c && c == 12, "and their contents are unchanged");
+        Expect(((Dictionary<string, object>)again["inventory"])["godshards"] is double g && g == 300, "items this version doesn't know are kept");
 
         var bare = SaveData.FromJson("{\"version\": 1}");
-        Expect(bare.Stars.Count == 0 && bare.Furthest.Count == 0 && bare.Teams.Count == 0 && bare.LastTeam == null, "a save with only a version loads with empty sections");
+        Expect(bare.Stars.Count == 0 && bare.Furthest.Count == 0 && bare.Teams.Count == 0 && bare.LastTeam == null && bare.Heroes.Count == 0 && Item.All.All(i => bare.Items[i] == 0), "a save with only a version loads with empty sections");
+        var hero = SaveData.FromJson("{\"version\": 2, \"heroes\": {\"pip\": {\"level\": 4}}}").Heroes["pip"];
+        Expect(hero.Level == 4 && hero.Xp == 0 && hero.Stars == 1 && hero.Skill == 1 && hero.Copies == 1, "a hero missing a field loads with that field's default");
         var partial = SaveData.FromJson("{\"version\": 1, \"campaign\": {\"stars\": {\"c0-3\": [1]}}}");
         Expect(partial.IsCleared("c0-3") && partial.Furthest.Count == 0, "a section missing a field loads with that field empty");
     }
@@ -237,20 +257,161 @@ static class Program
     static void Reset(string folder)
     {
         var progress = Progress(folder, out _);
-        progress.RecordBattle(realm[0], "win");
+        progress.RecordBattle(realm[0], "win", Five);
         progress.SaveTeam(realm[0].Id, new List<TeamSlot> { new TeamSlot("pip", "back0") }, "2-3");
         File.WriteAllText(Path.Combine(folder, "save.damaged-20261009-120000.json"), "kept for checking");
         progress.Reset();
         Expect(!progress.IsCleared(realm[0].Id) && progress.Furthest("normal") == null && progress.LoadTeam(realm[0].Id).Count == 5, "progress and teams are forgotten");
+        Expect(data.Heroes.All(h => progress.Wallet.Hero(h.Id)?.Level == 1), "the heroes are back to a new game's");
         Expect(!File.Exists(Path.Combine(folder, SaveStore.FileName)), "the save file is removed");
         Expect(File.Exists(Path.Combine(folder, "save.damaged-20261009-120000.json")), "damaged saves kept for checking stay");
         Expect(!Progress(folder, out _).IsCleared(realm[0].Id), "reopening after a reset is a new game");
     }
 
+    static void StartingHeroes(string folder)
+    {
+        var progress = Progress(folder, out var warnings);
+        var growth = curve.Growth;
+        // TODO(E9-F2-S1-T5): a new game owns only the 3 starters once summons exist.
+        Expect(data.Heroes.All(h => progress.Wallet.Owns(h.Id)) && progress.Save.Heroes.Count == data.Heroes.Count, "every test hero is owned (until summons exist)");
+        Expect(data.Heroes.All(h => progress.Wallet.Hero(h.Id) is var o && o.Level == 1 && o.Xp == 0 && o.Skill == 1 && o.Copies == 1 && o.Stars == growth.StartStars(h.Rarity)),
+            "each at level 1 with no XP, skill level 1, one copy and their rarity's starting stars (Common 1★ to Legendary 5★)");
+        Expect(Item.All.All(i => progress.Wallet.Count(i) == 0), "the inventory is empty");
+        Expect(warnings.Count == 0 && !File.Exists(Path.Combine(folder, SaveStore.FileName)), "nothing is written until something happens");
+        var team = progress.StrongestTeam();
+        Expect(team.Count == 5 && team.Distinct().Count() == 5 && team.Any(id => data.Hero(id).Role == "Tank") && team.Any(id => data.Hero(id).Role == "Support"), $"the default team is 5 strong heroes with a Tank and a Support ({string.Join(", ", team)})");
+        Expect(data.Heroes.Where(h => h.Rarity == "Legendary").All(h => team.Contains(h.Id)), "it includes the Legendaries");
+        Expect(Slots(progress.LoadTeam(realm[0].Id)) == Slots(Formation.AutoPlace(data, team)), "a new game's team screen opens with it");
+    }
+
+    static void SaveWithoutHeroes(string folder)
+    {
+        string v2 = "{\"version\": 2, \"campaign\": {\"stars\": {\"c0-0\": [1], \"c0-1\": [1]}, \"furthest\": {\"normal\": \"c0-1\"}}}";
+        File.WriteAllText(Path.Combine(folder, SaveStore.FileName), v2);
+        var progress = Progress(folder, out var warnings);
+        Expect(warnings.Count == 0 && progress.IsCleared("c0-1"), "it loads with its progress");
+        Expect(data.Heroes.All(h => progress.Wallet.Hero(h.Id)?.Level == 1), "and the starting heroes at level 1");
+    }
+
+    static void WalletItems(string folder)
+    {
+        var progress = Progress(folder, out _);
+        var wallet = progress.Wallet;
+        wallet.Earn(new Dictionary<string, long> { [Item.Gold] = 500, [Item.SkillTomes] = 3, [Item.Vessel(3)] = 2 });
+        Expect(wallet.Count(Item.Gold) == 500 && wallet.Count(Item.SkillTomes) == 3 && wallet.Count(Item.Vessel(3)) == 2 && wallet.Count(Item.Vessel(4)) == 0, "earning adds each item");
+        Expect(Progress(folder, out _).Wallet.Count(Item.Gold) == 500, "earning is saved straight away");
+        wallet.Earn(new Dictionary<string, long> { [Item.Gold] = 250 });
+        Expect(wallet.Count(Item.Gold) == 750, "earning more adds to what's there");
+
+        Expect(wallet.Spend(new Dictionary<string, long> { [Item.Gold] = 300, [Item.SkillTomes] = 1 }) && wallet.Count(Item.Gold) == 450 && wallet.Count(Item.SkillTomes) == 2, "spending what you have takes it");
+        Expect(Progress(folder, out _).Wallet.Count(Item.Gold) == 450, "spending is saved straight away");
+        Expect(wallet.Spend(new Dictionary<string, long> { [Item.Gold] = 450 }) && wallet.Count(Item.Gold) == 0, "spending everything leaves zero");
+
+        string before = File.ReadAllText(Path.Combine(folder, SaveStore.FileName));
+        Expect(!wallet.Spend(new Dictionary<string, long> { [Item.Gold] = 1 }), "can't spend gold you don't have");
+        Expect(!wallet.Spend(new Dictionary<string, long> { [Item.SkillTomes] = 1, [Item.Vessel(3)] = 3 }) && wallet.Count(Item.SkillTomes) == 2 && wallet.Count(Item.Vessel(3)) == 2, "a cost you can only partly pay takes nothing");
+        Expect(!wallet.Spend(new Dictionary<string, long> { [Item.RebirthScrolls] = 1 }), "can't spend an item you never had");
+        Expect(File.ReadAllText(Path.Combine(folder, SaveStore.FileName)) == before, "a refused spend changes nothing in the save");
+
+        Expect(Throws(() => wallet.Earn(new Dictionary<string, long> { ["diamonds"] = 1 })), "an unknown item is refused");
+        Expect(Throws(() => wallet.Earn(new Dictionary<string, long> { [Item.Gold] = -10 })) && Throws(() => wallet.Spend(new Dictionary<string, long> { [Item.Gold] = -10 })), "a negative amount is refused both ways");
+        Expect(wallet.Count(Item.Gold) == 0, "and changes nothing");
+    }
+
+    static void BattleXp(string folder)
+    {
+        var progress = Progress(folder, out _);
+        var growth = curve.Growth;
+        long xp = curve.FirstClearXp(realm[0]);
+        Expect(xp == Math.Round(curve.FirstClearXpLevels * growth.XpToNext(1)) && xp > 0, $"realm 1's first battle gives {xp} XP: progression.json's first-clear XP at its recommended level");
+        long late = curve.FirstClearXp(realm[39]);
+        Expect(late == Math.Round(curve.FirstClearXpLevels * growth.XpToNext(curve.RecLevel(0, 39))) && late > xp, $"later battles give more ({late} XP at the realm boss)");
+
+        var three = new[] { "hilde", "grub", "korvald" };
+        progress.RecordBattle(realm[0], "lose", three);
+        Expect(three.All(id => Total(progress, id) == 0), "a loss gives no XP");
+        progress.RecordBattle(realm[0], "win", three);
+        Expect(three.All(id => Total(progress, id) == xp / 3), $"a first win shares the XP evenly by the heroes who fought ({xp / 3} each)");
+        Expect(data.Heroes.Where(h => !three.Contains(h.Id)).All(h => Total(progress, h.Id) == 0), "heroes who didn't fight get none");
+        progress.RecordBattle(realm[0], "win", three);
+        Expect(three.All(id => Total(progress, id) == xp / 3), "replaying a cleared battle gives none (until farming arrives)");
+        Expect(Progress(folder, out _).Wallet.Hero("hilde").Xp == progress.Wallet.Hero("hilde").Xp, "battle XP is saved");
+
+        // Levelling up: every time XP reaches the next level, without gold.
+        var wallet = progress.Wallet;
+        var pip = wallet.Hero("pip");
+        wallet.ShareBattleXp(new[] { "pip" }, (long)growth.XpToNext(1) - 1);
+        Expect(pip.Level == 1 && pip.Xp == growth.XpToNext(1) - 1, "one XP short of the next level stays at level 1");
+        wallet.ShareBattleXp(new[] { "pip" }, 1);
+        Expect(pip.Level == 2 && pip.Xp == 0, "reaching it levels up, with nothing left over");
+        wallet.ShareBattleXp(new[] { "pip" }, (long)(growth.XpToNext(2) + growth.XpToNext(3) + growth.XpToNext(4)) + 7);
+        Expect(pip.Level == 5 && pip.Xp == 7, "enough XP for several levels gives them all at once, and keeps the rest");
+        Expect(wallet.Count(Item.Gold) == 0, "levelling up costs no gold");
+        wallet.ShareBattleXp(new[] { "pip", "pip", "no-such-hero" }, 10);
+        Expect(pip.Xp == 17, "a hero listed twice gets one share, and an unknown hero none");
+    }
+
+    static void LevelCaps(string folder)
+    {
+        var progress = Progress(folder, out _);
+        var growth = curve.Growth;
+        var wallet = progress.Wallet;
+        var kesh = wallet.Hero("kesh");   // Common: 1★, capped at level 30
+        int cap = growth.LevelCap(kesh.Stars);
+        Expect(kesh.Stars == 1 && cap == 30 && wallet.LevelCap(kesh) == 30, "a 1★ hero's cap is level 30");
+        long toCap = Enumerable.Range(1, cap - 1).Sum(l => (long)growth.XpToNext(l));
+        wallet.ShareBattleXp(new[] { "kesh" }, toCap + 5000);
+        Expect(kesh.Level == cap && kesh.Xp == 0, "XP past the cap stops at the cap and isn't kept");
+        wallet.ShareBattleXp(new[] { "kesh", "maren" }, 1000);
+        Expect(kesh.Level == cap && kesh.Xp == 0 && Total(progress, "maren") == 1000, "a capped hero takes no share: the others get it all");
+        wallet.ShareBattleXp(new[] { "kesh" }, 1000);
+        Expect(kesh.Level == cap && kesh.Xp == 0, "a team of capped heroes gets nothing");
+    }
+
+    static void Strength(string folder)
+    {
+        var progress = Progress(folder, out _);
+        var growth = curve.Growth;
+        Expect(progress.HeroScale("thessaly") == growth.StatScale("Epic", 1, 4, 0, 1) && Math.Abs(progress.HeroScale("thessaly") - 1.1) < 1e-9, "a new Epic hero fights at 1.1x their listed stats (4★, level 1)");
+        Expect(Math.Abs(progress.HeroScale("kesh") - 0.6) < 1e-9 && Math.Abs(progress.HeroScale("solenne") - 1.38) < 1e-9, "a new Common at 0.6x, a new Legendary at 1.38x");
+        progress.Wallet.ShareBattleXp(new[] { "thessaly" }, (long)(growth.XpToNext(1) + growth.XpToNext(2)));
+        Expect(Math.Abs(progress.HeroScale("thessaly") - 1.1 * 1.06) < 1e-9, "two levels later: +3% a level");
+        Expect(Math.Abs(progress.HeroScale("thessaly") - curve.RecScale(0, 0) * 1.06) < 1e-9, "the first battle's recommended strength is a new Epic's");
+        Expect(Throws(() => progress.HeroScale("no-such-hero")), "a hero the player doesn't own can't fight");
+    }
+
+    static void HeroesReload(string folder)
+    {
+        var progress = Progress(folder, out _);
+        foreach (var b in realm.Take(10)) progress.RecordBattle(b, "win", Five);
+        progress.Wallet.Earn(new Dictionary<string, long> { [Item.XpPotions] = 1200, [Item.Vessel(5)] = 1, [Item.RebirthScrolls] = 1 });
+        string written = File.ReadAllText(Path.Combine(folder, SaveStore.FileName));
+        var reopened = Progress(folder, out var warnings);
+        Expect(warnings.Count == 0, "no warnings");
+        Expect(Five.All(id => reopened.Wallet.Hero(id).Level > 1) && data.Heroes.All(h => Same(reopened.Wallet.Hero(h.Id), progress.Wallet.Hero(h.Id))), "every hero's level, XP, stars, skill and copies come back");
+        Expect(Item.All.All(i => reopened.Wallet.Count(i) == progress.Wallet.Count(i)) && reopened.Wallet.Count(Item.XpPotions) == 1200, "every item comes back");
+        Expect(Five.All(id => reopened.HeroScale(id) == progress.HeroScale(id)), "heroes fight at the same strength after reopening");
+        Expect(reopened.Save.ToJson() == written, "writing the reloaded save gives the identical file");
+    }
+
+    static long Total(PlayerProgress p, string id)
+    {
+        var h = p.Wallet.Hero(id);
+        return Enumerable.Range(1, h.Level - 1).Sum(l => (long)curve.Growth.XpToNext(l)) + h.Xp;
+    }
+
+    static bool Same(OwnedHero a, OwnedHero b) => a.Id == b.Id && a.Level == b.Level && a.Xp == b.Xp && a.Stars == b.Stars && a.Skill == b.Skill && a.Copies == b.Copies;
+
+    static bool Throws(Action a)
+    {
+        try { a(); return false; }
+        catch (ArgumentException) { return true; }
+    }
+
     static PlayerProgress Progress(string folder, out List<string> warnings)
     {
         var w = warnings = new List<string>();
-        return new PlayerProgress(data, new SaveStore(folder), w.Add);
+        return new PlayerProgress(data, curve, new SaveStore(folder), w.Add);
     }
 
     static bool IsCleared(this SaveData save, string id) => save.Stars.TryGetValue(id, out var s) && s.Contains(1);
