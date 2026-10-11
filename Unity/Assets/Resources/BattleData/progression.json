@@ -1,5 +1,5 @@
 {
-  "_about": "Progression and economy rules (plan docs 07, 08 and 10). Read by tools/ProgressionSim; the game will read the same file. Rewards marked 'levels' are worth that many level-ups at the recommended level of the player's current campaign battle, so they scale as the player advances. Each difficulty's rewardScale multiplies XP, gold, gear materials and skill tomes (easing in from the previous difficulty), which sets how long the later difficulties take. 'vessels' map a star rank to an expected count (0.3 = a 30% chance of one): a Vessel counts as any hero of that star rank when ascending.",
+  "_about": "Progression and economy rules (plan docs 07, 08 and 10). Read by tools/ProgressionSim and by the game. Rewards marked 'levels' are worth that many level-ups at the recommended level of the player's current campaign battle, so they scale as the player advances. Each difficulty's rewardScale multiplies XP, gold, gear materials and skill tomes (easing in from the previous difficulty), which sets how long the later difficulties take. 'vessels' map a star rank to an expected count (0.3 = a 30% chance of one): a Vessel counts as any hero of that star rank when ascending.",
   "heroGrowth": {
     "levelGain": 0.03,
     "starGain": 0.1,
