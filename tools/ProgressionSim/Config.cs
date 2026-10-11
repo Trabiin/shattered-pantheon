@@ -52,8 +52,8 @@ class Cfg
     public Dictionary<string, int> Launch;
     public List<string> Release; public int ReleaseEvery;
     public List<string> Starters;
-    public double SummonCost; public Dictionary<string, double> Rates; public bool FirstTenEpic;
-    public List<(string rarity, int every)> Guarantees = new List<(string, int)>();
+    // Summon cost, rates and guarantees: the rules the game uses too (Unity/Assets/BattleCore/Summon.cs).
+    public Summon Summon;
     public Dictionary<string, double> ShardUnlock;
     // Shop (doc 08)
     public List<(double price, double godshards)> Packs = new List<(double, double)>();
@@ -116,7 +116,7 @@ class Cfg
         string text = File.ReadAllText(path);
         var r = JsonDocument.Parse(text).RootElement;
         var curve = CampaignCurve.FromJson(text);
-        var c = new Cfg { Growth = curve.Growth, Curve = curve };
+        var c = new Cfg { Growth = curve.Growth, Curve = curve, Summon = Summon.FromJson(text) };
 
         var ro = r.GetProperty("roster");
         List<string> Strs(JsonElement e, string k) => e.GetProperty(k).EnumerateArray().Select(x => x.GetString()).ToList();
@@ -125,10 +125,6 @@ class Cfg
         c.Release = Strs(ro, "release"); c.ReleaseEvery = (int)N(ro, "releaseEveryDays");
         c.Starters = Strs(ro, "starters");
 
-        var su = r.GetProperty("summon");
-        c.SummonCost = N(su, "cost"); c.Rates = Map(su.GetProperty("rates"));
-        foreach (var gu in su.GetProperty("guarantees").EnumerateArray()) c.Guarantees.Add((gu.GetProperty("rarity").GetString(), (int)N(gu, "every")));
-        c.FirstTenEpic = B(su, "firstTenGuaranteesEpic");
         c.ShardUnlock = Map(r.GetProperty("heroShards").GetProperty("unlock"));
 
         var sh = r.GetProperty("shop");

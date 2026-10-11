@@ -41,8 +41,7 @@ class Player
     // Fodder by star rank: duplicates and Vessels, which count as any hero of that rank when ascending.
     readonly Dictionary<int, int> fodder = Enumerable.Range(1, 6).ToDictionary(r => r, r => 0);
     double xp, gold, shards, devotion, gearMats, tomes, tickets, shardsEarned, heroShards;
-    readonly Dictionary<string, int> sinceRarity = new Dictionary<string, int>();   // pulls since at least this rarity
-    int pullsTotal;
+    readonly SummonPity pity;   // the guarantee counters
     public double Dollars;
     public int Diff, Battle;   // next campaign battle: difficulty and index within it
     int[,] stars;              // stars earned per difficulty and battle (0 = not cleared, 1 = won, 2-5 challenges)
@@ -63,7 +62,7 @@ class Player
         stars = new int[c.Difficulties.Count, c.BattlesPerDifficulty];
         stageChests = new int[c.Difficulties.Count, c.Stages];
         foreach (var kit in c.Starters) Gain(cards.First(h => h.Kit == kit && h.ReleaseDay == 0), false, "Starters");
-        foreach (var g in c.Guarantees) sinceRarity[g.rarity] = 0;
+        pity = c.Summon.NewPity();
         shards = c.StartingGodshards;   // the first 10-pull, a few minutes in
     }
 
@@ -512,20 +511,14 @@ class Player
 
     void Summon()
     {
-        while (tickets >= 1 || shards >= C.SummonCost)
+        while (true)
         {
-            if (tickets >= 1) tickets--; else shards -= C.SummonCost;
-            pullsTotal++; if (today != null) today.Pulls++;
-            foreach (var g in C.Guarantees) sinceRarity[g.rarity]++;
-            // Roll a rarity, then lift it to the rarest guarantee that's due.
-            double roll = rng.NextDouble(), acc = 0;
-            int rank = C.Rarities.Count - 1;
-            for (int i = 0; i < C.Rarities.Count; i++) { acc += C.Rates[C.Rarities[i]]; if (roll < acc) { rank = i; break; } }
-            foreach (var g in C.Guarantees) if (sinceRarity[g.rarity] >= g.every) rank = Math.Min(rank, Rank(g.rarity));
-            if (C.FirstTenEpic && pullsTotal == 10 && !Roster.Values.Any(o => Rank(o.Card.Rarity) <= Rank("Epic"))) rank = Math.Min(rank, Rank("Epic"));
-            foreach (var g in C.Guarantees) if (rank <= Rank(g.rarity)) sinceRarity[g.rarity] = 0;
-            var pool = Released.Where(h => h.Rarity == C.Rarities[rank]).ToList();
-            Gain(pool[rng.Next(pool.Count)], true);
+            var pay = C.Summon.HowToPay(tickets, shards);
+            if (pay == SummonPayment.None) return;
+            if (pay == SummonPayment.Ticket) tickets--; else shards -= C.Summon.Cost;
+            if (today != null) today.Pulls++;
+            Gain(C.Summon.Pull(pity, rng, () => Roster.Values.Any(o => Rank(o.Card.Rarity) <= Rank("Epic")),
+                rarity => Released.Where(h => h.Rarity == rarity).ToList()), true);
         }
     }
 
