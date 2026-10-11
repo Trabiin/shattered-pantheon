@@ -80,14 +80,17 @@ namespace ShatteredPantheon.Game
 
         // Battle XP after a win (doc 10 section 5): shared evenly by the hero cards that fought and can still
         // level. Every time a hero's XP reaches the next level they level up, without gold; a hero who
-        // reaches their star rank's cap keeps no XP beyond it.
-        public void ShareBattleXp(IEnumerable<string> cards, long xp)
+        // reaches their star rank's cap keeps no XP beyond it. Returns each card's share (heroes already at
+        // their cap get none).
+        public Dictionary<string, long> ShareBattleXp(IEnumerable<string> cards, long xp)
         {
             if (xp < 0) throw new ArgumentException("Negative battle XP");
             var growing = cards.Distinct().Select(Hero).Where(h => h != null && h.Level < LevelCap(h)).ToList();
-            if (growing.Count == 0) return;
-            foreach (var hero in growing) GiveXp(hero, xp / growing.Count);
+            var shares = growing.ToDictionary(h => h.Id, h => xp / growing.Count);
+            if (growing.Count == 0) return shares;
+            foreach (var hero in growing) GiveXp(hero, shares[hero.Id]);
             write();
+            return shares;
         }
 
         void GiveXp(OwnedHero hero, long xp)

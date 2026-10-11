@@ -237,11 +237,29 @@ namespace ShatteredPantheon.Game
     {
         // XP potions are counted in XP: any amount can go to any hero (E8-F5).
         public const string Gold = "gold", XpPotions = "xpPotions", SkillTomes = "skillTomes", RebirthScrolls = "rebirthScrolls";
+        // Godshards and summon tickets pay for summons (E9-F2-S1); gear materials wait for gear (E8-F9); hero
+        // shards wait for the wish list, whose top hero they go to (E9-F5).
+        public const string Godshards = "godshards", SummonTickets = "summonTickets", GearMats = "gearMats", HeroShards = "heroShards";
         // A Vessel counts as any hero of its star rank when ascending (doc 08 section 4), so there are
         // Vessels for every rank a hero ascends from: 1★ to 5★.
         public static string Vessel(int stars) => "vessel" + stars;
         public const int MaxVesselStars = 5;
-        public static readonly string[] All = new[] { Gold, XpPotions, SkillTomes, RebirthScrolls }
+        public static readonly string[] All = new[] { Gold, XpPotions, SkillTomes, RebirthScrolls, Godshards, SummonTickets, GearMats, HeroShards }
             .Concat(Enumerable.Range(1, MaxVesselStars).Select(Vessel)).ToArray();
+
+        // What the player reads, for an amount of an item: "120 Gold", "1 Summon ticket", "2 Vessels (3★)".
+        public static string Describe(string item, long amount)
+        {
+            bool vessel = item.StartsWith("vessel");
+            string name = vessel ? "Vessel" : Names.TryGetValue(item, out var n) ? n : item;
+            bool plural = amount != 1 && item != Gold && item != XpPotions;
+            return $"{amount} {name}{(plural ? "s" : "")}{(vessel ? $" ({item.Substring(6)}★)" : "")}";
+        }
+
+        static readonly Dictionary<string, string> Names = new Dictionary<string, string>
+        {
+            [Gold] = "Gold", [XpPotions] = "XP in potions", [SkillTomes] = "Skill tome", [RebirthScrolls] = "Rebirth Scroll",
+            [Godshards] = "Godshard", [SummonTickets] = "Summon ticket", [GearMats] = "Gear material", [HeroShards] = "Hero shard",
+        };
     }
 }

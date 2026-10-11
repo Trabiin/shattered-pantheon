@@ -26,9 +26,9 @@ namespace ShatteredPantheon.Game
             Screen.orientation = ScreenOrientation.Portrait;
             Application.targetFrameRate = 60;
             Data = LoadData();
-            // Hero growth, the campaign's recommended power and battle XP follow progression.json, as in the progression simulator.
-            var curve = CampaignCurve.FromJson(Resources.Load<TextAsset>("BattleData/progression").text);
-            Progress = new PlayerProgress(Data, curve, new SaveStore(Application.persistentDataPath), Debug.LogWarning);
+            // Hero growth, the campaign's recommended power and its rewards follow progression.json, as in the progression simulator.
+            var rewards = CampaignRewards.FromJson(Resources.Load<TextAsset>("BattleData/progression").text);
+            Progress = new PlayerProgress(Data, rewards, new SaveStore(Application.persistentDataPath), Debug.LogWarning);
             BuildCanvas();
             ShowStages();
         }
@@ -64,7 +64,7 @@ namespace ShatteredPantheon.Game
         public void ShowTeam(StageDef stage) => Show(new TeamView(this, stage));
         // A locked battle can't be started, whichever screen asks.
         public void ShowBattle(StageDef stage, List<TeamSlot> team, string formation) { if (Progress.IsOpen(stage)) Show(new BattleView(this, stage, team, formation)); }
-        public void ShowResults(StageDef stage, List<TeamSlot> team, Battle battle) => Show(new ResultsView(this, stage, team, battle));
+        public void ShowResults(StageDef stage, List<TeamSlot> team, Battle battle, BattleRewards rewards) => Show(new ResultsView(this, stage, team, battle, rewards));
 
         void Show(View next)
         {
