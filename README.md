@@ -22,14 +22,26 @@ A mobile auto-battle gacha game, built in Unity. Design docs live in the project
 
 ## Open the game
 
-1. Install **Unity Hub**, then **Unity 6.3 LTS** with *Android Build Support* (and *iOS Build Support* on a Mac).
-2. In Unity Hub: **Add > Add project from disk**, pick the `Unity` folder, and open it with Unity 6.3 LTS. The first open takes a few minutes while Unity imports everything.
-3. The game's scene is created automatically (`Assets/Scenes/Main.unity`). Open it and press **Play**. If it's missing, use the menu **Shattered Pantheon > Rebuild Main Scene**.
-4. In the Game view, pick a portrait phone resolution (for example 1080x1920) to see it as on a phone.
+1. Install **Unity Hub**, then **Unity 6.3 LTS** with *Android Build Support* (and *iOS Build Support* on a Mac). The project names its exact editor in `Unity/ProjectSettings/ProjectVersion.txt` (6000.3.26f1); if you have a different 6.3 version, Unity Hub offers to install that one or open with yours.
+2. Clone the repository (for example with GitHub Desktop, or `git clone https://github.com/Trabiin/shattered-pantheon.git`).
+3. In Unity Hub: **Add > Add project from disk**, pick the `Unity` folder inside the clone, and open it. The first open takes a few minutes while Unity imports everything into `Unity/Library/`.
+4. In the Project window, open `Assets/Scenes/Main.unity` and press **Play**. If the scene is missing, use the menu **Shattered Pantheon > Rebuild Main Scene**.
+5. In the Game view, pick a portrait phone resolution (for example 1080x1920) to see it as on a phone.
+
+If Unity won't open the project because "another Unity instance is running", a Unity process from an earlier session is still running: end it in Task Manager (or Activity Monitor on a Mac) and open the project again.
+
+The repository holds everything a fresh clone needs: `Unity/ProjectSettings/`, `Unity/Packages/` and a `.meta` file beside every file and folder in `Unity/Assets/` (Unity keeps each asset's id there, and the scene finds its scripts by those ids). What Unity makes for each computer (`Library/`, `Temp/`, `Logs/`, `UserSettings/`, `obj/`) stays out of git (`.gitignore`). When you add a file under `Unity/Assets/`, commit the `.meta` file Unity makes beside it; the Unity compile check fails without it.
 
 The game opens on the campaign: realm 1 (Hearth) on Normal, its 10 stages with 4 battles each (battle 4 is the stage boss; stage 10's is the realm boss). Battles open in order: a new game opens only the first battle, each win opens the next, and beating a stage boss opens the next stage (locked battles are greyed out and say **Locked**). Cleared battles can always be replayed. Tap an open battle, set your team and formation (tap a slot, then a hero; the formation button switches between 2 in front and 3 in front), and press **Fight!**. The team screen lists your heroes with their level and star rank, and starts with your strongest five (with a Tank and a Support). The fight plays itself (tap the speed button for 1x/2x/3x, **Retreat** to go back), then the results show what each hero did, and won battles show as **Cleared**.
 
 Until summoning arrives, a new game owns all 20 test heroes, each at level 1 and the star rank their rarity starts at (Common 1★ up to Legendary 5★). Heroes fight at their own strength: rarity, level, star rank and skill level (doc 07). The first win on a battle shares its battle XP evenly among the heroes who fought (replays give none yet); whenever a hero's XP reaches the next level they level up, with no gold, up to their star rank's level cap. Items (gold, XP potions, skill tomes, Vessels, Rebirth Scrolls) are kept but can't be earned or spent in the game yet.
+
+## Testing tools (Unity editor and development builds only)
+
+These are for testing and are never in a release build (they switch on with Unity's `Debug.isDebugBuild`, which is true in the editor and in builds made with *Development Build* ticked):
+
+- **Testing speeds:** the battle speed button goes on past 3x to **10x** and **20x**, so a whole realm can be played quickly.
+- **Fight log:** every battle writes what happened to the Console (**Window > General > Console**). The first line names the battle, its seed and both teams; then one line per action, starting with the fight time at 1x and the action number, holding everything in it: turns, skills and ultimates, damage, healing, shields, effects (and resists), rituals starting and completing, interrupts, deaths, and the result. Units that share a name also say where they stand. To find one thing (an interrupt, a death), type a word from it ("interrupts", "falls", "ritual") in the Console's search box. The log only reads what the battle engine already reports, so a release build does no extra work.
 
 ## Your save
 
@@ -37,11 +49,9 @@ Progress is kept in one file on the device, `save.json`, written after every bat
 
 | Where the game runs | Folder |
 |---|---|
-| Unity editor or a build on Windows | `%USERPROFILE%\AppData\LocalLow\<company>\<product>\` |
-| Unity editor or a build on a Mac | `~/Library/Application Support/<company>/<product>/` |
-| Android | the app's own storage, `Android/data/<package name>/files/` |
-
-Until the build settings name the app, Unity uses `DefaultCompany` and `Unity` for the company and product.
+| Unity editor or a build on Windows | `%USERPROFILE%\AppData\LocalLow\Shattered Pantheon\Shattered Pantheon\save.json` (Unity also keeps its own `Unity` folder there) |
+| Unity editor or a build on a Mac | `~/Library/Application Support/Shattered Pantheon/Shattered Pantheon/save.json` |
+| Android | the app's own storage, `Android/data/<package name>/files/save.json` |
 
 **To start again:** tap **Reset progress** at the bottom of the campaign screen, then **Tap again to reset**. Or close the game and delete `save.json`. The button is for testing and goes before the closed test.
 
@@ -67,9 +77,10 @@ dotnet run --project tools/ProgressionSim -c Release -- --build-campaign      # 
 ## Checks without Unity
 
 Every pull request runs these on GitHub (`.github/workflows/`):
+- **Fresh clone:** `Unity/ProjectSettings/ProjectVersion.txt` names a Unity 6.3 editor (without it Unity Hub can't add the project) and every file and folder in `Unity/Assets/` has its `.meta` file.
 - **Unity compile:** the game and editor scripts are compiled against the real Unity 6.3 libraries, taken from an official Unity editor image (from Docker Hub, or Google's copy of it if Docker Hub fails) and kept in GitHub's cache until a newer image comes out. No Unity licence is needed.
-- **Screen smoke test:** `dotnet run --project tools/ScreenSmokeTest` plays the screens on a stand-in for Unity, like a player would (locked battles can't be started, then all 40 realm 1 battles in order with a new game's strongest team at its real levels, each win opening the next and sharing battle XP, retrying lost ones, then closing and reopening the game and resetting progress), and fails on errors, on fights that differ from the engine, on heroes fighting at the wrong strength or on battle XP that doesn't add up.
-- **Save tests:** `dotnet run --project tools/SaveTests` saves and reloads progress, heroes and items, and checks a new game and its heroes, damaged saves, upgrading an older version (version 1 saves keep the renamed heroes Jink and Korvald in their teams), saves from before heroes were kept, resetting, the wallet (earning, spending, refusing to overspend), battle XP and level caps, and each hero's fighting strength.
+- **Screen smoke test:** `dotnet run --project tools/ScreenSmokeTest` plays the screens on a stand-in for Unity, like a player would (a card hit twice in quick succession going back to its own colour, locked battles can't be started, the first fights as a release build with no testing speeds and no fight log, then all 40 realm 1 battles in order as a development build at 20x with the fight log checked against every event, played by a new game's strongest team at its real levels, each win opening the next and sharing battle XP, retrying lost ones, results bars inside their rows, then closing and reopening the game and resetting progress), and fails on errors, on fights that differ from the engine, on heroes fighting at the wrong strength or on battle XP that doesn't add up.
+- **Save tests:** `dotnet run --project tools/SaveTests` saves and reloads progress, heroes and items, and checks a new game and its heroes, damaged saves (and that their warning reads as whole sentences), upgrading an older version (version 1 saves keep the renamed heroes Jink and Korvald in their teams), saves from before heroes were kept, resetting, the wallet (earning, spending, refusing to overspend), battle XP and level caps, and each hero's fighting strength.
 - **Campaign order tests:** `dotnet run --project tools/CampaignTests` checks the order battles open in across all 4 difficulties: a new game, each win, stage and realm bosses, the next difficulty, replays and a reloaded save.
 - **Growth tests:** `dotnet run --project tools/GrowthTests` checks the growth rules on the real `progression.json` against values worked out by hand from doc 07: health and attack multipliers, level caps, XP per level, fodder to ascend, skill tomes and gear costs.
 - **Battle data:** the files `tools/BattleData/gen_data.py` writes match the ones in the repository, and its checks pass (kits fit their rarity, no names close to a god's).

@@ -10,7 +10,9 @@ namespace ShatteredPantheon.Game
 
     public class GameApp : MonoBehaviour
     {
-        public static readonly float[] Speeds = { 1, 2, 3 };
+        // 10x and 20x are for testing (playing a whole realm quickly): only in the Unity editor and development builds.
+        public static float[] Speeds => Debug.isDebugBuild ? TestingSpeeds : PlayerSpeeds;
+        static readonly float[] PlayerSpeeds = { 1, 2, 3 }, TestingSpeeds = { 1, 2, 3, 10, 20 };
 
         public GameData Data { get; private set; }
         public PlayerProgress Progress { get; private set; }

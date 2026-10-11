@@ -157,6 +157,7 @@ static class Program
             var kept = Directory.GetFiles(folder, "save.damaged-*.json");
             Expect(progress.Save.Stars.Count == 0 && progress.Save.Version == SaveData.CurrentVersion, $"{what}: starts a new game");
             Expect(warnings.Count == 1 && kept.Length == 1 && warnings[0].Contains(Path.GetFileName(kept[0])), $"{what}: reports where the old file was kept ({warnings.FirstOrDefault()})");
+            Expect(warnings.Count == 1 && System.Text.RegularExpressions.Regex.IsMatch(warnings[0], @"[.!?] Started a new game;"), $"{what}: the reader's message ends with a full stop before \"Started a new game\"");
             Expect(kept.Length == 1 && File.ReadAllText(kept[0]) == text, $"{what}: the old file is kept unchanged");
             Expect(!File.Exists(store.FilePath), $"{what}: the damaged file no longer sits in the save's place");
             progress.RecordBattle(realm[0], "win", Five);

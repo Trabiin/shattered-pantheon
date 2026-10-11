@@ -1,7 +1,9 @@
 // Plays the game's screens on fake Unity (FakeUnity.cs) the way a player would: the campaign screen,
 // locked battles, team and formation editing, every realm 1 battle in order (each win opening the
 // next, and the first win sharing battle XP among the heroes who fought), retreating mid-fight,
-// results, retry, closing and reopening the game with its save, and resetting progress.
+// results, retry, closing and reopening the game with its save, and resetting progress. The first
+// fights run as a release build; realm 1 is then played as a development build, at the testing speed
+// of 20x with the fight log on.
 // Fails on any exception a screen throws, on a fight that differs from the engine run directly, on
 // heroes fighting at anything but their own level's strength, on battle XP that doesn't add up, on
 // screens or animations left behind, or on a team that isn't what the player picked.
@@ -38,6 +40,8 @@ static class Program
         var realm = CampaignView.Battles(data);
         Expect(realm.Count == 40 && realm.GroupBy(b => b.StageNumber).Count() == 10 && realm.GroupBy(b => b.StageNumber).All(g => g.Count() == 4), "realm 1 on Normal has 10 stages of 4 battles");
         Expect(realm.All(b => (b.BattleNumber == 4) == (b.Boss != null)) && realm.Count(b => b.Boss == "realm") == 1 && realm.Last().Boss == "realm", "battle 4 of each stage is its boss, and stage 10's is the realm boss");
+
+        CardFlash(data, realm[0]);
 
         app = new GameObject("Game").AddComponent<GameApp>();
         Call(app, "Start");
@@ -101,9 +105,16 @@ static class Program
         Expect(Scheduler.Errors.Count == 0, "retreating mid-fight throws nothing");
         Click("Speed Button"); Click("Speed Button");
         Expect(Label(Find("Speed Button")) == "3x", "speed button cycles to 3x");
+        Expect(GameApp.Speeds.SequenceEqual(new float[] { 1, 2, 3 }), "a release build has only the 1x, 2x and 3x speeds");
         CheckFight(data, first, picked);
         for (int tries = 1; !app.Progress.IsCleared(first.Id) && tries < MaxTries; tries++) { Click("Retry Button"); CheckFight(data, first, picked); }
         Expect(app.Progress.IsCleared(first.Id), $"{first.Name}: won (retrying up to {MaxTries} times) before going on");
+        Expect(Debug.Logs.Count == 0, "a release build writes no fight log");
+
+        // From here on, a development build (as in the Unity editor): the testing speeds and the fight log.
+        Debug.isDebugBuild = true;
+        Expect(GameApp.Speeds.SequenceEqual(new float[] { 1, 2, 3, 10, 20 }), "a development build adds the testing speeds 10x and 20x");
+        FightLogWords(data, first);
 
         // Realm 1 from start to finish with the starter team: every battle in order from the campaign
         // screen, retrying a lost battle like a player would.
@@ -124,6 +135,11 @@ static class Program
             var team = last = Team();
             Expect(team.Select(t => t.Id).OrderBy(x => x).SequenceEqual(Starter.OrderBy(x => x)), $"{stage.Name}: the starter team is picked");
             Click("Fight! Button");
+            if (stage == realm[1])
+            {
+                Click("Speed Button"); Click("Speed Button");
+                Expect(Label(Find("Speed Button")) == "20x", "in a development build the speed button goes on to 10x and 20x");
+            }
             int tries = 1;
             while (!CheckFight(data, stage, team) && tries < MaxTries) { Click("Retry Button"); tries++; }
             Expect(app.Progress.IsCleared(stage.Id), $"{stage.Name}: won within {MaxTries} tries ({tries})");
@@ -213,6 +229,9 @@ static class Program
         Expect(direct.Result != "win" || app.Progress.IsCleared(stage.Id), $"{stage.Name}: a win marks the battle cleared");
         Expect(SaveData.FromJson(File.ReadAllText(Path.Combine(Application.persistentDataPath, SaveStore.FileName))).Stars.ContainsKey(stage.Id) == app.Progress.IsCleared(stage.Id), $"{stage.Name}: the save on the device matches after the fight");
         Expect(direct.Heroes.All(h => Find("Row: " + h.Id) != null), $"{stage.Name}: every hero has a results row");
+        var bars = Named("Row: ").SelectMany(r => r.transform.Cast<Transform>()).Where(c => c.name == "Bar").Select(c => (RectTransform)c).ToList();
+        Expect(bars.Count > 0 && bars.All(b => Math.Abs(b.anchoredPosition.x) + b.sizeDelta.x / 2 <= 500 - 10), $"{stage.Name}: the results bars keep a margin inside their row");
+        if (Debug.isDebugBuild) CheckFightLog(stage, shown);
         Expect(Scheduler.Running == 0, $"{stage.Name}: no animations left running ({Scheduler.Running})");
         Expect(CanvasChildren() == 2, $"{stage.Name}: old screens are cleaned up ({CanvasChildren()} canvas children)");
         return direct.Result == "win";
@@ -223,6 +242,53 @@ static class Program
     {
         var h = app.Progress.Wallet.Hero(id);
         return Enumerable.Range(1, h.Level - 1).Sum(l => (long)curve.Growth.XpToNext(l)) + h.Xp;
+    }
+
+    // A card hit twice in quick succession goes back to its own colour, not the half-white one of the first hit.
+    static void CardFlash(GameData data, StageDef stage)
+    {
+        var unit = new Battle(data, Formation.AutoPlace(data, Starter), stage.Id, 1, new BattleOptions()).Units[0];
+        var holder = new GameObject("Flash test", typeof(RectTransform));
+        var card = new UnitCard(unit, (RectTransform)holder.transform, Vector2.zero);
+        var face = (Image)Field(card, "face");
+        var own = face.color;
+        card.Flash();
+        Expect(!Same(face.color, own), "a hit flashes the card");
+        RunFor(0.05f);
+        card.Flash();
+        RunFor(0.5f);
+        Expect(Same(face.color, own), "a card hit twice 0.05 s apart goes back to its own colour");
+        UnityEngine.Object.Destroy(holder);
+        RunFor(0.1f);
+    }
+
+    static bool Same(Color a, Color b) => Math.Abs(a.r - b.r) + Math.Abs(a.g - b.g) + Math.Abs(a.b - b.b) + Math.Abs(a.a - b.a) < 1e-4;
+
+    // The fight log names what the player needs to confirm.
+    static void FightLogWords(GameData data, StageDef stage)
+    {
+        var battle = new Battle(data, Formation.AutoPlace(data, Starter), stage.Id, 1, new BattleOptions());
+        string hero = battle.Units.First(u => u.Side == "A").Key, foe = battle.Units.First(u => u.Side == "E").Key;
+        string Say(EventKind kind, string detail = null, double amount = 0) => FightLog.Describe(battle, new BattleEvent { Kind = kind, Actor = hero, Target = foe, Detail = detail, Amount = amount });
+        Expect(Say(EventKind.Turn, "skill:Shield Bash").Contains("uses Shield Bash"), "the fight log names skills");
+        Expect(Say(EventKind.Turn, "ult:Last Stand").Contains("Last Stand"), "the fight log names ultimates");
+        Expect(Say(EventKind.StatusAdded, "godstruck", 1).Contains("Godstruck"), "the fight log names effects");
+        Expect(Say(EventKind.RitualStart).Contains("ritual") && Say(EventKind.RitualComplete).Contains("ritual"), "the fight log shows rituals starting and completing");
+        Expect(Say(EventKind.Interrupt).Contains("interrupts"), "the fight log shows interrupts");
+        Expect(Say(EventKind.Death).Contains("falls"), "the fight log shows deaths");
+    }
+
+    // In a development build every fight writes its log to the Console: a first line naming the battle, then
+    // one line per action holding everything in it, ending with the result.
+    static void CheckFightLog(StageDef stage, Battle shown)
+    {
+        int start = Debug.Logs.FindLastIndex(l => l.StartsWith("Fight log: "));
+        var lines = start < 0 ? new List<string>() : Debug.Logs.Skip(start).ToList();
+        Expect(lines.Count > 0 && lines[0].StartsWith($"Fight log: {stage.Name} ("), $"{stage.Name}: the fight log starts with the battle");
+        string text = string.Join("\n", lines);
+        var missing = shown.Events.Select(e => FightLog.Describe(shown, e)).Where(d => d != null && !text.Contains(d)).ToList();
+        Expect(missing.Count == 0, $"{stage.Name}: the fight log has every turn, hit, effect, ritual, interrupt and death ({lines.Count - 1} lines{(missing.Count > 0 ? ", missing: " + missing[0] : "")})");
+        Expect(lines.Count > 0 && lines.Last().Contains("Fight over"), $"{stage.Name}: the fight log ends with the result");
     }
 
     static void Expect(bool ok, string what) { if (!ok) failures++; Console.WriteLine((ok ? "  ok   " : "  FAIL ") + what); }

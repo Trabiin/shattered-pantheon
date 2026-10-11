@@ -33,7 +33,7 @@ namespace ShatteredPantheon.Game
             catch (Exception e) when (e is FormatException || e is IOException || e is UnauthorizedAccessException)
             {
                 string kept = SetAside();
-                problem = $"{e.Message} Started a new game; the old save was kept as {kept}.";
+                problem = $"{Sentence(e.Message)} Started a new game; the old save was kept as {kept}.";
                 return new SaveData();
             }
         }
@@ -51,6 +51,13 @@ namespace ShatteredPantheon.Game
         public void Delete()
         {
             if (File.Exists(FilePath)) File.Delete(FilePath);
+        }
+
+        // The reader's message ends with a full stop, so the next sentence doesn't run into it.
+        static string Sentence(string message)
+        {
+            message = message.Trim();
+            return message.Length == 0 || ".!?".IndexOf(message[message.Length - 1]) >= 0 ? message : message + ".";
         }
 
         string SetAside()

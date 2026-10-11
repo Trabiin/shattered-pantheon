@@ -37,7 +37,7 @@ namespace ShatteredPantheon.Game
             double maxTaken = Mathf.Max(1, (float)heroes.Max(u => u.Stats.Taken));
             Ui.Label(Root, "Damage dealt", 24, Palette.Damage, TextAnchor.MiddleCenter, new Vector2(-80, 500), new Vector2(240, 40));
             Ui.Label(Root, "Heal + shield", 24, Palette.Heal, TextAnchor.MiddleCenter, new Vector2(170, 500), new Vector2(240, 40));
-            Ui.Label(Root, "Damage taken", 24, Palette.Muted, TextAnchor.MiddleCenter, new Vector2(400, 500), new Vector2(220, 40));
+            Ui.Label(Root, "Damage taken", 24, Palette.Muted, TextAnchor.MiddleCenter, new Vector2(390, 500), new Vector2(200, 40));
             for (int i = 0; i < heroes.Count; i++)
             {
                 var u = heroes[i];
@@ -48,7 +48,8 @@ namespace ShatteredPantheon.Game
                 Ui.Label(row, u.Def.Name + fell, 26, Color.white, TextAnchor.MiddleLeft, new Vector2(-340, 0), new Vector2(280, 100)).Bold().FitText(16);
                 StatBar(row, new Vector2(-80, 0), u.Stats.Dmg / maxDmg, u.Stats.Dmg, Palette.Damage);
                 StatBar(row, new Vector2(170, 0), u.Stats.Heal / maxHeal, u.Stats.Heal, Palette.Heal);
-                StatBar(row, new Vector2(400, 0), u.Stats.Taken / maxTaken, u.Stats.Taken, new Color(1, 1, 1, 0.45f), 200);
+                // The last bar stops short of the row's right edge (a margin like the name's on the left).
+                StatBar(row, new Vector2(390, 0), u.Stats.Taken / maxTaken, u.Stats.Taken, new Color(1, 1, 1, 0.45f), 170);
             }
 
             Ui.MakeButton(Root, "Retry", new Vector2(-340, -620), new Vector2(300, 120), () => App.ShowBattle(stage, team, battle.HeroFormation));
