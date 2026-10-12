@@ -517,6 +517,10 @@ static class Program
         Expect(wallet.Hero("hilde#2").Level == 2 && wallet.Hero("hilde").Level == 1, "XP for one copy levels only that copy");
         var team = progress.AutoPlace(cards);
         Expect(team.Select(t => t.Id).OrderBy(x => x).SequenceEqual(cards.OrderBy(x => x)) && team.Select(t => t.Slot).Distinct().Count() == 5, "auto-placing keeps both copies, each in its own slot");
+        var five = new[] { "hilde", "hilde#2", "hilde#3", "hilde#4", "hilde#5" };
+        foreach (var _ in five.Skip(3)) wallet.NewCard("hilde");
+        var stack = progress.AutoPlace(five);
+        Expect(stack.Select(t => t.Id).OrderBy(x => x).SequenceEqual(five) && stack.Select(t => t.Slot).Distinct().Count() == 5, "a team of five copies fills all five slots");
         var fighting = progress.FightingTeam(team);
         Expect(fighting.Count(t => t.Id == "hilde") == 2 && fighting.All(t => data.Hero(t.Id) != null), "the battle gets Hilde twice");
         Expect(fighting.Zip(team, (f, c) => f.Slot == c.Slot && f.HpScale == progress.HeroScale(c.Id) && f.AtkScale == f.HpScale).All(x => x) && progress.HeroScale("hilde#2") > progress.HeroScale("hilde"), "each copy at its own card's strength");

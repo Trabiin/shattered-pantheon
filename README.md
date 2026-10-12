@@ -13,7 +13,7 @@ A mobile auto-battle gacha game, built in Unity. Design docs live in the project
 | `tools/BattleData/` | The script that writes the battle data, and a guide to its format. |
 | `tools/FightViewer/` | A browser page that replays real engine fights turn by turn (`build.py` explains how to rebuild it). |
 | `tools/ProgressionSim/` | The progression and economy simulator: simulated players play a year of the campaign day by day, every campaign battle a real fight. Reads `progression.json` and `campaign.json`. |
-| `tools/BattleSim/` | The balance simulator, compiled from the same `BattleCore` files. It fights the 6 test stages in `stages.json`. |
+| `tools/BattleSim/` | The balance simulator, compiled from the same `BattleCore` files. It fights the 6 test stages in `stages.json` with random teams (copies of a hero included), and checks teams of 5 copies of each hero on early and late battles of `campaign.json`. |
 | `tools/SaveTests/` | Tests for the game's save file (`Unity/Assets/Game/Scripts/Save/`). |
 | `tools/CampaignTests/` | Tests for the order campaign battles open in (`Unity/Assets/BattleCore/CampaignOrder.cs`). |
 | `tools/GrowthTests/` | Tests for the hero growth and cost rules (`Unity/Assets/BattleCore/Growth.cs`). |

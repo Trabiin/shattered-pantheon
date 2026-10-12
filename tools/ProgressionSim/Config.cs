@@ -65,6 +65,7 @@ class Cfg
     public List<TimeProfile> Times = new List<TimeProfile>();
     public List<SpendProfile> Spends = new List<SpendProfile>();
     public double FightOverhead, ReplaySpeed; public int AttemptsBeforeUpgrading;
+    public double FodderMinutes;   // levelling a spare copy with XP potions and ascending it, on the menus
     // Targets
     public Dictionary<string, double> NormalDays, HardDays;
     public double WallDays, NewHeroEveryDays, FirstLegendaryDay, MaxDaysWithoutBig;
@@ -154,6 +155,7 @@ class Cfg
                 PackDollarsPerMonth = N(s, "packDollarsPerMonth"), DevotionRefillsPerDay = N(s, "devotionRefillsPerDay"),
             });
         c.FightOverhead = N(pl, "secondsPerFightOverhead"); c.ReplaySpeed = N(pl, "replaySpeed"); c.AttemptsBeforeUpgrading = (int)N(pl, "attemptsBeforeUpgrading");
+        c.FodderMinutes = N(pl, "minutesToMakeFodder");
 
         var ta = r.GetProperty("targets");
         c.NormalDays = Map(ta.GetProperty("normalDays")); c.HardDays = Map(ta.GetProperty("hardDays"));

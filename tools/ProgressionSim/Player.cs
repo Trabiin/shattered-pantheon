@@ -10,6 +10,7 @@ class HeroCard
 {
     public string Id, Kit, Name, Rarity, Faction, Role;
     public double KitPower;   // how much the kit lifts a team's win rate (1 = average), measured once by simulation
+    public double CopyPower;  // how a second copy of the kit does against another hero in its place (1 = as well), measured the same way
     public int ReleaseDay;    // 0 = in the launch roster
 }
 
@@ -17,11 +18,13 @@ class Owned
 {
     public HeroCard Card;
     public int Level = 1, Stars, Gear, Skill = 1;
+    public bool Copy;   // a second or later copy of the hero, kept to field
 }
 
 class DayLog
 {
     public int Day, Difficulty, Battle, Roster, TeamLevel, Stars, Fights, FarmFights, Hunts, Pulls, Released, Legendaries, LegendariesReleased, Epics, EpicsReleased;
+    public int TeamCopies;   // team slots taken by a further copy of a hero already in the team
     public double TeamStars, TeamGear, TeamSkill;
     public double TeamScale, RecScale, Godshards, GodshardsEarned, MinutesUnused;
     public bool OutOfEnergy, BigMoment, NewHero, Progressed;
@@ -37,9 +40,14 @@ class Player
     readonly Random rng;
     readonly long seed;
 
+    // Every hero the player develops, keyed by card id; copies kept to field are "<card id>#2" and so on.
     public readonly Dictionary<string, Owned> Roster = new Dictionary<string, Owned>();
-    // Fodder by star rank: duplicates and Vessels, which count as any hero of that rank when ascending.
-    readonly Dictionary<int, int> fodder = Enumerable.Range(1, 6).ToDictionary(r => r, r => 0);
+    // Fodder by star rank, which counts as any hero of that rank when ascending: Vessels, spare copies
+    // at level 1, and spare copies the player has levelled to their rank's cap and ascended (doc 07 section 1).
+    readonly Dictionary<int, int> vessels = Ranks(), spares = Ranks(), made = Ranks();
+    static Dictionary<int, int> Ranks() => Enumerable.Range(1, 6).ToDictionary(r => r, r => 0);
+    public int FodderMade;
+    double busy;   // minutes of menu work (making fodder) not yet taken from a session
     double xp, gold, shards, devotion, gearMats, tomes, tickets, shardsEarned, heroShards;
     readonly SummonPity pity;   // the guarantee counters
     public double Dollars;
@@ -81,13 +89,13 @@ class Player
         today = new DayLog { Day = day };
         double before = shardsEarned;
         int clearedBefore = battlesCleared;
-        int rosterBefore = Roster.Count;
+        int rosterBefore = Roster.Values.Count(o => !o.Copy);
         double minutesPerSession = time.Minutes / time.Sessions;
         attemptsToday = 0;
 
         for (int s = 0; s < time.Sessions; s++)
         {
-            double minutes = minutesPerSession;
+            double minutes = Busy(minutesPerSession);
             // Shrine and energy fill while away.
             double away = 24.0 / time.Sessions;
             src = "Shrine"; Add(C.ShrinePerHour, Math.Min(away, C.ShrineCapHours));
@@ -109,29 +117,32 @@ class Player
             if (s == 0) minutes = Hunts(minutes, C.BossHunts.FreePerDay, false);
             Upgrade();
             Summon();
-            minutes = PushCampaign(minutes);
+            minutes = PushCampaign(Busy(minutes));
             Upgrade();
             // Devotion first (hunts, farming), then replays for challenge stars with the time left.
-            minutes = Hunts(minutes, 0, true);
+            minutes = Hunts(Busy(minutes), 0, true);
             minutes = FarmFights(minutes);
             minutes = Challenges(minutes);
-            today.MinutesUnused += Math.Max(0, minutes);
             Upgrade();
             Summon();
+            today.MinutesUnused += Math.Max(0, Busy(minutes));
         }
 
         var t = BestTeam(null);
-        today.Difficulty = Diff; today.Battle = Battle; today.Roster = Roster.Count;
+        today.Difficulty = Diff; today.Battle = Battle;
         today.TeamLevel = t.Count == 0 ? 0 : (int)Math.Round(t.Average(o => o.Level));
         if (t.Count > 0) { today.TeamStars = t.Average(o => o.Stars); today.TeamGear = t.Average(o => o.Gear); today.TeamSkill = t.Average(o => o.Skill); }
+        today.TeamCopies = t.Count - t.Select(o => o.Card.Id).Distinct().Count();
         today.Released = Released.Count();
-        today.Epics = Roster.Values.Count(o => o.Card.Rarity == C.Rarities[1]); today.EpicsReleased = Released.Count(h => h.Rarity == C.Rarities[1]); today.Legendaries = Roster.Values.Count(o => o.Card.Rarity == C.Rarities[0]);
+        var owned = Roster.Values.Where(o => !o.Copy).ToList();
+        today.Roster = owned.Count;
+        today.Epics = owned.Count(o => o.Card.Rarity == C.Rarities[1]); today.EpicsReleased = Released.Count(h => h.Rarity == C.Rarities[1]); today.Legendaries = owned.Count(o => o.Card.Rarity == C.Rarities[0]);
         today.LegendariesReleased = Released.Count(h => h.Rarity == C.Rarities[0]);
         today.TeamScale = TeamScale(t); today.RecScale = C.RecScale(Math.Min(Diff, C.Difficulties.Count - 1), Math.Min(Battle, C.BattlesPerDifficulty - 1));
         today.Stars = starsTotal; today.Godshards = shards; today.GodshardsEarned = shardsEarned - before;
         today.Progressed = battlesCleared > clearedBefore;
         if (Debug && !today.Progressed && Diff < C.Difficulties.Count && Days.Count >= 20 && Days.Skip(Days.Count - 20).All(x => !x.Progressed) && Days[^20].Progressed == false && !debugged.Contains((Diff, Battle))) DebugWall();
-        today.NewHero |= Roster.Count > rosterBefore;
+        today.NewHero |= today.Roster > rosterBefore;
         Days.Add(today);
     }
 
@@ -164,11 +175,11 @@ class Player
             lossesHere[(Diff, Battle)] = tries + 1;
             // A player who has already lost a full session here tries once, then goes to grow the team
             // (hunts, farming) instead of spending the whole session on the same battle.
-            if (tries >= C.AttemptsBeforeUpgrading * 2) { Upgrade(); Summon(); break; }
+            if (tries >= C.AttemptsBeforeUpgrading * 2) { Upgrade(); Summon(); minutes = Busy(minutes); break; }
             if (losses >= C.AttemptsBeforeUpgrading)
             {
                 if (upgradedAfterLoss) break;   // stuck for this session
-                Upgrade(); Summon();
+                Upgrade(); Summon(); minutes = Busy(minutes);
                 upgradedAfterLoss = true; losses = 0;
             }
         }
@@ -318,7 +329,7 @@ class Player
             if (ShatteredPantheon.Battle.Battle.Run(data, Place(VariantTeam(enemies, i)), stage, 98000 + i, null).Result == "win") winsVar++;
         }
         Console.Error.WriteLine($"[{Name} {seed}] day {today.Day} stuck 20+ days on {stage}: team {TeamScale(team) / C.RecScale(Diff, Battle):P0} of recommended, wins {wins}/{n}, variants {winsVar}/{n}. " +
-            string.Join(", ", team.Select(o => $"{o.Card.Kit}/{o.Card.Rarity[0]} L{o.Level} {o.Stars}* g{o.Gear} s{o.Skill}")) + $" | fodder {string.Join(" ", fodder.Select(kv => kv.Key + ":" + kv.Value))} xp {xp:0} gold {gold:0} mats {gearMats:0} tomes {tomes:0} farm {Days.Skip(Math.Max(0, Days.Count - 20)).Sum(x => x.FarmFights)} hunts {Days.Skip(Math.Max(0, Days.Count - 20)).Sum(x => x.Hunts)} unused {Days.Skip(Math.Max(0, Days.Count - 20)).Sum(x => x.MinutesUnused):0}m");
+            string.Join(", ", team.Select(o => $"{o.Card.Kit}/{o.Card.Rarity[0]} L{o.Level} {o.Stars}* g{o.Gear} s{o.Skill}")) + $" | fodder (Vessels/spare/made) {string.Join(" ", vessels.Keys.Select(r => $"{r}:{vessels[r]}/{spares[r]}/{made[r]}"))} xp {xp:0} gold {gold:0} mats {gearMats:0} tomes {tomes:0} farm {Days.Skip(Math.Max(0, Days.Count - 20)).Sum(x => x.FarmFights)} hunts {Days.Skip(Math.Max(0, Days.Count - 20)).Sum(x => x.Hunts)} unused {Days.Skip(Math.Max(0, Days.Count - 20)).Sum(x => x.MinutesUnused):0}m");
     }
 
     // ---------- Team ----------
@@ -327,10 +338,18 @@ class Player
     // Kit strength counts for a lot: an average kit needs about 15% more growth to match a strong one.
     double Power(Owned o) => HeroScale(o) * Math.Pow(o.Card.KitPower, 2);
     double TeamScale(List<Owned> team) => team.Count == 0 ? 0 : team.Average(HeroScale) * Math.Min(1, team.Count / 5.0);
+    // How strong a hero gets for the same growth as any other.
+    double Potential(HeroCard c) => C.Growth.RarityBase[c.Rarity] * Math.Pow(c.KitPower, 2);
 
-    // The strongest 5 heroes with different kits, nudged toward heroes whose type does well against
-    // the enemies, and with at least one front-liner when one is available.
-    List<Owned> BestTeam(List<UnitDef> enemies)
+    // A kept copy is ranked as strong as its hero's first copy, which it's being built to match.
+    double BenchPower(Owned o) => Math.Max(Power(o), Power(Roster[o.Card.Id]));
+
+    // The bench of 10 the player levels: the strongest heroes that could share a team.
+    List<Owned> Bench() => Pick(Roster.Values.OrderByDescending(BenchPower), 10);
+
+    // The strongest 5 heroes, copies of one hero included (doc 04 section 2.1), nudged toward heroes
+    // whose type does well against the enemies, and with a tank and a healer when there are decent ones.
+    List<Owned> BestTeam(List<UnitDef> enemies, bool copies = true)
     {
         double Score(Owned o)
         {
@@ -342,37 +361,55 @@ class Player
         }
         // A tank and a healer first when there's a decent one: without them most line-ups lose
         // badly at equal power (a team of five Warriors wins about 1 fight in 10 that a balanced team wins).
-        var ranked = Roster.Values.OrderByDescending(Score).ToList();
+        var score = Roster.Values.ToDictionary(o => o, Score);
+        var ranked = Roster.Values.OrderByDescending(o => score[o]).ToList();
         var team = new List<Owned>();
-        double top = ranked.Count > 0 ? Score(ranked[0]) : 0;
+        double top = ranked.Count > 0 ? score[ranked[0]] : 0;
         foreach (var role in new[] { "Tank", "Support" })
         {
-            var o = ranked.FirstOrDefault(h => h.Card.Role == role && team.All(t => t.Card.Kit != h.Card.Kit));
-            if (o != null && Score(o) >= top * 0.7) team.Add(o);
+            var o = ranked.FirstOrDefault(h => h.Card.Role == role && Fits(team, h, copies));
+            if (o != null && score[o] >= top * 0.7) team.Add(o);
         }
-        foreach (var o in ranked)
+        // Then the strongest picks, a further copy of a hero counting for what a second copy adds.
+        while (team.Count < 5)
         {
-            if (team.Count == 5) break;
-            if (team.All(t => t.Card.Kit != o.Card.Kit)) team.Add(o);
+            var o = ranked.Where(h => Fits(team, h, copies)).OrderByDescending(h => score[h] * CopyFactor(team, h)).FirstOrDefault();
+            if (o == null) break;
+            team.Add(o);
         }
+        return team;
+    }
+
+    // Copies of one hero may share a team. Different heroes on one test kit may not: the kit stands in
+    // for heroes with kits of their own, and fielding it twice would fight like copies they aren't.
+    static bool Fits(List<Owned> team, Owned o, bool copies = true) => !team.Contains(o) && team.All(t => t.Card.Kit != o.Card.Kit || (copies && t.Card.Id == o.Card.Id));
+
+    static double CopyFactor(List<Owned> team, Owned o) => team.Any(t => t.Card.Id == o.Card.Id) ? Math.Pow(o.Card.CopyPower, 2) : 1;
+
+    // The first heroes in this order that can share a team.
+    static List<Owned> Pick(IEnumerable<Owned> heroes, int count = 5)
+    {
+        var team = new List<Owned>();
+        foreach (var o in heroes) if (team.Count < count && Fits(team, o)) team.Add(o);
         return team;
     }
 
     readonly Dictionary<(int, int), int> lossesHere = new Dictionary<(int, int), int>();
 
-    // A different line-up after a loss: any 5 kits whose best hero is close to the strongest ones,
-    // keeping a tank and a healer when the pool has them. Players rearrange and try counters before grinding (doc 10).
+    // A different line-up after a loss: any 5 heroes close to the strongest ones, keeping a tank and
+    // a healer when the pool has them. Players rearrange and try counters before grinding (doc 10).
     List<Owned> VariantTeam(List<UnitDef> enemies, int variant, double barFactor = 0.85)
     {
         var best = BestTeam(enemies);
-        var byKit = Roster.Values.OrderByDescending(HeroScale).GroupBy(o => o.Card.Kit).Select(g => g.First()).ToList();
-        double bar = byKit.Count >= 5 ? HeroScale(byKit[4]) * barFactor : 0;
-        var pool = byKit.Where(o => HeroScale(o) >= bar).ToList();
+        var all = Roster.Values.OrderByDescending(HeroScale).ToList();
+        var strongest = Pick(all);
+        double bar = strongest.Count >= 5 ? HeroScale(strongest[4]) * barFactor : 0;
+        var pool = all.Where(o => HeroScale(o) >= bar).ToList();
         if (pool.Count <= 5) return best;
         var r = new Random(variant * 7919 + Diff * 31 + Battle);
         for (int tries = 0; tries < 20; tries++)
         {
-            var team = pool.OrderBy(_ => r.Next()).Take(5).ToList();
+            var team = Pick(pool.OrderBy(_ => r.Next()));
             bool Has(string role) => team.Any(t => t.Card.Role == role) || pool.All(t => t.Card.Role != role);
             if (Has("Tank") && Has("Support")) return team;
         }
@@ -380,14 +417,15 @@ class Player
     }
 
     // After a couple of losses the player studies the fight and tries counters (doc 10: rearrange
-    // before grinding). Modelled as picking, from the best line-up and a spread of other line-ups,
-    // the one that does best in a few practice fights. Re-thought now and then as the roster grows.
+    // before grinding). Modelled as picking, from the best line-up, the best one without copies and a
+    // spread of other line-ups, the one that does best in a few practice fights. Re-thought now and
+    // then as the roster grows.
     readonly Dictionary<(int, int), (int at, List<Owned> team)> plans = new Dictionary<(int, int), (int, List<Owned>)>();
     List<Owned> Counter(string stage, List<UnitDef> enemies, int tries)
     {
         if (plans.TryGetValue((Diff, Battle), out var plan) && tries < plan.at * 2 + 4) return plan.team;   // re-think less and less often
         var main = BestTeam(enemies);
-        var candidates = new List<List<Owned>> { main };
+        var candidates = new List<List<Owned>> { main, BestTeam(enemies, false) };
         for (int v = 0; v < 9; v++) candidates.Add(VariantTeam(enemies, tries * 100 + v));
         List<Owned> best = null; int bestWins = -1;
         foreach (var team in candidates)
@@ -407,11 +445,9 @@ class Player
     List<TeamSlot> Place(List<Owned> team, double scale = 0)
     {
         var placed = Formation.AutoPlace(data, team.Select(o => o.Card.Kit).ToList());
-        foreach (var s in placed)
-        {
-            var o = team.First(t => t.Card.Kit == s.Id);
-            s.HpScale = s.AtkScale = scale > 0 ? scale : HeroScale(o);
-        }
+        // Heroes on the same kit (copies, or heroes the kit stands in for) take its slots in turn.
+        var byKit = team.GroupBy(o => o.Card.Kit).ToDictionary(g => g.Key, g => new Queue<Owned>(g));
+        foreach (var s in placed) s.HpScale = s.AtkScale = scale > 0 ? scale : HeroScale(byKit[s.Id].Dequeue());
         return placed;
     }
 
@@ -421,12 +457,23 @@ class Player
     {
         var team = BestTeam(null);
         // A bench of 10 is levelled together, so there are real line-ups to switch to when a battle needs a counter.
-        var core = Roster.Values.OrderByDescending(Power).GroupBy(o => o.Card.Kit).Select(g => g.First()).Take(10).ToList();
+        var core = Bench();
+        // Kept copies that fell off the bench and out of the team become fodder; their levels come back as XP.
+        foreach (var o in Roster.Values.Where(o => o.Copy && !core.Contains(o) && !team.Contains(o)).ToList())
+        {
+            Roster.Remove(Roster.First(kv => kv.Value == o).Key);
+            xp += XpBetween(1, o.Level);
+            spares[o.Stars]++;
+        }
         // Gear first, up to what the current battle recommends, so gold isn't all spent on levels.
         var rec = C.Recommended(Math.Min(Diff, C.Difficulties.Count - 1), Math.Min(Battle, C.BattlesPerDifficulty - 1));
         UpgradeGear(team, (int)Math.Ceiling(rec.gear));
         // Levels: the team up to the recommended level first, then the whole bench, lowest first.
+        // Capped team heroes ascend before the bench takes the XP, which making fodder needs for a while.
+        // When making their fodder is short of XP, the player saves XP for it instead of levelling the bench.
         foreach (var (group, upTo) in new[] { (team, (int)Math.Ceiling(rec.level)), (core, int.MaxValue) })
+        {
+            if (group == core && savingXp) break;
             while (true)
             {
                 var o = group.Where(h => h.Level < Math.Min(upTo, C.Growth.LevelCap(h.Stars))).OrderBy(h => h.Level).FirstOrDefault();
@@ -435,17 +482,30 @@ class Player
                 if (xp < cost) break;
                 xp -= cost; o.Level++;
             }
-        // Then gear beyond the recommendation, and skills.
-        UpgradeGear(team, C.Growth.MaxGear);
+            if (group == team) Ascend(Growing(team));
+        }
+        // Then gear beyond the recommendation, and skills, for the team and kept copies.
+        var growing = Growing(team);
+        UpgradeGear(growing, C.Growth.MaxGear);
         while (true)
         {
-            var o = team.Where(h => h.Skill < C.Growth.MaxSkill).OrderBy(h => h.Skill).FirstOrDefault();
+            var o = growing.Where(h => h.Skill < C.Growth.MaxSkill).OrderBy(h => h.Skill).FirstOrDefault();
             if (o == null) break;
             double need = C.Growth.TomesToNext(o.Skill);
             if (tomes < need) break;
             tomes -= need; o.Skill++;
         }
-        // Ascension: a capped team hero takes fodder of its own star rank.
+        Ascend(growing);
+    }
+
+    // The team, then kept copies still being built up to take their place in it.
+    List<Owned> Growing(List<Owned> team) => team.Concat(Roster.Values.Where(o => o.Copy && !team.Contains(o))).ToList();
+
+    // Ascension: a capped hero takes fodder of its own star rank, the strongest first.
+    bool savingXp;   // a capped team hero is waiting for fodder that needs more XP than the player has
+    void Ascend(List<Owned> team)
+    {
+        savingXp = false;
         foreach (var o in team.Where(h => h.Level >= C.Growth.LevelCap(h.Stars) && h.Stars < C.Growth.MaxStars).OrderByDescending(Power))
             if (TakeFodder(o.Stars, C.Growth.FodderToAscend(o.Stars)))
             {
@@ -467,26 +527,62 @@ class Player
         }
     }
 
-    // Fodder of a star rank, made from lower-rank fodder when needed (a fodder hero is ascended
-    // with the same cost as any other hero). Crafted fodder that isn't used stays in the pool.
+    // Fodder of a star rank, made from lower-rank spare copies when there isn't enough (doc 07 section 1).
+    // Fodder made but not used stays in the pool.
     bool TakeFodder(int rank, int count)
     {
-        if (!Ensure(rank, count)) return false;
-        fodder[rank] -= count;
+        while (vessels[rank] + spares[rank] + made[rank] < count)
+            if (!MakeFodder(rank)) return false;
+        Feed(rank, count);
         return true;
     }
 
-    bool Ensure(int rank, int count)
+    // One fodder hero of this rank: a spare copy a rank lower, levelled to its cap with XP and ascended
+    // with that rank's fodder, like any other hero. Vessels can't be levelled, so they're only fodder of
+    // their own rank. The XP is on loan: it comes back as potions when the hero is fed (doc 08 section 4).
+    bool MakeFodder(int rank)
     {
-        while (fodder[rank] < count)
-        {
-            if (rank <= 1) return false;
-            int need = 1 + C.Growth.FodderToAscend(rank - 1);
-            if (!Ensure(rank - 1, need)) return false;
-            fodder[rank - 1] -= need;
-            fodder[rank]++;
-        }
+        int r = rank - 1;
+        if (r < 1) return false;
+        if (spares[r] + made[r] == 0 && !MakeFodder(r)) return false;
+        int feed = C.Growth.FodderToAscend(r);
+        while (vessels[r] + spares[r] + made[r] - 1 < feed)
+            if (!MakeFodder(r)) return false;
+        bool levelled = made[r] > 0;   // already at the cap of the rank below, so it needs fewer levels
+        double cost = XpBetween(levelled ? C.Growth.LevelCap(r - 1) : 1, C.Growth.LevelCap(r));
+        if (xp < cost) { savingXp = true; return false; }
+        xp -= cost;
+        if (levelled) made[r]--; else spares[r]--;
+        Feed(r, feed);
+        made[rank]++; FodderMade++;
+        busy += C.FodderMinutes;
         return true;
+    }
+
+    // Vessels go first, then spare copies; levelled fodder last, since it can be ascended further.
+    void Feed(int rank, int count)
+    {
+        for (int i = 0; i < count; i++)
+            if (vessels[rank] > 0) vessels[rank]--;
+            else if (spares[rank] > 0) spares[rank]--;
+            else { made[rank]--; xp += XpBetween(1, C.Growth.LevelCap(rank - 1)); }
+    }
+
+    // XP from one level to a higher one.
+    readonly Dictionary<(int, int), double> xpBetween = new Dictionary<(int, int), double>();
+    double XpBetween(int from, int to)
+    {
+        if (!xpBetween.TryGetValue((from, to), out var x))
+            xpBetween[(from, to)] = x = Enumerable.Range(from, Math.Max(0, to - from)).Sum(l => C.Growth.XpToNext(l));
+        return x;
+    }
+
+    // Menu time spent since the last check comes out of the session's minutes; what doesn't fit waits for the next session.
+    double Busy(double minutes)
+    {
+        double used = Math.Min(busy, Math.Max(0, minutes));
+        busy -= used;
+        return minutes - used;
     }
 
     // ---------- Heroes and summons ----------
@@ -496,7 +592,19 @@ class Player
         HeroesFrom[how + (Roster.ContainsKey(card.Id) ? " (duplicate)" : "")] = (HeroesFrom.TryGetValue(how + (Roster.ContainsKey(card.Id) ? " (duplicate)" : ""), out var n) ? n : 0) + 1;
         if (Roster.ContainsKey(card.Id))
         {
-            fodder[C.Growth.StartStars(card.Rarity)]++;
+            // A duplicate is its own hero. Once the team is fully ascended (until then its rank's fodder
+            // is worth more), the player keeps it to field when its hero is in the team and, grown as far,
+            // it would clearly beat one of the team's heroes that no kept copy is already meant to replace
+            // (a Legendary copy over a Rare, say). Otherwise it's a spare copy for fodder.
+            var team = BestTeam(null);
+            int weaker = team.Count(t => !t.Copy && t.Card != card && 1.1 * Potential(t.Card) < Potential(card) * Math.Pow(card.CopyPower, 2));
+            if (team.Count == 5 && team.Contains(Roster[card.Id]) && team.All(t => t.Stars == C.Growth.MaxStars) && Roster.Values.Count(o => o.Copy) < weaker)
+            {
+                int copy = 2;
+                while (Roster.ContainsKey(card.Id + "#" + copy)) copy++;
+                Roster[card.Id + "#" + copy] = new Owned { Card = card, Stars = C.Growth.StartStars(card.Rarity), Copy = true };
+            }
+            else spares[C.Growth.StartStars(card.Rarity)]++;
             return;
         }
         Roster[card.Id] = new Owned { Card = card, Stars = C.Growth.StartStars(card.Rarity) };
@@ -545,7 +653,7 @@ class Player
             double n = kv.Value * times;
             int whole = (int)n;
             if (rng.NextDouble() < n - whole) whole++;
-            fodder[kv.Key] += whole;
+            vessels[kv.Key] += whole;
         }
     }
 
