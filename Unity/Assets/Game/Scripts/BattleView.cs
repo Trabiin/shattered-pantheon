@@ -71,8 +71,9 @@ namespace ShatteredPantheon.Game
             logLine.text = Battle.Result == "win" ? "Victory!" : Battle.Result == "lose" ? "Defeat..." : "Time's up";
             yield return new WaitForSeconds(1.2f);
             if (Closed) yield break;
-            App.Progress.RecordBattle(stage, Battle.Result, team.Select(t => t.Id));
-            App.ShowResults(stage, team, Battle);
+            // TODO(E7-F5-S3-T2): no challenge stars until challenge checks exist, so a win is 1 star.
+            var rewards = App.Progress.RecordBattle(stage, Battle.Result, team.Select(t => t.Id), Seed);
+            App.ShowResults(stage, team, Battle, rewards);
         }
 
         void Show(BattleEvent e)

@@ -7,24 +7,6 @@ using System.Linq;
 using System.Text.Json;
 using ShatteredPantheon.Battle;
 
-class Reward
-{
-    public double XpLevels, GoldLevels, Godshards, Devotion, GearMats, SkillTomes, SummonTickets, HeroShards;
-    public Dictionary<int, double> Vessels = new Dictionary<int, double>();   // star rank -> expected count
-    public static Reward From(JsonElement e)
-    {
-        var r = new Reward
-        {
-            XpLevels = Cfg.N(e, "xpLevels"), GoldLevels = Cfg.N(e, "goldLevels"), Godshards = Cfg.N(e, "godshards"),
-            Devotion = Cfg.N(e, "devotion"), GearMats = Cfg.N(e, "gearMats"), SkillTomes = Cfg.N(e, "skillTomes"),
-            SummonTickets = Cfg.N(e, "summonTickets"), HeroShards = Cfg.N(e, "heroShards"),
-        };
-        if (e.TryGetProperty("vessels", out var v)) r.Vessels = Cfg.Vessels(v);
-        return r;
-    }
-    public static List<Reward> List(JsonElement e) => e.EnumerateArray().Select(From).ToList();
-}
-
 class Mode { public int UnlockBattles, FreePerDay; public double DevotionCost, Minutes; public List<Reward> ByDifficulty; }
 
 class TimeProfile { public string Name; public double Minutes; public int Sessions; }
@@ -40,13 +22,16 @@ class Cfg
     public static double N(JsonElement e, string k, double def = 0) => e.TryGetProperty(k, out var v) && v.ValueKind == JsonValueKind.Number ? v.GetDouble() : def;
     static double[] Arr(JsonElement e, string k) => e.GetProperty(k).EnumerateArray().Select(x => x.GetDouble()).ToArray();
     static Dictionary<string, double> Map(JsonElement e) => e.EnumerateObject().Where(p => p.Value.ValueKind == JsonValueKind.Number).ToDictionary(p => p.Name, p => p.Value.GetDouble());
-    public static Dictionary<int, double> Vessels(JsonElement e) => Map(e).ToDictionary(kv => int.Parse(kv.Key), kv => kv.Value);
+    // Rewards are read by the shared code (Unity/Assets/BattleCore/CampaignRewards.cs), as in the game.
+    static Reward R(JsonElement e) => Reward.FromJson(Json.Parse(e.GetRawText()));
+    static List<Reward> RList(JsonElement e) => e.EnumerateArray().Select(R).ToList();
     static bool B(JsonElement e, string k) => e.TryGetProperty(k, out var v) && v.ValueKind == JsonValueKind.True;
 
-    // Hero growth and its costs, and what the campaign expects at each battle: the rules the game uses
-    // too (Unity/Assets/BattleCore/Growth.cs and CampaignCurve.cs).
+    // Hero growth and its costs, what the campaign expects at each battle and what it gives: the rules
+    // the game uses too (Unity/Assets/BattleCore/Growth.cs, CampaignCurve.cs and CampaignRewards.cs).
     public Growth Growth;
     public CampaignCurve Curve;
+    public CampaignRewards Rewards;
     // Roster and summons
     public List<string> Rarities;                        // rarest first
     public Dictionary<string, int> Launch;
@@ -68,13 +53,10 @@ class Cfg
     public double[] StarSteps, WinBand, BossWinBand, RealmBossWinBand, EarlyWinBand;
     public int EarlyBattles;
     // Rewards
-    public Reward ShrinePerHour, FirstClear, StageClear, StarChest, Farm, Daily, Weekly;
-    public double[] StageChestStars; public List<Reward> StageChests;
-    public List<Dictionary<int, double>> StageClearVessels;
-    public List<Reward> FarmByDifficulty;
+    public Reward ShrinePerHour, Daily, Weekly;
     public Mode BossHunts, Endless;
     public double StartingGodshards, LoginEvery, LoginTickets;
-    public double ShrineCapHours, StarGodshards, StarChestEvery, FarmCost, DailyMinutes, DailyHardCount, DailyHardGodshards, DailyHardPower;
+    public double ShrineCapHours, DailyMinutes, DailyHardCount, DailyHardGodshards, DailyHardPower;
     public Dictionary<string, double> CodexFirst; public Dictionary<int, double> CodexStars = new Dictionary<int, double>();
     public SortedDictionary<double, double> CodexFaction = new SortedDictionary<double, double>();
     public int LegendaryPickBattles = -1, EpicPickDay = -1;
@@ -116,8 +98,9 @@ class Cfg
     {
         string text = File.ReadAllText(path);
         var r = JsonDocument.Parse(text).RootElement;
-        var curve = CampaignCurve.FromJson(text);
-        var c = new Cfg { Growth = curve.Growth, Curve = curve, Summon = Summon.FromJson(text) };
+        var rewards = CampaignRewards.FromJson(text);
+        var curve = rewards.Curve;
+        var c = new Cfg { Growth = curve.Growth, Curve = curve, Rewards = rewards, Summon = Summon.FromJson(text) };
 
         var ro = r.GetProperty("roster");
         List<string> Strs(JsonElement e, string k) => e.GetProperty(k).EnumerateArray().Select(x => x.GetString()).ToList();
@@ -130,8 +113,8 @@ class Cfg
 
         var sh = r.GetProperty("shop");
         foreach (var pk in sh.GetProperty("godshardPacks").EnumerateArray()) c.Packs.Add((N(pk, "price"), N(pk, "godshards")));
-        var so = sh.GetProperty("starterOffer"); c.StarterOffer = Reward.From(so); c.StarterPrice = N(so, "price");
-        var pp = sh.GetProperty("pilgrimsPath"); c.PassReward = Reward.From(pp); c.PassPrice = N(pp, "price"); c.PassDays = N(pp, "days"); c.PassBonus = N(pp, "xpGoldBonus");
+        var so = sh.GetProperty("starterOffer"); c.StarterOffer = R(so); c.StarterPrice = N(so, "price");
+        var pp = sh.GetProperty("pilgrimsPath"); c.PassReward = R(pp); c.PassPrice = N(pp, "price"); c.PassDays = N(pp, "days"); c.PassBonus = N(pp, "xpGoldBonus");
         var bl = sh.GetProperty("shrineBlessing"); c.BlessingPrice = N(bl, "price"); c.BlessingDays = N(bl, "days"); c.BlessingNow = N(bl, "godshardsNow"); c.BlessingPerDay = N(bl, "godshardsPerDay"); c.BlessingDevotion = N(bl, "devotionPerDay");
         var rf = sh.GetProperty("devotionRefill"); c.RefillDevotion = N(rf, "devotion"); c.RefillCosts = Arr(rf, "godshards");
 
@@ -144,19 +127,12 @@ class Cfg
         c.EarlyBattles = (int)N(ca, "earlyBattles"); c.EarlyWinBand = Arr(ca, "earlyWinBand");
 
         var re = r.GetProperty("rewards");
-        c.ShrinePerHour = Reward.From(re.GetProperty("shrinePerHour")); c.ShrineCapHours = N(re, "shrineCapHours");
-        c.FirstClear = Reward.From(re.GetProperty("firstClear")); c.StageClear = Reward.From(re.GetProperty("stageClear"));
-        c.StarGodshards = N(re.GetProperty("star"), "godshards"); c.StarChestEvery = N(re, "starChestEvery");
-        c.StarChest = Reward.From(re.GetProperty("starChest"));
-        var sc = re.GetProperty("stageChests"); c.StageChestStars = Arr(sc, "stars"); c.StageChests = Reward.List(sc.GetProperty("rewards"));
-        c.StageClearVessels = re.GetProperty("stageClearVessels").EnumerateArray().Select(Vessels).ToList();
-        c.FarmByDifficulty = Reward.List(re.GetProperty("farmByDifficulty"));
-        Mode M(JsonElement e) => new Mode { UnlockBattles = (int)N(e, "unlockBattles"), FreePerDay = (int)N(e, "freePerDay"), DevotionCost = N(e, "devotionCost"), Minutes = N(e, "minutes"), ByDifficulty = Reward.List(e.GetProperty("byDifficulty")) };
+        c.ShrinePerHour = R(re.GetProperty("shrinePerHour")); c.ShrineCapHours = N(re, "shrineCapHours");
+        Mode M(JsonElement e) => new Mode { UnlockBattles = (int)N(e, "unlockBattles"), FreePerDay = (int)N(e, "freePerDay"), DevotionCost = N(e, "devotionCost"), Minutes = N(e, "minutes"), ByDifficulty = RList(e.GetProperty("byDifficulty")) };
         c.BossHunts = M(re.GetProperty("bossHunts")); c.Endless = M(re.GetProperty("endless"));
-        c.Farm = Reward.From(re.GetProperty("farm")); c.FarmCost = c.Farm.Devotion; c.Farm.Devotion = 0;
-        c.Daily = Reward.From(re.GetProperty("daily")); c.DailyMinutes = N(re.GetProperty("daily"), "minutes");
+        c.Daily = R(re.GetProperty("daily")); c.DailyMinutes = N(re.GetProperty("daily"), "minutes");
         var dh = re.GetProperty("dailyHard"); c.DailyHardCount = N(dh, "count"); c.DailyHardGodshards = N(dh, "godshards"); c.DailyHardPower = N(dh, "powerOver");
-        c.Weekly = Reward.From(re.GetProperty("weekly"));
+        c.Weekly = R(re.GetProperty("weekly"));
         var cx = re.GetProperty("codex");
         c.CodexFirst = Map(cx.GetProperty("firstCopy"));
         foreach (var kv in Map(cx.GetProperty("stars"))) c.CodexStars[int.Parse(kv.Key)] = kv.Value;

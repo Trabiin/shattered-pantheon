@@ -54,7 +54,8 @@ class Player
     public int Diff, Battle;   // next campaign battle: difficulty and index within it
     int[,] stars;              // stars earned per difficulty and battle (0 = not cleared, 1 = won, 2-5 challenges)
     int[,] stageChests;   // chests opened per stage (0 to 3)
-    int starsTotal, starChestsGiven, battlesCleared, attemptsToday;
+    int starsTotal, battlesCleared, attemptsToday;
+    readonly int[] starsOn, starChestsGiven;   // stars and star track chests per difficulty
     bool legendaryPicked, epicPicked;
     readonly HashSet<string> codexDone = new HashSet<string>();
     public readonly List<DayLog> Days = new List<DayLog>();
@@ -69,6 +70,7 @@ class Player
         rng = new Random((int)(seed * 7919 % int.MaxValue));
         stars = new int[c.Difficulties.Count, c.BattlesPerDifficulty];
         stageChests = new int[c.Difficulties.Count, c.Stages];
+        starsOn = new int[c.Difficulties.Count]; starChestsGiven = new int[c.Difficulties.Count];
         foreach (var kit in c.Starters) Gain(cards.First(h => h.Kit == kit && h.ReleaseDay == 0), false, "Starters");
         pity = c.Summon.NewPity();
         shards = c.StartingGodshards;   // the first 10-pull, a few minutes in
@@ -188,10 +190,11 @@ class Player
     {
         int d = Diff, k = Battle;
         stars[d, k] = Math.Max(stars[d, k], 1);
-        starsTotal++; battlesCleared++;
-        src = "Campaign"; Add(C.FirstClear, 1);
-        src = "Campaign"; if (k % C.BattlesPerStage == C.BattlesPerStage - 1) { Add(C.StageClear, 1); AddVessels(C.StageClearVessels[d], 1); today.BigMoment = true; }
-        CheckStarChest(); CheckStageChests(d, k);
+        starsTotal++; starsOn[d]++; battlesCleared++;
+        // The first win's reward, with the stage clear and its Vessel chance on a stage boss: the game's rules (CampaignRewards).
+        src = "Campaign"; Add(C.Rewards.FirstWin(d, k));
+        if (C.Rewards.IsStageBoss(k)) today.BigMoment = true;
+        CheckStarChest(d); CheckStageChests(d, k);
         if (battlesCleared == C.LegendaryPickBattles && !legendaryPicked) { legendaryPicked = true; Pick("Legendary"); }
         Battle++;
         if (C.IsRealmBoss(k)) DoneDay.TryAdd($"{C.Difficulties[d].Name} realm {C.RealmOf(k) + 1}", today.Day);
@@ -210,10 +213,10 @@ class Player
                 double need = C.RecScale(d, k);
                 while (stars[d, k] < 5 && team >= need * C.StarSteps[stars[d, k] - 1] && minutes > 0)
                 {
-                    stars[d, k]++; starsTotal++;
-                    src = "Stars"; Earn(C.StarGodshards);
+                    stars[d, k]++; starsTotal++; starsOn[d]++;
+                    src = "Stars"; Add(C.Rewards.Stars(1, Here.diff, Here.k));
                     minutes -= FightSeconds(60) / 60;
-                    CheckStarChest(); CheckStageChests(d, k);
+                    CheckStarChest(d); CheckStageChests(d, k);
                 }
             }
         return minutes;
@@ -224,20 +227,21 @@ class Player
     {
         int st = C.StageOf(k), first = st * C.BattlesPerStage, got = 0;
         for (int b = first; b < first + C.BattlesPerStage; b++) got += stars[d, b];
-        while (stageChests[d, st] < C.StageChestStars.Length && got >= C.StageChestStars[stageChests[d, st]])
+        while (stageChests[d, st] < C.Rewards.StageChestsAt(got))
         {
-            src = "Stage chests"; Add(C.StageChests[stageChests[d, st]], 1);
-            if (stageChests[d, st] == C.StageChestStars.Length - 1) today.BigMoment = true;
+            src = "Stage chests"; Add(C.Rewards.StageChest(stageChests[d, st], Here.diff, Here.k));
+            if (stageChests[d, st] == C.Rewards.StageChestStars.Length - 1) today.BigMoment = true;
             stageChests[d, st]++;
         }
     }
 
-    void CheckStarChest()
+    // The star track: a chest every 100 stars on a difficulty (doc 06 section 1.4).
+    void CheckStarChest(int d)
     {
-        while (starsTotal >= (starChestsGiven + 1) * C.StarChestEvery)
+        while (starChestsGiven[d] < C.Rewards.StarChestsAt(starsOn[d]))
         {
-            starChestsGiven++;
-            src = "Stars"; Add(C.StarChest, 1);
+            starChestsGiven[d]++;
+            src = "Stars"; Add(C.Rewards.StarTrackChest(Here.diff, Here.k));
             today.BigMoment = true;
         }
     }
@@ -247,10 +251,9 @@ class Player
         double each = FightSeconds(40) / 60;
         while (minutes >= each)
         {
-            if (devotion < C.FarmCost) { today.OutOfEnergy = true; break; }
-            devotion -= C.FarmCost;
-            src = "Farming"; Add(C.Farm, 1);
-            src = "Farming"; Add(C.FarmByDifficulty[HuntTier()], 1, false);
+            if (devotion < C.Rewards.ReplayDevotion) { today.OutOfEnergy = true; break; }
+            devotion -= C.Rewards.ReplayDevotion;
+            src = "Farming"; Add(C.Rewards.Replay(HuntTier(), Here.diff, Here.k));
             minutes -= each;
             today.FarmFights++;
         }
@@ -663,28 +666,29 @@ class Player
 
     // ---------- Rewards ----------
 
-    // XP and gold rewards are counted in level-ups at the current battle's recommended level.
-    double LevelCost() => C.Curve.LevelCost(Math.Min(Diff, C.Difficulties.Count - 1), Math.Min(Battle, C.BattlesPerDifficulty - 1));
-    double RewardScale() => C.Curve.RewardScale(Math.Min(Diff, C.Difficulties.Count - 1), Math.Min(Battle, C.BattlesPerDifficulty - 1));
+    // The current campaign battle, where rewards counted in level-ups are valued (CampaignRewards).
+    (int diff, int k) Here => (Math.Min(Diff, C.Difficulties.Count - 1), Math.Min(Battle, C.BattlesPerDifficulty - 1));
 
-    // XP, gold, gear materials and tomes follow the difficulty's rewardScale, except from Boss Hunts,
-    // Endless and per-difficulty farm drops, whose tables already list the amount for each difficulty.
-    void Add(Reward r, double times, bool scaled = true)
+    // A reward from progression.json, valued by the shared rules: XP, gold, gear materials and tomes follow
+    // the difficulty's rewardScale, except from Boss Hunts and Endless (scaled: false), whose tables already
+    // list the amount for each difficulty.
+    void Add(Reward r, double times, bool scaled = true) => Add(C.Rewards.Value(r, Here.diff, Here.k, scaled).Times(times));
+
+    // Amounts are expected values; Vessels are rolled. The Pilgrim's Path adds to XP and gold.
+    void Add(Loot l)
     {
-        double lc = scaled ? LevelCost() : C.Growth.XpToNext(Math.Max(1, C.RecLevel(Math.Min(Diff, C.Difficulties.Count - 1), Math.Min(Battle, C.BattlesPerDifficulty - 1))));
-        double rs = scaled ? RewardScale() : 1;
         double bonus = spend.PilgrimsPath ? C.PassBonus : 0;
-        xp += r.XpLevels * lc * times * (1 + bonus);
-        gold += r.GoldLevels * lc * C.Growth.GoldPerXp * times * (1 + bonus);
-        Earn(r.Godshards * times);
-        devotion += r.Devotion * times;
-        gearMats += r.GearMats * times * rs;
-        tomes += r.SkillTomes * times * rs;
-        tickets += r.SummonTickets * times;
-        heroShards += r.HeroShards * times;
-        if (r.HeroShards > 0) HeroShardsFrom[src] = (HeroShardsFrom.TryGetValue(src, out var hv) ? hv : 0) + r.HeroShards * times;
-        AddVessels(r.Vessels, times);
-        if (r.HeroShards > 0) SpendHeroShards();
+        xp += l.Xp * (1 + bonus);
+        gold += l.Gold * (1 + bonus);
+        Earn(l.Godshards);
+        devotion += l.Devotion;
+        gearMats += l.GearMats;
+        tomes += l.SkillTomes;
+        tickets += l.SummonTickets;
+        heroShards += l.HeroShards;
+        if (l.HeroShards > 0) HeroShardsFrom[src] = (HeroShardsFrom.TryGetValue(src, out var hv) ? hv : 0) + l.HeroShards;
+        AddVessels(l.Vessels, 1);
+        if (l.HeroShards > 0) SpendHeroShards();
     }
 
     // Where Godshards and hero shards come from, for the report.

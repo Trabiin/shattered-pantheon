@@ -22,6 +22,8 @@ jobs:
         run: dotnet build tools/BattleSim -c Release
       - name: Test the hero growth and cost rules against doc 07
         run: dotnet run --project tools/GrowthTests
+      - name: Test the campaign rewards against docs 06, 08 and 10
+        run: dotnet run --project tools/RewardTests
       - name: A million summons keep the rates and guarantees of doc 08
         run: dotnet run --project tools/SummonTests -c Release
       - name: The same seed always gives the same fight

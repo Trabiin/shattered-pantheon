@@ -1,7 +1,7 @@
-// What the campaign expects of the player's heroes at each battle (doc 07 section 2) and the battle XP
-// a first clear gives, read from the "campaign" and "rewards" sections of progression.json
-// (Unity/Assets/Resources/BattleData). The progression simulator builds and plays the campaign with
-// these, and the game shares out battle XP with them, so both follow the same numbers.
+// What the campaign expects of the player's heroes at each battle (doc 07 section 2) and what a level-up
+// is worth there, read from the "campaign" section of progression.json (Unity/Assets/Resources/BattleData).
+// The progression simulator builds and plays the campaign with these, and rewards (CampaignRewards) are
+// valued with them, so the game and the simulator follow the same numbers.
 // In Unity, pass the TextAsset's text to CampaignCurve.FromJson.
 using System;
 using System.Collections.Generic;
@@ -25,8 +25,6 @@ namespace ShatteredPantheon.Battle
         public int Stages, BattlesPerStage, StagesPerRealm;
         // Share of a difficulty's battles over which rewards ease in from the previous difficulty's scale.
         public double RewardEase = 1;
-        // A first clear's XP, in level-ups at the battle's recommended level.
-        public double FirstClearXpLevels;
 
         public int BattlesPerDifficulty => Stages * BattlesPerStage;
 
@@ -44,7 +42,6 @@ namespace ShatteredPantheon.Battle
                 }).ToList(),
                 Stages = (int)Num(ca, "stages"), BattlesPerStage = (int)Num(ca, "battlesPerStage"), StagesPerRealm = (int)Num(ca, "stagesPerRealm"),
                 RewardEase = Num(ca, "rewardEase", 1),
-                FirstClearXpLevels = Num(Obj(Obj(root["rewards"])["firstClear"]), "xpLevels"),
             };
         }
 
@@ -83,13 +80,6 @@ namespace ShatteredPantheon.Battle
             int diff = Difficulties.FindIndex(d => string.Equals(d.Name, battle.Difficulty, StringComparison.OrdinalIgnoreCase));
             if (diff < 0 || battle.RealmNumber < 1) throw new ArgumentException(battle.Id + " isn't a campaign battle");
             return (diff, ((battle.RealmNumber - 1) * StagesPerRealm + battle.StageNumber - 1) * BattlesPerStage + battle.BattleNumber - 1);
-        }
-
-        // The battle XP the heroes who fought share when they clear this battle for the first time.
-        public long FirstClearXp(StageDef battle)
-        {
-            var (diff, k) = Position(battle);
-            return (long)Math.Round(FirstClearXpLevels * LevelCost(diff, k));
         }
     }
 }
